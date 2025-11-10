@@ -93,6 +93,7 @@ sa_df = sa_model_df[sa_model_df["unique_id"].isin(ID_SUBSET)].reset_index(drop=T
 
 # %%
 # top candidate performance by threshold on distance
+split_subsets = True
 digits_set = [0, 2, 3, 4, 5]
 info_cols = [
     "unique_id",
@@ -147,7 +148,10 @@ for DIGITS in digits_set:
         )
         .copy()
     )
-    combined_df["subset"] = combined_df["unique_id"].map(lambda x: x[:2])
+    if split_subsets:
+        combined_df["subset"] = combined_df["unique_id"].map(lambda x: x[:2])
+    else:
+        combined_df["subset"] = "All"
 
     # cumulative eval of top candidate based on threshold
     for method in ["semantic", "CIMS"]:
@@ -216,18 +220,31 @@ sa_df = pd.DataFrame()
 for DIGITS in digits_set:
 
     clerical_codes_it2 = prep_clerical_codes(cc_raw_df, cc_4plus_df, digits=DIGITS)
+    sa_model_df["initial_code2"] = sa_model_df["initial_code"]
+    if not split_subsets:
+        kb_msk = sa_model_df["semantic_search_results"].map(
+            lambda x: x[0]["distance"] < 1 / 100 if len(x) > 0 else False
+        )
+        sa_model_df.loc[kb_msk, "initial_code2"] = sa_model_df.loc[
+            kb_msk, "semantic_search_results"
+        ].map(lambda x: x[0]["code"])
     model_prompt2 = prep_model_codes(
         sa_model_df,
         digits=DIGITS,
+        codes_col="initial_code2",
         out_col="sa_initial_codes",
         threshold=0,
     )
     combined_dataframe_m2 = model_prompt2.merge(
         clerical_codes_it2, on="unique_id", how="inner"
     )
-    combined_dataframe_m2["subset"] = combined_dataframe_m2["unique_id"].map(
-        lambda x: x[:2]
-    )
+    if split_subsets:
+        combined_dataframe_m2["subset"] = combined_dataframe_m2["unique_id"].map(
+            lambda x: x[:2]
+        )
+    else:
+        combined_dataframe_m2["subset"] = "All"
+
     for subset in combined_dataframe_m2["subset"].unique():
 
         eval_metr = calc_simple_metrics(
@@ -297,7 +314,8 @@ for DIGITS in plot_df["digits"].unique():
         },
     )
     # Add vline to all subplots/facets
-    for fac_row, subset in enumerate(plot_df["subset"].unique()):
+    subsets = plot_df["subset"].unique()
+    for fac_row, subset in enumerate(subsets):
         x_val = cc_codable[
             (cc_codable["digits"] == str(DIGITS)) & (cc_codable["subset"] == subset)
         ]["codability"].values[0]
@@ -308,12 +326,12 @@ for DIGITS in plot_df["digits"].unique():
             annotation_text="Clerical codability",
             annotation_position="bottom right",
             annotation_font_size=10,
-            row=2 - fac_row,
+            row=len(subsets) - fac_row,
         )
 
     # add dots for SA model by facets
     for fac_col, match_type in enumerate(["OO", "MO"]):
-        for fac_row, subset in enumerate(plot_df["subset"].unique()):
+        for fac_row, subset in enumerate(subsets):
             msk = (
                 (sa_df["digits"] == DIGITS)
                 & (sa_df["match_type"] == match_type)
@@ -326,7 +344,7 @@ for DIGITS in plot_df["digits"].unique():
                 marker={"size": 10, "color": "navy", "symbol": "x"},
                 name="SurveyAssist",
                 col=fac_col + 1,
-                row=2 - fac_row,
+                row=len(subsets) - fac_row,
                 showlegend=(fac_col == 0) & (fac_row == 0),
             )
 
