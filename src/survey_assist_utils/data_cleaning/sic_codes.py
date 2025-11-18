@@ -197,7 +197,7 @@ def extract_alt_candidates_n_digit_codes(
 
     cleaned: dict[str, float] = {}
     for item in alt_candidates:
-        codes = get_clean_n_digit_one_code(item.get(code_name, None), n)
+        codes = get_clean_n_digit_one_code(item.get(code_name, ""), n)
         score = item.get(score_name, 0)
         for code in codes:
             if code in cleaned:
