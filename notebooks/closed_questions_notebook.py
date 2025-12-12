@@ -1,13 +1,23 @@
-# pylint: disable=C0103, C0116, C0301, C0114
 # %%
+# pylint: disable=C0103, C0116, C0301, C0114
+
 import re
 
+# %%
+import dotenv
 import pandas as pd
 
 # %%
-data = pd.read_parquet(
-    "/home/user/sic-classification-utils/scripts/firestore_data/evaluation_df_with_sa_clean_codes.parquet"
-)
+evaluation_bucket = dotenv.get_key(".env", "EVALUATION_BUCKET")
+analysis_bucket = dotenv.get_key(".env", "ANALYSIS_BUCKET")
+if not evaluation_bucket:
+    raise ValueError("EVALUATION_BUCKET not found in .env file. Please set it.")
+if not analysis_bucket:
+    raise ValueError("ANALYSIS_BUCKET not found in .env file. Please set it.")
+
+
+# %%
+data = pd.read_parquet(f"{analysis_bucket}evaluation_df_with_sa_clean_codes.parquet")
 
 # %%
 column = "survey_assist_closed_question_option_"
@@ -19,7 +29,7 @@ for row in range(len(data)):
     response = data["survey_assist_closed_question_response"][row]
 
     # check only when closed question was asked
-    if response is not None:
+    if response is not None and response != "none of the above":
 
         # change options from closed questions to lower case (matching the selected response)
         for i in range(1, 7):
@@ -75,10 +85,12 @@ print(
     round(100 * selected_response_order["option_6"] / len(selected_response), 2),
 )
 
+# %% [markdown]
+# Note, "none of the above" is always presented at the bottom of the list, so 6th option never brings a code. Options 1 and 2 will always have possible codes.
+
 # %%
-# sic_knowledge = pd.read_csv("/home/user/sic-classification-utils/notebooks/sic_data/sic_knowledge_base_utf8.csv")
 sic_rephrased = pd.read_csv(
-    "/home/user/sic-classification-utils/notebooks/sic_data/sic_rephrased_descriptions_2025_02_03.csv"
+    f"{evaluation_bucket}sic_rephrased_descriptions_2025_02_03.csv"
 )
 
 
@@ -107,7 +119,9 @@ def convert_to_dict(dict_string):
 
 
 # %%
-# sic_knowledge['description'] = sic_knowledge['description'].str.lower()
+sic_rephrased.sample()
+
+# %%
 sic_rephrased["reviewed_description"] = sic_rephrased[
     "reviewed_description"
 ].str.lower()
@@ -142,19 +156,14 @@ for row in range(len(data)):
             sic_code = sic_rephrased[sic_rephrased["reviewed_description"] == response][
                 "input_code"
             ].item()
-            response_codes.append(sic_code)
-
-        # elif response in list(sic_knowledge['description']):
-        #     sic_code = sic_knowledge[sic_knowledge['description'] == response]['label'].item()
-        #     response_codes.append(sic_code)
+            response_codes.append(str(sic_code))
 
         else:
             sic_code = get_code_by_title(sic_dictionary, response)
-            response_codes.append(sic_code)
+            response_codes.append(str(sic_code))
 
     else:
         response_codes.append("None")
-
 
 # %%
 # we get "None" when the closed question was not asked or the answer was "none of the above"
@@ -172,3 +181,75 @@ round(100 * none_of_the_above / len(selected_response), 2)
 
 # %%
 data["survey_assist_closed_question_response_code"] = response_codes
+
+# %%
+closed_q_data = data[
+    [
+        "unique_id",
+        "user",
+        "job_title",
+        "job_description",
+        "org_description",
+        "survey_assist_alt_candidate_code_1",
+        "survey_assist_alt_candidate_code_2",
+        "survey_assist_alt_candidate_code_3",
+        "survey_assist_alt_candidate_code_4",
+        "survey_assist_alt_candidate_code_5",
+        "survey_assist_closed_question_response",
+        "survey_assist_closed_question_option_1",
+        "survey_assist_closed_question_option_2",
+        "survey_assist_closed_question_option_3",
+        "survey_assist_closed_question_option_4",
+        "survey_assist_closed_question_option_5",
+        "survey_assist_closed_question_option_6",
+        "survey_assist_closed_question_response_code",
+    ]
+]
+
+# %%
+sic_dictionary = sic_rephrased["input_description"].apply(convert_to_dict)
+
+options: dict[str, list[str | None]] = {"1": [], "2": [], "3": [], "4": [], "5": []}
+
+for row in range(len(closed_q_data)):
+    # if the closed question response is None, it means the question was not asked, and there's no codes.
+    if closed_q_data["survey_assist_closed_question_response"][row] is not None:
+
+        i = 1
+        while i < 6:  # noqa: PLR2004
+            current_row = closed_q_data[f"survey_assist_closed_question_option_{i}"][
+                row
+            ].lower()
+            if current_row == "none of the above":
+                while i < 6:  # noqa: PLR2004
+                    options[f"{i}"].append(None)
+                    i += 1
+
+            else:
+                if current_row in list(sic_rephrased["reviewed_description"]):
+                    sic_code = sic_rephrased[
+                        sic_rephrased["reviewed_description"] == current_row
+                    ]["input_code"].item()
+                    options[f"{i}"].append(str(sic_code))
+
+                else:
+                    sic_code = get_code_by_title(sic_dictionary, current_row)
+                    options[f"{i}"].append(str(sic_code))
+
+                i += 1
+    else:
+        options["1"].append(None)
+        options["2"].append(None)
+        options["3"].append(None)
+        options["4"].append(None)
+        options["5"].append(None)
+
+
+# %%
+for k in range(1, 6):
+    closed_q_data[f"survey_assist_closed_question_option_{k}_code"] = options[f"{k}"]
+
+# %%
+closed_q_data.to_parquet(
+    f"{analysis_bucket}closed_questions/closed_questions_codes.parquet", index=False
+)
