@@ -1,3 +1,11 @@
+"""Work in progess.
+
+Initial analysis of survey responses, focusing on Clased Follow up questions.
+
+Create .env file with bucket variables, such as EVALUATION_BUCKET = "gs://<bucket-name>/<folder>/",
+and ANALYSIS_BUCKET similarly.
+"""
+
 # %%
 # pylint: disable=C0103, C0116, C0301, C0114
 
