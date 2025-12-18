@@ -157,13 +157,15 @@ def get_clean_n_digit_codes(
         - If input_list is a single string, it is converted to a list internally.
         - Invalid codes are logged and returned in the second set.
     """
+    if input_list is None:
+        return set(), set()
     if isinstance(input_list, str):
         input_list = [input_list]
     if not isinstance(input_list, (set, list)):
         logger.warning(
             "Expected a list or set of strings for input_list, got %s", type(input_list)
         )
-        return set()
+        return set(), set()
 
     # Was an item in the input list invalid?
     cleaned_set: set[str] = set()
@@ -331,7 +333,7 @@ def get_codability_level(codes: set[str]) -> str:
 
 def asses_codability_gain(
     row: pd.Series, initial_level_col: str, final_level_col: str
-) -> bool | None:
+) -> int | None:
     """Assess if there was a codability gain between initial and final levels.
 
     Args:
@@ -347,4 +349,4 @@ def asses_codability_gain(
     right = level_to_num.get(row[final_level_col], None)
     if left is None or right is None:
         return None
-    return right > left
+    return right - left
