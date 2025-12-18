@@ -343,7 +343,7 @@ class TextAnalyser:
         ]
         ids_most_representative_pt = [np.argmin(e) for e in distances_from_centroids]
         return [
-            self.df.iloc[pt_id]["feedback_comments"]
+            self.df.iloc[pt_id][self.text_column]
             for pt_id in ids_most_representative_pt
         ]
 
@@ -479,6 +479,6 @@ class TextAnalyser:
             f"{textwrap.fill(self.cluster_representatives[cluster_id])}\n\n"
         )
         for c in self.df[self.df["feedback_comment_labels"] == cluster_id][
-            "feedback_comments"
+            self.text_column
         ]:
             print(f"{textwrap.fill(c, width=100)}\n")
