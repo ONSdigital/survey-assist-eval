@@ -8,7 +8,7 @@ and ANALYSIS_BUCKET similarly.
 """
 
 # %%
-# pylint: disable=C0103, C0116, C0301, C0114
+# pylint: disable=C0103, C0116, C0301, C0114, R0801
 # ruff: noqa: PLR2004
 
 import re
