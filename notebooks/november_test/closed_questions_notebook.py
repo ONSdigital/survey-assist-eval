@@ -20,14 +20,16 @@ from scipy import stats
 
 # %%
 evaluation_bucket = dotenv.get_key(".env", "EVALUATION_BUCKET")
-analysis_bucket = dotenv.get_key(".env", "ANALYSIS_BUCKET")
+analysis_bucket = dotenv.get_key(".env", "PREPROD_DATA_BUCKET")
 if not evaluation_bucket:
     raise ValueError("EVALUATION_BUCKET not found in .env file. Please set it.")
 if not analysis_bucket:
-    raise ValueError("ANALYSIS_BUCKET not found in .env file. Please set it.")
+    raise ValueError("PREPROD_DATA_BUCKET not found in .env file. Please set it.")
 
 # %%
-data = pd.read_parquet(f"{analysis_bucket}evaluation_df_with_sa_clean_codes.parquet")
+data = pd.read_parquet(
+    f"{analysis_bucket}analysis-interim-results/evaluation_df_with_sa_clean_codes.parquet"
+)
 
 # %%
 column = "survey_assist_closed_question_option_"
