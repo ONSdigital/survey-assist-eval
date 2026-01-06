@@ -31,32 +31,48 @@ data = pd.read_parquet(
     f"{analysis_bucket}analysis-interim-results/evaluation_df_with_sa_clean_codes.parquet"
 )
 
+
 # %%
-column = "survey_assist_closed_question_option_"
-selected_response = []
+def get_selected_responses(df: pd.DataFrame) -> list:
+    """Creates a list of the ranks the responses were selected by user.
 
-# iterate through all rows of the data
-for row in range(len(data)):
-    # save the response selected by the user
-    response = data["survey_assist_closed_question_response"][row]
+    Args:
+        df: dataframe with survey responses.
 
-    # check only when closed question was asked
-    if response is not None and response != "none of the above":
+    Return:
+        response_list: list
+    """
+    column = "survey_assist_closed_question_option_"
+    response_list = []
+    # iterate through all rows of the data
+    for response_row in range(len(df)):
+        # save the response selected by the user
+        response = df["survey_assist_closed_question_response"][response_row]
 
-        # change options from closed questions to lower case (matching the selected response)
-        for i in range(1, 7):
-            column_name = column + str(i)
-            if data[column_name][row] is not None:
-                data.loc[row, column_name] = data[column_name][row].lower()
+        # check only when closed question was asked
+        if response is not None and response != "none of the above":
 
-        # find the order of the selected response
-        j = 1
-        while j < 7:
-            column_name = column + str(j)
-            if response == data[column_name][row]:
-                selected_response.append(j)
-                j = 7
-            j += 1
+            # change options from closed questions to lower case (matching the selected response)
+            for k in range(1, 7):
+                column_name = column + str(k)
+                if df[column_name][response_row] is not None:
+                    df.loc[response_row, column_name] = df[column_name][
+                        response_row
+                    ].lower()
+
+            # find the order of the selected response
+            j = 1
+            while j < 7:
+                column_name = column + str(j)
+                if response == data[column_name][response_row]:
+                    response_list.append(j)
+                    j = 7
+                j += 1
+    return response_list
+
+
+# %%
+selected_response = get_selected_responses(data)
 
 # %%
 # percentage of codes found using closed quesiton
@@ -173,77 +189,111 @@ closed_q_data = data[
     ]
 ]
 
+
 # %%
-sic_dictionary = sic_rephrased["input_description"].apply(convert_to_dict)
-none_of_the_above = 0
+def get_options_codes(response_row):
 
-options: dict[str, list[str | None]] = {"1": [], "2": [], "3": [], "4": [], "5": []}
+    options_list: dict[str, list[str | None]] = {
+        "1": [],
+        "2": [],
+        "3": [],
+        "4": [],
+        "5": [],
+    }
+    sic_dictionary = sic_rephrased["input_description"].apply(convert_to_dict)
 
-for row in range(len(closed_q_data)):
-    # if the closed question response is None, it means the question was not asked, and there's no codes.
-    if closed_q_data["survey_assist_closed_question_response"][row] is not None:
+    response = response_row["survey_assist_closed_question_response"]
 
-        i = 1
-        while i < 6:
-            current_row = closed_q_data[f"survey_assist_closed_question_option_{i}"][
-                row
+    if response is not None:
+
+        k = 1
+        while k < 6:
+            current_row = response_row[
+                f"survey_assist_closed_question_option_{k}"
             ].lower()
             if current_row == "none of the above":
-                none_of_the_above += 1
-                while i < 6:
-                    options[f"{i}"].append(None)
-                    i += 1
+                while k < 6:
+                    options_list[f"{k}"].append(None)
+                    k += 1
 
             else:
                 if current_row in list(sic_rephrased["reviewed_description"]):
                     sic_code = sic_rephrased[
                         sic_rephrased["reviewed_description"] == current_row
                     ]["input_code"].item()
-                    options[f"{i}"].append(str(sic_code))
+                    options_list[f"{k}"].append(str(sic_code))
 
                 else:
                     sic_code = get_code_by_title(sic_dictionary, current_row)
-                    options[f"{i}"].append(str(sic_code))
+                    options_list[f"{k}"].append(str(sic_code))
 
-                i += 1
+                k += 1
     else:
-        options["1"].append(None)
-        options["2"].append(None)
-        options["3"].append(None)
-        options["4"].append(None)
-        options["5"].append(None)
+        options_list["1"].append(None)
+        options_list["2"].append(None)
+        options_list["3"].append(None)
+        options_list["4"].append(None)
+        options_list["5"].append(None)
+    return options_list
+
 
 # %%
-for k in range(1, 6):
-    closed_q_data[f"survey_assist_closed_question_option_{k}_code"] = options[f"{k}"]
+options = pd.DataFrame(closed_q_data.apply(get_options_codes, axis=1).to_list())
+options = options.map(lambda x: x[0] if isinstance(x, list) else x)
 
 # %%
-response_codes = []
-for row in range(len(closed_q_data)):
-    response = closed_q_data["survey_assist_closed_question_response"][row]
+codes_columns = options
+codes_columns.columns = [
+    f"survey_assist_closed_question_option_{k}_code" for k in codes_columns.columns
+]
+closed_q_data = pd.concat([closed_q_data, codes_columns], axis=1)
+
+
+# %%
+def get_response_codes(response_row: pd.Series):
+    """Get the code corresponding to the option selected by the user.
+
+    Args:
+        response_row: row with survey response
+
+    Return:
+        responde code
+    """
+    # res_codes = []
+    response = response_row["survey_assist_closed_question_response"]
     if response is None or response == "none of the above":
-        response_codes.append("None")
+        res_codes = "None"
     else:
-        i = 1
-        while i < 6:
-            option = "survey_assist_closed_question_option_" + str(i)
-            option_code = "survey_assist_closed_question_option_" + str(i) + "_code"
-            if response == closed_q_data[option][row]:
-                response_codes.append(closed_q_data[option_code][row])
-                i = 6
+        k = 1
+        while k < 6:
+            option = "survey_assist_closed_question_option_" + str(k)
+            option_code = "survey_assist_closed_question_option_" + str(k) + "_code"
+            if response == response_row[option]:
+                res_codes = response_row[option_code]
+                k = 6
             else:
-                i += 1
+                k += 1
+    return res_codes
+
+
+# %%
+response_codes = closed_q_data.apply(get_response_codes, axis=1)
 
 # %%
 # we get "None" when the closed question was not asked or the answer was "none of the above"
-response_codes.count("None")
+print((response_codes == "None").sum())
 
 # %%
 len(response_codes)
 
 # %%
+none_of_the_above_answer = (
+    closed_q_data["survey_assist_closed_question_response"] == "none of the above"
+).sum()
+
+# %%
 # asked closed question, but didn't get a code
-round(100 * none_of_the_above / len(selected_response), 2)
+print(round(100 * none_of_the_above_answer / len(selected_response), 2))
 
 # %%
 closed_q_data["survey_assist_closed_question_response_code"] = response_codes
@@ -254,15 +304,16 @@ closed_q_data["survey_assist_closed_question_response_code"] = response_codes
 # )
 
 # %%
-options.keys()
+aa = options.count()
 
 # %%
-options_df = pd.DataFrame(options)
+for i in range(5):
+    print(i + 1, aa.iloc[i])
 
 # %%
 alt_codes_count = []
 for i in range(len(closed_q_data)):
-    responses = int(options_df.iloc[i].count())
+    responses = int(options.iloc[i].count())
     if (
         responses != 0
         and closed_q_data["survey_assist_closed_question_response"][i]
@@ -289,7 +340,8 @@ df_options = pd.DataFrame(options_dict)
 
 # %%
 def chi2_test(df, response_column: str, alt_codes_column: str, n: int = 1):
-    """df: dataframe
+    """Args:
+    df: dataframe
     response_column: a column with the respondends choice recorded as a rank
     alt_codes_column: count of alternative codes
     n: n-th option to be tested.
@@ -328,9 +380,6 @@ df_grouped = df_options[df_options["alt_codes_count"] == 2]
 print(chi2_test(df_grouped, "selected_response", "alt_codes_count"))
 # print(chi2_test(df_options, 'selected_response', 'alt_codes_count'))
 
-# %%
-df_grouped.sample()
-
 # %% [markdown]
 # ## SA assigned code randomness
 
@@ -353,7 +402,6 @@ for row in range(len(closed_q_data)):
         i += 1
     if i == 6:
         sa_code_match.append("None")
-
 
 # %%
 sa_alt_codes_count = []
