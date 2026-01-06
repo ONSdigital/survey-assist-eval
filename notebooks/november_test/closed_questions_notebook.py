@@ -88,30 +88,11 @@ for i in range(1, 7):
 # order, which answer was seleceted
 print(selected_response_order)
 # order of the question selected
-print(
-    "1st option [%]:",
-    round(100 * selected_response_order["option_1"] / len(selected_response), 2),
-)
-print(
-    "2nd option [%]:",
-    round(100 * selected_response_order["option_2"] / len(selected_response), 2),
-)
-print(
-    "3rd option [%]:",
-    round(100 * selected_response_order["option_3"] / len(selected_response), 2),
-)
-print(
-    "4th option [%]:",
-    round(100 * selected_response_order["option_4"] / len(selected_response), 2),
-)
-print(
-    "5th option [%]:",
-    round(100 * selected_response_order["option_5"] / len(selected_response), 2),
-)
-print(
-    "6th option [%]:",
-    round(100 * selected_response_order["option_6"] / len(selected_response), 2),
-)
+for i in range(1, 7):
+    option_order = "option_" + str(i)
+    print(
+        f"Option in order {i} [%]: {round(100 * selected_response_order[option_order] / len(selected_response), 2)}"
+    )
 
 # %% [markdown]
 # Note, "none of the above" is always presented at the bottom of the list, so 6th option never brings a code. Options 1 and 2 will always have possible codes.
@@ -322,13 +303,8 @@ for i in range(len(closed_q_data)):
         alt_codes_count.append(responses)
 
 # %%
-print(alt_codes_count.count(0))
-print(alt_codes_count.count(1))
-print(alt_codes_count.count(2))
-print(alt_codes_count.count(3))
-print(alt_codes_count.count(4))
-print(alt_codes_count.count(5))
-print(alt_codes_count.count(6))
+for i in range(7):
+    print(alt_codes_count.count(i))
 
 # %%
 options_dict = {
@@ -339,15 +315,15 @@ df_options = pd.DataFrame(options_dict)
 
 
 # %%
-def chi2_test(df, response_column: str, alt_codes_column: str, n: int = 1):
+def chi2_test(df, response_column: str, alt_codes_column: str, k: int = 1):
     """Args:
     df: dataframe
     response_column: a column with the respondends choice recorded as a rank
     alt_codes_column: count of alternative codes
-    n: n-th option to be tested.
+    k: k-th option to be tested.
     """
     # The first option was selected, where 'none of the above' was NOT selected
-    N_P1 = df[df[response_column] == n].shape[0]
+    N_P1 = df[df[response_column] == k].shape[0]
 
     # Total number of surveys asked, where 'none of the above' was NOT selected
     N_Surveys = df.shape[0]
@@ -424,60 +400,33 @@ for row in range(len(closed_q_data)):
 len(sa_alt_codes_count)
 
 # %%
-print(sa_code_match.count(0))
-print(sa_code_match.count(1))
-print(sa_code_match.count(2))
-print(sa_code_match.count(3))
-print(sa_code_match.count(4))
-print(sa_code_match.count(5))
+for i in range(6):
+    print(sa_code_match.count(i))
 print(sa_code_match.count("None"))
 
 # %%
-print(sa_alt_codes_count.count(0))
-print(sa_alt_codes_count.count(1))
-print(sa_alt_codes_count.count(2))
-print(sa_alt_codes_count.count(3))
-print(sa_alt_codes_count.count(4))
-print(sa_alt_codes_count.count(5))
+for i in range(6):
+    print(sa_alt_codes_count.count(i))
 
 # %%
 sa_codes = {"selected_code": sa_code_match, "alt_codes_count": sa_alt_codes_count}
 df_sa_codes = pd.DataFrame(sa_codes)
 
 # %%
-print("1:", chi2_test(df_sa_codes, "selected_code", "alt_codes_count", 1))
-print("2:", chi2_test(df_sa_codes, "selected_code", "alt_codes_count", 2))
-print("3:", chi2_test(df_sa_codes, "selected_code", "alt_codes_count", 3))
-print("4:", chi2_test(df_sa_codes, "selected_code", "alt_codes_count", 4))
-print("5:", chi2_test(df_sa_codes, "selected_code", "alt_codes_count", 5))
+for i in range(1, 6):
+    print(f"{i}:", chi2_test(df_sa_codes, "selected_code", "alt_codes_count", i))
 
 # %%
 df_sa_codes_no_none = df_sa_codes[df_sa_codes["selected_code"] != "None"]
 
 # %%
 print("alt codes count x rank of selected response\n")
-df_group_sa = df_sa_codes_no_none[df_sa_codes_no_none["alt_codes_count"] == 2]
-print(df_group_sa.shape[0])
-print("2x1:", chi2_test(df_group_sa, "selected_code", "alt_codes_count", 1))
-print("2x2:", chi2_test(df_group_sa, "selected_code", "alt_codes_count", 2), "\n")
 
-df_group_sa = df_sa_codes_no_none[df_sa_codes_no_none["alt_codes_count"] == 3]
-print(df_group_sa.shape[0])
-print("3x1:", chi2_test(df_group_sa, "selected_code", "alt_codes_count", 1))
-print("3x2:", chi2_test(df_group_sa, "selected_code", "alt_codes_count", 2))
-print("3x3:", chi2_test(df_group_sa, "selected_code", "alt_codes_count", 3), "\n")
-
-df_group_sa = df_sa_codes_no_none[df_sa_codes_no_none["alt_codes_count"] == 4]
-print(df_group_sa.shape[0])
-print("4x1:", chi2_test(df_group_sa, "selected_code", "alt_codes_count", 1))
-print("4x2:", chi2_test(df_group_sa, "selected_code", "alt_codes_count", 2))
-print("4x3:", chi2_test(df_group_sa, "selected_code", "alt_codes_count", 3))
-print("4x4:", chi2_test(df_group_sa, "selected_code", "alt_codes_count", 4), "\n")
-
-df_group_sa = df_sa_codes_no_none[df_sa_codes_no_none["alt_codes_count"] == 5]
-print(df_group_sa.shape[0])
-print("5x1:", chi2_test(df_group_sa, "selected_code", "alt_codes_count", 1))
-print("5x2:", chi2_test(df_group_sa, "selected_code", "alt_codes_count", 2))
-print("5x3:", chi2_test(df_group_sa, "selected_code", "alt_codes_count", 3))
-print("5x4:", chi2_test(df_group_sa, "selected_code", "alt_codes_count", 4))
-print("5x5:", chi2_test(df_group_sa, "selected_code", "alt_codes_count", 5))
+for i in range(2, 6):
+    df_group_sa = df_sa_codes_no_none[df_sa_codes_no_none["alt_codes_count"] == i]
+    print(df_group_sa.shape[0])
+    for n in range(1, i + 1):
+        print(
+            f"{i}x{n}: {chi2_test(df_group_sa, "selected_code", "alt_codes_count", n)}"
+        )
+    print()
