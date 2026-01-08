@@ -31,32 +31,6 @@ data = pd.read_parquet(
 )
 
 # %%
-
-
-# %%
-
-
-# %%
-# # percentage of codes found using closed quesiton
-# print(round(100 * len(selected_response) / len(data), 2))
-
-# %%
-# selected_response_order = {}
-# for i in range(1, 7):
-#     picked_response = "option_" + str(i)
-#     selected_response_order[picked_response] = selected_response.count(i)
-
-# %%
-# # order, which answer was seleceted
-# print(selected_response_order)
-# # order of the question selected
-# for i in range(1, 7):
-#     option_order = "option_" + str(i)
-#     print(
-#         f"Option in order {i} [%]: {round(100 * selected_response_order[option_order] / len(selected_response), 2)}"
-#     )
-
-# %%
 sic_rephrased = pd.read_csv(
     f"{evaluation_bucket}sic_rephrased_descriptions_2025_02_03.csv", dtype=str
 )
@@ -75,19 +49,11 @@ def convert_to_dict(dict_string):
     title_value = title.group(1).strip() if title else ""
     title_value = title_value.lower()
 
-    activities = re.search(r"Example activities: \s*(.*?)\s*}", clean_string, re.DOTALL)
-    activities_value = activities.group(1).strip() if activities else ""
-
     result_dictionary = {
-        "Code": code_value,
-        "Title": title_value,
-        "Example activities": activities_value,
+        title_value: code_value,
     }
     return result_dictionary
 
-
-# %%
-sic_rephrased.sample()
 
 # %%
 sic_rephrased["reviewed_description"] = sic_rephrased[
@@ -96,15 +62,6 @@ sic_rephrased["reviewed_description"] = sic_rephrased[
 sic_rephrased["llm_rephrased_description"] = sic_rephrased[
     "llm_rephrased_description"
 ].str.lower()
-
-
-# %%
-def get_code_by_title(dictionary, title):
-    for item in dictionary:
-        if item.get("Title") == title:
-            return item.get("Code")
-    return "XXXXX"
-
 
 # %%
 closed_q_data = data[
@@ -131,7 +88,7 @@ closed_q_data = data[
 
 
 # %%
-def get_options_codes(response_row):
+def get_options_codes(response_row, dictionary):
 
     options_list: dict[str, list[str | None]] = {
         "1": [],
@@ -140,7 +97,6 @@ def get_options_codes(response_row):
         "4": [],
         "5": [],
     }
-    sic_dictionary = sic_rephrased["input_description"].apply(convert_to_dict)
 
     response = response_row["survey_assist_closed_question_response"]
 
@@ -157,6 +113,7 @@ def get_options_codes(response_row):
                     k += 1
 
             else:
+
                 if current_row in list(sic_rephrased["reviewed_description"]):
                     sic_code = sic_rephrased[
                         sic_rephrased["reviewed_description"] == current_row
@@ -164,7 +121,7 @@ def get_options_codes(response_row):
                     options_list[f"{k}"].append(str(sic_code))
 
                 else:
-                    sic_code = get_code_by_title(sic_dictionary, current_row)
+                    sic_code = dictionary.get(current_row)
                     options_list[f"{k}"].append(str(sic_code))
 
                 k += 1
@@ -178,7 +135,13 @@ def get_options_codes(response_row):
 
 
 # %%
-options = pd.DataFrame(closed_q_data.apply(get_options_codes, axis=1).to_list())
+sic_dictionary = sic_rephrased["input_description"].apply(convert_to_dict)
+sic_dictionary = {key: value for d in sic_dictionary for key, value in d.items()}
+
+# %%
+options = pd.DataFrame(
+    closed_q_data.apply(get_options_codes, axis=1, args=(sic_dictionary,)).to_list()
+)
 options = options.map(lambda x: x[0] if isinstance(x, list) else x)
 
 # %%
