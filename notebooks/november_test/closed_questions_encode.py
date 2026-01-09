@@ -88,7 +88,7 @@ closed_q_data = data[
 
 
 # %%
-def get_options_codes(response_row, dictionary):
+def get_options_codes(response_row, lookup):
 
     options_list: dict[str, list[str | None]] = {
         "1": [],
@@ -107,22 +107,15 @@ def get_options_codes(response_row, dictionary):
             current_row = response_row[
                 f"survey_assist_closed_question_option_{k}"
             ].lower()
+
             if current_row == "none of the above":
                 while k < 6:
                     options_list[f"{k}"].append(None)
                     k += 1
 
             else:
-
-                if current_row in list(sic_rephrased["reviewed_description"]):
-                    sic_code = sic_rephrased[
-                        sic_rephrased["reviewed_description"] == current_row
-                    ]["input_code"].item()
-                    options_list[f"{k}"].append(str(sic_code))
-
-                else:
-                    sic_code = dictionary.get(current_row)
-                    options_list[f"{k}"].append(str(sic_code))
+                sic_code = lookup.get(current_row)
+                options_list[f"{k}"].append(str(sic_code))
 
                 k += 1
     else:
@@ -135,12 +128,19 @@ def get_options_codes(response_row, dictionary):
 
 
 # %%
-sic_dictionary = sic_rephrased["input_description"].apply(convert_to_dict)
-sic_dictionary = {key: value for d in sic_dictionary for key, value in d.items()}
+# create a lookup using sic description and rephrased sic description. Allow for 'none of the above'
+
+sic_lookup = sic_rephrased["input_description"].apply(convert_to_dict)
+sic_lookup = {key: value for d in sic_lookup for key, value in d.items()}
+sic_lookup["none of the above"] = None
+
+# %%
+rephrased_lookup = sic_rephrased.set_index("reviewed_description")["sic_code"].to_dict()
+sic_lookup.update(rephrased_lookup)
 
 # %%
 options = pd.DataFrame(
-    closed_q_data.apply(get_options_codes, axis=1, args=(sic_dictionary,)).to_list()
+    closed_q_data.apply(get_options_codes, axis=1, args=(sic_lookup,)).to_list()
 )
 options = options.map(lambda x: x[0] if isinstance(x, list) else x)
 
