@@ -1,10 +1,14 @@
 # %%
-"""Work in progess.
+"""Notebook that converts options presented to (and selected by) respondents back into SIC codes.
 
-Initial analysis of survey responses, focusing on Clased Follow up questions.
+Saves to the storage in a location specified in .env file (cell with that functionality
+is currently commented out, at the very bottom of this notebook).
 
-Create .env file with bucket variables, such as EVALUATION_BUCKET = "gs://<bucket-name>/<folder>/",
-and ANALYSIS_BUCKET similarly.
+Before running the notebook, create .env file with bucket variables, such as
+PREPROD_DATA_BUCKET = "gs://<bucket-name>/<folder>/", and EVALUATION_BUCKET similarly.
+
+PREPROD_DATA_BUCKET - location of the input files.
+EVALUATION_BUCKET - location where the file is to be saved.
 """
 
 # %%
@@ -19,15 +23,15 @@ import pandas as pd
 
 # %%
 evaluation_bucket = dotenv.get_key(".env", "EVALUATION_BUCKET")
-analysis_bucket = dotenv.get_key(".env", "PREPROD_DATA_BUCKET")
+preprod_bucket = dotenv.get_key(".env", "PREPROD_DATA_BUCKET")
 if not evaluation_bucket:
     raise ValueError("EVALUATION_BUCKET not found in .env file. Please set it.")
-if not analysis_bucket:
+if not preprod_bucket:
     raise ValueError("PREPROD_DATA_BUCKET not found in .env file. Please set it.")
 
 # %%
 data = pd.read_parquet(
-    f"{analysis_bucket}analysis-interim-results/evaluation_df_with_sa_clean_codes.parquet"
+    f"{preprod_bucket}analysis-interim-results/evaluation_df_with_sa_clean_codes.parquet"
 )
 
 # %%
@@ -35,8 +39,13 @@ sic_rephrased = pd.read_csv(
     f"{evaluation_bucket}sic_rephrased_descriptions_2025_02_03.csv", dtype=str
 )
 
-
 # %%
+# Majority of the sic descriptions come from 'reviewed_description' column, however some come from
+# a dictionary, which is saved as 'input_description'. Because the file is saved as a CSV,
+# the dictionary is converted into a string. This function allows unpacking sic codes and their
+# descriptions from the string.
+
+
 def convert_to_dict(dict_string):
     clean_string = dict_string.strip().strip("'")
 
@@ -183,12 +192,12 @@ response_codes = closed_q_data.apply(get_response_codes, axis=1)
 
 # %%
 # we get "None" when the closed question was not asked or the answer was "none of the above"
-print((response_codes == "None").sum())
+print((response_codes.isna()).sum())
 
 # %%
 closed_q_data["survey_assist_closed_question_response_code"] = response_codes
 
 # %%
 # closed_q_data.to_parquet(
-#     f"{analysis_bucket}closed_questions/closed_questions_codes.parquet", index=False
+#     f"{preprod_bucket}closed_questions/closed_questions_codes.parquet", index=False
 # )
