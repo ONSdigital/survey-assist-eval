@@ -16,6 +16,11 @@ from matplotlib.gridspec import GridSpec
 from scipy.stats import kruskal, mannwhitneyu
 from scipy.stats import t as stats_t  # type: ignore[attr-defined]
 
+from survey_assist_utils.data_cleaning.sic_codes import (
+    get_clean_n_digit_codes,
+    parse_numerical_code,
+)
+
 # %matplotlib inline
 
 data_bucket = dotenv.get_key(".env", "PREPROD_DATA_BUCKET") or ""
@@ -31,6 +36,98 @@ out_folder = None  # type: ignore[assignment]
 # %%
 # read data exported from firesore
 eval_df = pd.read_parquet(folder + "/evaluation_df_with_sa_clean_codes.parquet")
+
+# %%
+# (initial processing to form SIC Section column taken from Iva's notebook)
+
+# load combined df with codability levels
+sa_coded_df = pd.read_parquet(folder + "/evaluation_df_with_sa_clean_codes.parquet")
+sa_closed_q = pd.read_parquet(
+    folder + "/closed_questions/closed_questions_codes.parquet"
+)
+cc_coded_df = pd.read_parquet(
+    folder + "/clerically-coded/clerical_df_with_cc_clean_codes.parquet"
+)
+
+eval_df = sa_coded_df.merge(
+    sa_closed_q.drop(
+        columns=sa_closed_q.columns.intersection(sa_coded_df.columns).difference(
+            ["unique_id", "user"]
+        )
+    ),
+    on=["unique_id", "user"],
+    how="outer",
+).merge(
+    cc_coded_df.drop(
+        columns=cc_coded_df.columns.intersection(sa_coded_df.columns).difference(
+            ["unique_id", "user"]
+        )
+    ),
+    on=["unique_id", "user"],
+    how="outer",
+)
+
+print(
+    f"Loaded data with {eval_df.shape[0]} records. "
+    f"Merging clerical ({cc_coded_df.shape[0]}) with model data ({sa_coded_df.shape[0]}) "
+    f"and closed q data ({sa_closed_q.shape[0]})."
+)
+
+# parquet doesn't like sets it saves it as arrays, convert back
+set_cols = [
+    "sa_initial_codes",
+    "sa_final_codes_open_q",
+    "cc_initial_codes",
+    "cc_final_codes_open_q",
+]
+
+for col in set_cols:
+    msk = eval_df[col].notna()
+    eval_df.loc[msk, col] = eval_df.loc[msk, col].apply(set)
+    eval_df.loc[~msk, col] = [set() for _ in range(msk.sum(), eval_df.shape[0])]
+
+# and convert closed q codes to set for consistency
+eval_df["sa_final_codes_closed_q"] = eval_df[
+    "survey_assist_closed_question_response_code"
+].apply(lambda x: get_clean_n_digit_codes(parse_numerical_code(x), n=5)[0])
+
+
+# update sic_section column based on final clerical codes
+def extract_sic_section(row):
+    """Extract SIC section (0-digit) from a set of codes."""
+    cc_final = get_clean_n_digit_codes(row["cc_final_codes_open_q"], n=0)[0]
+    if len(cc_final) == 1:
+        return next(iter(cc_final))
+    sa_closed = get_clean_n_digit_codes(row["sa_final_codes_closed_q"], n=0)[0]
+    sa_open = get_clean_n_digit_codes(row["sa_final_codes_open_q"], n=0)[0]
+    if (len(sa_closed.intersection(cc_final)) == 1) | (
+        len(sa_closed.intersection(sa_open)) == 1
+    ):
+        return next(iter(sa_closed))
+    if len(sa_open.intersection(cc_final)) == 1:
+        return next(iter(sa_open.intersection(cc_final)))
+
+    cc_initial = get_clean_n_digit_codes(row["cc_initial_codes"], n=0)[0]
+    sa_initial = get_clean_n_digit_codes(row["sa_initial_codes"], n=0)[0]
+    # find most frequent section among all codes
+    codes = (
+        list(cc_final)
+        + list(sa_closed)
+        + list(sa_open)
+        + list(cc_initial)
+        + list(sa_initial)
+    )
+    if not codes:
+        return None
+    _section_counts = pd.Series(codes).value_counts()
+    freq_sections = _section_counts[_section_counts == _section_counts.max()].index
+    if len(freq_sections) == 1:
+        return freq_sections[0]
+    # print(row['most_likely_sic_section'], cc_final, sa_closed, sa_open, cc_initial, sa_initial, section_counts)
+    return row["most_likely_sic_section"]
+
+
+eval_df["SIC Section"] = eval_df.apply(extract_sic_section, axis=1)
 
 # %%
 ### eval_df.columns
@@ -352,15 +449,19 @@ plt.savefig("corr_mat_feedback_concise.png", dpi=275, transparent=True)
 plt.show()
 
 # %%
-section_counts = feedback_given_df["most_likely_sic_section"].value_counts()
+
+# Section-level analysis
+
+
+section_counts = feedback_given_df["SIC Section"].value_counts()
 ### section_counts
 
 # %%
 feedback_given_df_SIC_dummies = pd.get_dummies(
-    feedback_given_df, columns=["most_likely_sic_section"], prefix="", prefix_sep=""
+    feedback_given_df, columns=["SIC Section"], prefix="", prefix_sep=""
 )
 
-unique_SIC_sections = feedback_given_df["most_likely_sic_section"].unique()
+unique_SIC_sections = feedback_given_df["SIC Section"].unique()
 ordered_SIC_sections = sorted(unique_SIC_sections)
 
 key_variables_SIC = feedback_score_cols.copy()
@@ -451,7 +552,7 @@ for i in range(correlations.shape[0]):
 
 cbar = fig.colorbar(corr_mat, ax=ax, shrink=0.45, aspect=6, pad=0.01)
 cbar.set_label("Kendall\ncorrelation\ncoefficient")
-ax.set_xlabel("Most-likely SIC Section")
+ax.set_xlabel("SIC Section (best guess)")
 
 observations_heatmap = ax2.imshow(
     np.array([section_counts[s] for s in key_variables_SIC[3:]]).reshape(1, -1),
