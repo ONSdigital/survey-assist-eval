@@ -4,10 +4,11 @@
 Note: ### = commented out to pass linting
 """
 
-import json
+# pylint: disable=C0301,C0103,R0801,C0302
 
-# pylint: disable=C0301,C0103,R0801
-# %%
+import json
+from textwrap import wrap
+
 import dotenv
 import matplotlib.pyplot as plt
 import numpy as np
@@ -24,6 +25,9 @@ from survey_assist_utils.data_cleaning.sic_codes import (
 # %matplotlib inline
 
 data_bucket = dotenv.get_key(".env", "PREPROD_DATA_BUCKET") or ""
+
+small_nonzero_number = 1e-256
+SIGNIFICANCE_THRESHOLD = 0.05
 
 # %%
 folder = data_bucket + "analysis-interim-results"
@@ -123,16 +127,16 @@ def extract_sic_section(row):
     freq_sections = _section_counts[_section_counts == _section_counts.max()].index
     if len(freq_sections) == 1:
         return freq_sections[0]
-    # print(row['most_likely_sic_section'], cc_final, sa_closed, sa_open, cc_initial, sa_initial, section_counts)
     return row["most_likely_sic_section"]
 
 
 eval_df["SIC Section"] = eval_df.apply(extract_sic_section, axis=1)
 
-# %%
-### eval_df.columns
 
 # %%
+
+# Convert feedback responses to scores:
+
 feedback_cols = [
     "feedback_survey_ease",
     "feedback_survey_relevance",
@@ -144,7 +148,6 @@ valid_responses_df = eval_df[eval_df["response_valid"]]
 feedback_given_df = valid_responses_df[
     valid_responses_df["feedback_survey_ease"].apply(len) > 0
 ]
-
 
 ease_map = {
     "very easy": 5,
@@ -186,8 +189,28 @@ print(
 )
 feedback_given_df[feedback_score_cols].describe()
 
+# %%
+
+# Aggregated summary statistics:
+
+midpt_score = 3
+for col in feedback_score_cols:
+    print(
+        f"{col}: +ve = {100*len(feedback_given_df[feedback_given_df[col] > midpt_score])/len(feedback_given_df):.3f}%"
+    )
+    print(
+        f"{col}: neutral = {100*len(feedback_given_df[feedback_given_df[col] == midpt_score])/len(feedback_given_df):.3f}%"
+    )
+    print(
+        f"{col}: -ve = {100*len(feedback_given_df[feedback_given_df[col] < midpt_score])/len(feedback_given_df):.3f}%"
+    )
+
 
 # %%
+
+# Identify responses where dynamic questions were used:
+
+
 def mark_questions_asked(row):
     """Helper function to mark cases responses where dynamic questions were asked."""
     if row["direct_lookup_classified"] or row["survey_assist_classified"]:
@@ -214,9 +237,10 @@ feedback_given_df["survey_assist_classified"] = feedback_given_df[
     "survey_assist_classified"
 ].fillna(False)
 
-feedback_given_df[path_cols].describe()
-
 # %%
+
+# Plot Feedback Distributions (all):
+
 ease_count_dict = feedback_given_df["feedback_survey_ease"].value_counts().to_dict()
 relevance_count_dict = (
     feedback_given_df["feedback_survey_relevance"].value_counts().to_dict()
@@ -271,28 +295,103 @@ ax.spines["top"].set_visible(False)
 ax.legend(fontsize=18)
 
 ax.set_ylabel("Number of responses", fontsize=18)
-# ax.set_yticks([0,100,200,300,400,500,600])
+ax.set_yticks([0, 100, 200, 300, 400, 500, 600])
 ax.set_yticklabels([0, 100, 200, 300, 400, 500, 600], size=14)  # type: ignore[list-item]
+ax.set_title(
+    f"Feedback Score Distributions\n(All Respondents - n={len(feedback_given_df)})",
+    fontsize=20,
+)
 
 plt.tight_layout()
 plt.savefig("quant_feedback_distributions_concise.png", dpi=275)
 
 # %%
+
+# Plot Feedback Distributions (dynamic only):
+
+feedback_given_dyn_df = feedback_given_df[
+    feedback_given_df["additional_questions_asked"]
+]
+
+ease_count_dict = feedback_given_dyn_df["feedback_survey_ease"].value_counts().to_dict()
+relevance_count_dict = (
+    feedback_given_dyn_df["feedback_survey_relevance"].value_counts().to_dict()
+)
+comfort_count_dict = (
+    feedback_given_dyn_df["feedback_survey_comfort"].value_counts().to_dict()
+)
+
+fig, ax = plt.subplots(ncols=1, nrows=1, figsize=(10, 8), constrained_layout=True)
+bar1 = ax.bar(
+    [i - 0.375 + 0.25 for i in range(1, 6)],
+    ease_count_dict.values(),
+    color="#12436D",
+    width=0.25,
+    label="Survey Ease",
+)
+bar2 = ax.bar(
+    [i - 0.375 + 2 * 0.25 for i in range(1, 6)],
+    relevance_count_dict.values(),
+    color="#28A197",
+    width=0.25,
+    label="Survey Relevance",
+)
+bar3 = ax.bar(
+    [i - 0.375 + 3 * 0.25 for i in range(1, 6)],
+    comfort_count_dict.values(),
+    color="#801650",
+    width=0.25,
+    label="Survey Comfort",
+)
+
+for barplot in [bar1, bar2, bar3]:
+    for bar in barplot:
+        ax.text(
+            bar.get_x() + bar.get_width() / 2,
+            bar.get_height(),
+            f"{bar.get_height()}",
+            ha="center",
+            va="bottom",
+            fontsize=14,
+        )
+
+ax.set_xticks(
+    [i - 0.375 + 2 * 0.25 for i in range(1, 6)],
+    labels=["very\npositive", "positive", "neutral", "negative", "very\nnegative"],
+    rotation=0,
+    fontsize=18,
+)
+
+ax.spines["right"].set_visible(False)
+ax.spines["top"].set_visible(False)
+ax.legend(fontsize=18)
+
+ax.set_ylabel("Number of responses", fontsize=18)
+ax.set_yticks([0, 100, 200, 300, 400])
+ax.set_yticklabels([0, 100, 200, 300, 400], size=14)  # type: ignore[list-item]
+ax.set_title(
+    f"Feedback Score Distributions\n(Dynamic Question Respondents Only - n={len(feedback_given_dyn_df)})",
+    fontsize=20,
+)
+plt.tight_layout()
+plt.savefig("quant_feedback_distributions_dynamic_only.png", dpi=275)
+
+# %%
+
+# Visulaise feedback-feedback relationships:
+
 key_variables = feedback_score_cols
 dof_overall = len(feedback_given_df) - 2
 correlations = feedback_given_df[key_variables].corr(method="kendall")
 fisher_transformed_z_scores = np.log(np.sqrt((1 + correlations) / (1 - correlations)))
 std_errs = 1 / np.sqrt(dof_overall - 1)
-confidence_interval_zspace = 1.645 * std_errs  # Using 90% confidence interval
+confidence_interval_zspace = 1.96 * std_errs  # Using 90% confidence interval
 correlation_CI_lower = (np.exp(2 * (correlations - confidence_interval_zspace)) - 1) / (
     np.exp(2 * (correlations - confidence_interval_zspace)) + 1
 )
 correlation_CI_upper = (np.exp(2 * (correlations + confidence_interval_zspace)) - 1) / (
     np.exp(2 * (correlations + confidence_interval_zspace)) + 1
 )
-
-small_nonzero_number = 1e-256
-significance_threshold = 0.1
 
 fig, ax = plt.subplots(figsize=(5, 5))
 corr_mat = ax.imshow(correlations, vmax=1, vmin=-1, cmap="PRGn")
@@ -334,13 +433,14 @@ cbar = fig.colorbar(corr_mat, ax=ax, shrink=0.65, pad=0.02)
 cbar.set_label(
     r"Correlation coefficient (Kendall $\tau$)"
     + "\n"
-    + "(90% confidence intervals stated)"
+    + "(95% confidence intervals stated)"
 )
 plt.tight_layout()
 plt.savefig("corr_mat_feedback_kendall_CI.png", dpi=275, transparent=True)
 
 # %%
 
+# Visulaise impact of dynamic questions on feedback:
 
 responses_by_path = [
     feedback_given_df[feedback_given_df["additional_questions_asked"]][
@@ -378,189 +478,220 @@ for col_id, col in enumerate(feedback_score_cols):
     )
 
 # %%
-significance_threshold = 0.1
-
-key_variables = ["additional_questions_asked", *feedback_score_cols]
-
-correlations = feedback_given_df[key_variables].corr(method="pearson")
-uncertainties = (1 - correlations) / np.sqrt(len(feedback_given_df))
-
-dof_overall = len(feedback_given_df) - 2
-t_values = correlations / uncertainties
-p_values = 2 * stats_t.sf(np.abs(t_values), dof_overall)
-
-annot_corrs = np.where(
-    (p_values > small_nonzero_number) * (p_values < significance_threshold),
-    np.round(correlations, 2).astype(str),
-    "",
-)
-annot_uncertainties = np.where(
-    (p_values > small_nonzero_number) * (p_values < significance_threshold),
-    np.round(2 * uncertainties, 2).astype(str),
-    "",
-)
-annot_pvalues = np.where(  # type: ignore[call-overload]
-    (p_values > small_nonzero_number) * (p_values < significance_threshold),
-    p_values,
-    None,
-)
-fig, ax = plt.subplots(figsize=(7, 7))
-corr_mat = ax.imshow(correlations, vmax=1, vmin=-1, cmap="PRGn")
-colour_change_limit = 0.75
-
-for i in range(len(correlations)):
-    for j in range(len(correlations)):
-        annotation = ""
-        colour = (
-            "w" if abs(correlations.to_numpy()[i, j]) > colour_change_limit else "k"
-        )
-        if annot_pvalues[i, j] is not None:
-            ax.text(
-                j,
-                i,
-                r"$r=$"
-                + annot_corrs[i, j]
-                + r"$\pm$"
-                + annot_uncertainties[i, j]
-                + "\n"
-                + r"$p=$"
-                + f"{annot_pvalues[i, j]:.2e}",
-                ha="center",
-                va="center",
-                color=colour,
-            )
-
-ax.set_xticks(
-    range(len(key_variables)),
-    labels=[k.replace("_", "\n") for k in key_variables],
-    rotation=20,
-)
-ax.set_yticks(
-    range(len(key_variables)),
-    labels=[k.replace("_", "\n") for k in key_variables],
-    rotation=0,
-)
-cbar = fig.colorbar(corr_mat, ax=ax, shrink=0.8)
-cbar.set_label(
-    "Pearson correlation coefficient\n"
-    + r"($r \pm 2\sigma_r\text{ and }p$ stated if significant at $p<0.1$)"
-)
-plt.savefig("corr_mat_feedback_concise.png", dpi=275, transparent=True)
-plt.show()
-
-# %%
 
 # Section-level analysis
 
-
+min_count_sections = 30
 section_counts = feedback_given_df["SIC Section"].value_counts()
-### section_counts
+print(section_counts, len(section_counts))
+sections_large_enough = section_counts >= min_count_sections
+
+big_sections = sorted(section_counts[sections_large_enough].keys())
+small_sections = sorted(section_counts[~sections_large_enough].keys())
+
+lcf_gp_1 = {"B", "D", "E"}
+lcf_gp_2 = {"R", "S", "T"}
+
+big_sections = sorted(set(big_sections).difference(lcf_gp_1, lcf_gp_2))
+small_sections = sorted(set(small_sections).difference(lcf_gp_1, lcf_gp_2))
 
 # %%
 feedback_given_df_SIC_dummies = pd.get_dummies(
     feedback_given_df, columns=["SIC Section"], prefix="", prefix_sep=""
 )
 
-unique_SIC_sections = feedback_given_df["SIC Section"].unique()
-ordered_SIC_sections = sorted(unique_SIC_sections)
+feedback_given_df_SIC_dummies[",".join(sorted(list(lcf_gp_1) + small_sections))] = (
+    feedback_given_df_SIC_dummies.apply(
+        lambda row: sum(
+            row[col]
+            for col in sorted(list(lcf_gp_1) + small_sections)
+            if col in feedback_given_df_SIC_dummies.columns
+        ),
+        axis=1,
+    )
+)
 
+feedback_given_df_SIC_dummies[",".join(sorted(lcf_gp_2))] = (
+    feedback_given_df_SIC_dummies.apply(
+        lambda row: sum(
+            row[col] for col in lcf_gp_2 if col in feedback_given_df_SIC_dummies.columns
+        ),
+        axis=1,
+    )
+)
+
+feedback_given_df_SIC_dummies = feedback_given_df_SIC_dummies.drop(
+    columns=[
+        c
+        for c in (lcf_gp_1 | lcf_gp_2 | set(small_sections))
+        if c in feedback_given_df_SIC_dummies.columns
+    ]
+)
+ordered_SIC_sections = [
+    *big_sections,
+    ",".join(sorted(lcf_gp_2)),
+    ",".join(sorted(list(lcf_gp_1) + small_sections)),
+]
+
+section_counts = feedback_given_df_SIC_dummies[ordered_SIC_sections].sum()
+print(section_counts)
+# %%
 key_variables_SIC = feedback_score_cols.copy()
 key_variables_SIC.extend([f"{sec}" for sec in ordered_SIC_sections])
 
 # %%
-# TODO: convert to Mann-Whitney tests, plot effect sizes as well as p-values # pylint: disable=fixme
 
-significance_threshold = 0.1
-
-observation_count_section = np.array([section_counts[c] for c in ordered_SIC_sections])
-dof_section_matrix = (
-    np.array(
-        [
-            observation_count_section,
-            observation_count_section,
-            observation_count_section,
-        ]
+results_ease = [
+    mannwhitneyu(
+        feedback_given_df_SIC_dummies[feedback_given_df_SIC_dummies[sec] == 1][
+            "ease_score"
+        ],
+        feedback_given_df_SIC_dummies[feedback_given_df_SIC_dummies[sec] == 0][
+            "ease_score"
+        ],
+        alternative="two-sided",
     )
-    - 2
+    for sec in ordered_SIC_sections
+]
+
+results_relevance = [
+    mannwhitneyu(
+        feedback_given_df_SIC_dummies[feedback_given_df_SIC_dummies[sec] == 1][
+            "relevance_score"
+        ],
+        feedback_given_df_SIC_dummies[feedback_given_df_SIC_dummies[sec] == 0][
+            "relevance_score"
+        ],
+        alternative="two-sided",
+    )
+    for sec in ordered_SIC_sections
+]
+
+results_comfort = [
+    mannwhitneyu(
+        feedback_given_df_SIC_dummies[feedback_given_df_SIC_dummies[sec] == 1][
+            "comfort_score"
+        ],
+        feedback_given_df_SIC_dummies[feedback_given_df_SIC_dummies[sec] == 0][
+            "comfort_score"
+        ],
+        alternative="two-sided",
+    )
+    for sec in ordered_SIC_sections
+]
+
+# Common Language Effect Size:
+# CLES = U/n1n2
+
+effect_strength_ease = [
+    res.statistic
+    / (
+        len(feedback_given_df_SIC_dummies[feedback_given_df_SIC_dummies[sec] == 1])
+        * len(feedback_given_df_SIC_dummies[feedback_given_df_SIC_dummies[sec] == 0])
+    )
+    for res, sec in zip(results_ease, ordered_SIC_sections)
+]
+
+effect_strength_relevance = [
+    res.statistic
+    / (
+        len(feedback_given_df_SIC_dummies[feedback_given_df_SIC_dummies[sec] == 1])
+        * len(feedback_given_df_SIC_dummies[feedback_given_df_SIC_dummies[sec] == 0])
+    )
+    for res, sec in zip(results_relevance, ordered_SIC_sections)
+]
+
+effect_strength_comfort = [
+    res.statistic
+    / (
+        len(feedback_given_df_SIC_dummies[feedback_given_df_SIC_dummies[sec] == 1])
+        * len(feedback_given_df_SIC_dummies[feedback_given_df_SIC_dummies[sec] == 0])
+    )
+    for res, sec in zip(results_comfort, ordered_SIC_sections)
+]
+
+effect_strengths_SIC = np.array(
+    [effect_strength_ease, effect_strength_relevance, effect_strength_comfort]
 )
 
-correlations = (
-    feedback_given_df_SIC_dummies[key_variables_SIC].corr(method="kendall").to_numpy()
-)
-correlations = correlations[:3, 3:]
-uncertainties = (1 - correlations) / np.sqrt(dof_section_matrix + 2)  # +2 to map dof->n
-
-t_values = correlations / uncertainties
-p_values = stats_t.sf(np.abs(t_values), dof_section_matrix)
-
-annot_corrs = np.where(
-    (p_values > small_nonzero_number) * (p_values < significance_threshold),
-    np.round(correlations, 2).astype(str),
-    "",
-)
-annot_uncertainties = np.where(
-    (p_values > small_nonzero_number) * (p_values < significance_threshold),
-    np.round(2 * uncertainties, 2).astype(str),
-    "",
-)
-annot_pvalues = np.where(  # type: ignore[call-overload]
-    (p_values > small_nonzero_number) * (p_values < significance_threshold),
-    p_values,
-    None,
+p_values = np.array(
+    [
+        [mw.pvalue for mw in fb]
+        for fb in [results_ease, results_relevance, results_comfort]
+    ]
 )
 
-boundary = np.max(np.abs(correlations))
+U_statistics = np.array(
+    [
+        [mw.statistic for mw in fb]
+        for fb in [results_ease, results_relevance, results_comfort]
+    ]
+)
+
+# %%
+
+bonferroni_sign_thresh = SIGNIFICANCE_THRESHOLD / (3 * 9)
+
 fig = plt.figure(figsize=(10, 4))
 gs = GridSpec(10, 10, figure=fig, wspace=0.01, hspace=0.005)
+colour_threshold = 0.1
 
 ax = fig.add_subplot(gs[3:, :])
-ax2 = fig.add_subplot(gs[1:7, :])
+ax2 = fig.add_subplot(gs[:3, :])
 
-corr_mat = ax.imshow(
-    correlations,
-    vmax=boundary,
-    vmin=-boundary,
-    cmap="PRGn",
-)
+corr_mat = ax.imshow(effect_strengths_SIC, cmap="PRGn", vmin=0.2, vmax=0.8)
 ax.set_xticks(
     range(len(key_variables_SIC[3:])),
-    labels=[k.replace("_", " ") for k in key_variables_SIC[3:]],
+    labels=["\n".join(wrap(k, 8)) for k in key_variables_SIC[3:]],
     rotation=0,
 )
 ax.set_yticks(
     range(len(key_variables_SIC[:3])),
-    labels=[k.replace("_", " ") for k in key_variables_SIC[:3]],
+    labels=[k.replace("_", "\n") for k in key_variables_SIC[:3]],
     rotation=0,
 )
 
-for i in range(correlations.shape[0]):
-    for j in range(correlations.shape[1]):
-        annotation = ""
+for i in range(effect_strengths_SIC.shape[0]):
+    for j in range(effect_strengths_SIC.shape[1]):
+        # annotation = r"$p=$" + f"\n{p_values[i, j]:.3f}"
+        annotation = f"{p_values[i, j]:.3f}\n{effect_strengths_SIC[i,j]:.2f}"
         colour = (
-            "w" if abs(correlations[i, j]) > colour_change_limit * boundary else "k"
+            "w" if abs(0.5 - effect_strengths_SIC[i, j]) > colour_threshold else "k"
         )
-        if annot_pvalues[i, j] is not None:
+        if p_values[i, j] is not None:
             ax.text(
                 j,
                 i,
-                r"$p=$" + f"\n{annot_pvalues[i, j]:.2f}",
+                annotation,  # if p_values[i, j] < bonferroni_sign_thresh else "",
                 ha="center",
                 va="center",
                 color=colour,
-                fontsize=6,
+                fontsize=10,
             )
 
-cbar = fig.colorbar(corr_mat, ax=ax, shrink=0.45, aspect=6, pad=0.01)
-cbar.set_label("Kendall\ncorrelation\ncoefficient")
-ax.set_xlabel("SIC Section (best guess)")
+cbar = fig.colorbar(corr_mat, ax=ax, shrink=0.825, aspect=6, pad=0.01)
+cbar.set_label("Effect Strength\n(CLES)")
+ax.set_xlabel("SIC Section (Most Likely)")
 
 observations_heatmap = ax2.imshow(
     np.array([section_counts[s] for s in key_variables_SIC[3:]]).reshape(1, -1),
     cmap="Greys",
 )
 section_cbar = fig.colorbar(
-    observations_heatmap, ax=ax2, shrink=0.2, aspect=3, pad=0.01
+    observations_heatmap, ax=ax2, shrink=0.675, aspect=2.2, pad=0.01
 )
+
+for sec_idx, sc in enumerate(section_counts):
+    colour = "w" if abs(sc) > 0.5 * np.max(section_counts) else "k"
+    ax2.text(
+        sec_idx,
+        0,
+        r"$n=$" + f"\n{sc}",
+        ha="center",
+        va="center",
+        color=colour,
+        fontsize=10,
+    )
 
 ax2.set_xticks(range(len(section_counts)), labels=[""] * len(section_counts))
 ax2.set_yticks([])
@@ -571,6 +702,9 @@ plt.savefig(
 )
 
 # %%
+
+# Analysis of LLM wait-time impact on Feedback:
+
 ### Parsing LLM wait times:
 with open("./time-in-dynamic-questions-08-Dec-1530.json", encoding="utf8") as f:
     llm_time_data = json.load(f)["users"]
@@ -602,10 +736,8 @@ feedback_given_llm_waittime_df = feedback_given_llm_waittime_df[
     feedback_given_llm_waittime_df["additional_questions_asked"]
 ]
 
-
 # %%
-
-significance_threshold = 0.05 / 3
+bonferroni_sign_thresh = SIGNIFICANCE_THRESHOLD / 3
 
 key_variables = ["time_to_show_dynamic_question", *feedback_score_cols]
 
@@ -619,7 +751,7 @@ dof_overall = len(feedback_given_llm_waittime_df) - 2
 
 fisher_transformed_z_scores = np.log(np.sqrt((1 + correlations) / (1 - correlations)))
 std_errs = 1 / np.sqrt(dof_overall - 1)
-confidence_interval_zspace = 1.645 * std_errs  # Using 90% confidence interval
+confidence_interval_zspace = 1.96 * std_errs  # Using 95% confidence interval
 correlation_CI_lower = (np.exp(2 * (correlations - confidence_interval_zspace)) - 1) / (
     np.exp(2 * (correlations - confidence_interval_zspace)) + 1
 )
@@ -631,7 +763,7 @@ t_values = correlations / uncertainties
 p_values = 2 * stats_t.sf(np.abs(t_values), dof_overall)
 
 annot_corrs = np.where(
-    (p_values > small_nonzero_number) * (p_values < significance_threshold),
+    (p_values > small_nonzero_number) * (p_values < bonferroni_sign_thresh),
     np.round(correlations, 2).astype(str),
     "",
 )
@@ -643,7 +775,7 @@ for i in range(correlations.shape[0]):
     for j in range(correlations.shape[1]):
         annotation = ""
         colour = "w" if abs(correlations[i, j]) > colour_change_limit else "k"
-        if p_values[i, j] < significance_threshold:
+        if p_values[i, j] < bonferroni_sign_thresh:
             ax.text(
                 j,
                 i,
@@ -677,8 +809,25 @@ cbar.set_label("Kendall correlation\ncoefficient " + r"($\tau$)")
 plt.savefig("corr_mat_feedback_LLM_waittime_kendall.png", dpi=275, transparent=True)
 
 # %%
+plt.figure()
+time_plot = feedback_given_llm_waittime_df["time_to_show_dynamic_question"].plot(
+    kind="hist", bins=12
+)
+time_plot.set_xlabel("Dynamic Question Generation Time (s)")
+time_plot.set_ylabel("Number of Respondents")
+plt.savefig("LLM_waittime_hist.png", dpi=275, transparent=True)
 
-significance_threshold = 0.05 / 3  # Bonferroni correction
+wait_cutoff = 600
+plt.figure()
+time_plot = feedback_given_llm_waittime_df[
+    feedback_given_llm_waittime_df["time_in_seconds"] < wait_cutoff
+]["time_in_seconds"].plot(kind="hist", bins=25)
+time_plot.set_xlabel("Time taken complete the dynamic questions (s)")
+time_plot.set_ylabel("Number of Respondents")
+plt.savefig("survey_completion_time_hist.png", dpi=275, transparent=True)
+
+# %%
+bonferroni_sign_thresh = SIGNIFICANCE_THRESHOLD / 3
 
 key_variables = ["additional_questions_asked", *feedback_score_cols]
 feedback_dynamic_df = feedback_given_df[key_variables].copy()
@@ -725,8 +874,8 @@ effect_strength_comfort = result_comfort.statistic / (
     len(feedback_dynamic_df[feedback_dynamic_df["additional_questions_asked"]])
     * len(feedback_dynamic_df[~feedback_dynamic_df["additional_questions_asked"]])
 )
-
-p_values = [result_ease.pvalue, result_relevance.pvalue, result_comfort.pvalue]
+eff_sizes = [effect_strength_ease, effect_strength_relevance, effect_strength_comfort]
+p_values_dyn = [result_ease.pvalue, result_relevance.pvalue, result_comfort.pvalue]
 U_ststistics = [
     result_ease.statistic,
     result_relevance.statistic,
@@ -746,11 +895,16 @@ corr_mat = ax.imshow(
 )
 
 for j in range(3):
-    if p_values[j] < significance_threshold:
+    if p_values_dyn[j] < bonferroni_sign_thresh:
         ax.text(
             j,
             0,
-            r"$U=$" + f"{U_ststistics[j]:.3e}\n" + r"$p=$" + f"{p_values[j]:.3e}",
+            r"$U=$"
+            + f"{U_ststistics[j]:.3e}\n"
+            + r"$p=$"
+            + f"{p_values_dyn[j]:.3e}\n"
+            + r"CLES$=$"
+            + f"{eff_sizes[j]:.3f}",
             ha="center",
             va="center",
             color="k",
@@ -773,7 +927,7 @@ plt.savefig("corr_mat_feedback_dynamic_MW_CLES.png", dpi=275, transparent=True)
 
 # %%
 ### Age-related analysis:
-significance_threshold = 0.05
+bonferroni_sign_thresh = SIGNIFICANCE_THRESHOLD / (3 * 5)
 
 feedback_given_df_age_dummies = pd.get_dummies(
     feedback_given_df[feedback_given_df["feedback_age_range"].notnull()],
@@ -805,17 +959,17 @@ t_values = correlations / uncertainties
 p_values = stats_t.sf(np.abs(t_values), dof_age_matrix)
 
 annot_corrs = np.where(
-    (p_values > small_nonzero_number) * (p_values < significance_threshold),
+    (p_values > small_nonzero_number) * (p_values < bonferroni_sign_thresh),
     np.round(correlations, 2).astype(str),
     "",
 )
 annot_uncertainties = np.where(
-    (p_values > small_nonzero_number) * (p_values < significance_threshold),
+    (p_values > small_nonzero_number) * (p_values < bonferroni_sign_thresh),
     np.round(2 * uncertainties, 2).astype(str),
     "",
 )
 annot_pvalues = np.where(  # type: ignore[call-overload]
-    (p_values > small_nonzero_number) * (p_values < significance_threshold),
+    (p_values > small_nonzero_number) * (p_values < bonferroni_sign_thresh),
     p_values,
     None,
 )
@@ -855,7 +1009,7 @@ for i in range(correlations.shape[0]):
             ax.text(
                 j,
                 i,
-                r"$p=$" + f"{p_values[i, j]:.5f}",
+                r"$p=$" + f"{p_values[i, j]:.3f}",
                 ha="center",
                 va="center",
                 color="k",
@@ -887,13 +1041,11 @@ ax2.set_xticks(range(len(age_counts)), labels=[""] * len(age_counts))
 ax2.set_yticks([])
 age_cbar.set_label("Obs.\n\n")
 plt.tight_layout()
-# plt.savefig("age_feedback_correlations.png", dpi=275, transparent=True)
+plt.savefig("age_feedback_correlations.png", dpi=275, transparent=True)
 
 # %%
 # Considering age in an ordered way (Kruskal-Wallis):
-
-significance_threshold = 0.05 / 3  # Bonferroni correction
-
+bonferroni_sign_thresh = SIGNIFICANCE_THRESHOLD / 3
 
 result_ease = kruskal(
     *[
@@ -937,7 +1089,7 @@ effect_strengths = [
     effect_strength_relevance,
     effect_strength_comfort,
 ]
-p_values = [result_ease.pvalue, result_relevance.pvalue, result_comfort.pvalue]
+p_values_age = [result_ease.pvalue, result_relevance.pvalue, result_comfort.pvalue]
 H_ststistics = [
     result_ease.statistic,
     result_relevance.statistic,
@@ -957,14 +1109,14 @@ corr_mat = ax.imshow(
 )
 
 for j in range(3):
-    if p_values[j] < significance_threshold:
+    if p_values_age[j] < bonferroni_sign_thresh:
         ax.text(
             j,
             0,
             r"$H=$"
             + f"{H_ststistics[j]:.2f}\n"
             + r"$p=$"
-            + f"{p_values[j]:.1e}\n"
+            + f"{p_values_age[j]:.1e}\n"
             + r"$\eta^2=$"
             + f"{effect_strengths[j]:.3f}",
             ha="center",
@@ -984,4 +1136,129 @@ cbar = fig.colorbar(corr_mat, ax=ax, shrink=0.62, aspect=7, pad=0.01)
 cbar.set_label(r"Effect Size $(\eta^2)$")
 plt.tight_layout()
 plt.savefig("corr_mat_feedback_age_KW_eta2.png", dpi=275, transparent=True)
+
+# %%
+
+# Real age distributions (source: https://www.ons.gov.uk/employmentandlabourmarket/peopleinwork/employmentandemployeetypes/datasets/employmentunemploymentandeconomicinactivitybyagegroupseasonallyadjusteda05sa)
+
+employed_16_18 = np.array(
+    [
+        346,
+        327,
+        338,
+        339,
+        325,
+        314,
+        320,
+        337,
+        338,
+        345,
+        330,
+        326,
+        316,
+    ]
+).mean()
+
+employed_18_24 = np.array(
+    [
+        3_365,
+        3_385,
+        3_397,
+        3_435,
+        3_429,
+        3_436,
+        3_476,
+        3_513,
+        3_527,
+        3_530,
+        3_563,
+        3_529,
+        3_548,
+    ]
+).mean()
+
+employed_16_24 = employed_16_18 + employed_18_24
+
+employed_25_34 = np.array(
+    [
+        7_629,
+        7_643,
+        7_675,
+        7_670,
+        7_669,
+        7_675,
+        7_715,
+        7_716,
+        7_714,
+        7_666,
+        7_672,
+        7_675,
+        7_711,
+    ]
+).mean()
+
+employed_35_49 = np.array(
+    [
+        11_402,
+        11_430,
+        11_456,
+        11_450,
+        11_499,
+        11_495,
+        11_507,
+        11_515,
+        11_505,
+        11_471,
+        11_473,
+        11_485,
+        11_525,
+    ]
+).mean()
+
+employed_50_64 = np.array(
+    [
+        9_488,
+        9_513,
+        9_476,
+        9_497,
+        9_461,
+        9_510,
+        9_513,
+        9_484,
+        9_462,
+        9_503,
+        9_487,
+        9_472,
+        9_480,
+    ]
+).mean()
+
+employed_65_plus = np.array(
+    [
+        1_559,
+        1_565,
+        1_580,
+        1_606,
+        1_592,
+        1_581,
+        1_598,
+        1_648,
+        1_696,
+        1_705,
+        1_668,
+        1_740,
+        1_722,
+    ]
+).mean()
+
+employed_total = (
+    employed_16_24 + employed_25_34 + employed_35_49 + employed_50_64 + employed_65_plus
+)
+
+expected_distribution = (877 / employed_total) * np.array(
+    [employed_16_24, employed_25_34, employed_35_49, employed_50_64, employed_65_plus]
+)
+
+for exp in expected_distribution:
+    print(f"{exp:.1f}")
 # %%
