@@ -4,7 +4,7 @@
 Note: ### = commented out to pass linting
 """
 
-# pylint: disable=C0301,C0103,R0801,C0302
+# pylint: disable=C0301,C0103,R0801,C0302,C0121
 
 import json
 from textwrap import wrap
@@ -148,6 +148,7 @@ valid_responses_df = eval_df[eval_df["response_valid"]]
 feedback_given_df = valid_responses_df[
     valid_responses_df["feedback_survey_ease"].apply(len) > 0
 ]
+
 
 ease_map = {
     "very easy": 5,
@@ -1261,4 +1262,214 @@ expected_distribution = (877 / employed_total) * np.array(
 
 for exp in expected_distribution:
     print(f"{exp:.1f}")
+
+
+# %%
+
+# General / Specific Open Question Analysis:
+
+# For total summary stats
+sa_coded_df["generic_open_q"] = sa_coded_df[
+    "survey_assist_open_question"
+].str.startswith("What is your employer's main business activity?")
+
+# # For feedback analysis
+feedback_given_df["generic_open_q"] = feedback_given_df[
+    "survey_assist_open_question"
+].str.startswith("What is your employer's main business activity?")
+
+sa_coded_df["additional_questions_asked"] = sa_coded_df.apply(
+    mark_questions_asked, axis=1
+)
+sa_coded_dynamic_df = sa_coded_df[sa_coded_df["additional_questions_asked"]]
+feedback_given_df["additional_questions_asked"] = feedback_given_df.apply(
+    mark_questions_asked, axis=1
+)
+feedback_given_dynamic_df = feedback_given_df[
+    feedback_given_df["additional_questions_asked"]
+]
+
+
+print(
+    f"total generic open questions: {sa_coded_dynamic_df['generic_open_q'].value_counts()}, {sa_coded_dynamic_df['generic_open_q'].value_counts()/len(sa_coded_dynamic_df)}%"
+)
+print(
+    f"feedback-given generic open questions: {feedback_given_dynamic_df['generic_open_q'].value_counts()}, {feedback_given_dynamic_df['generic_open_q'].value_counts()/len(feedback_given_dynamic_df)}"
+)
+
+total_counts = sa_coded_dynamic_df["generic_open_q"].value_counts()
+feedback_counts = feedback_given_dynamic_df["generic_open_q"].value_counts()
+
+labels = ["Specific Question", "Generic Question"]
+x = np.arange(len(labels))
+width = 0.35
+
+fig, ax = plt.subplots(figsize=(10, 8))
+rects1 = ax.bar(
+    x - width / 2,
+    [total_counts.get(False, 0), total_counts.get(True, 0)],
+    width,
+    label=f"All Open Questions (n={len(sa_coded_dynamic_df)})",
+    color="#12436D",
+)
+rects2 = ax.bar(
+    x + width / 2,
+    [feedback_counts.get(False, 0), feedback_counts.get(True, 0)],
+    width,
+    label=f"Open Questions - Responses Where\nFeedback Was Provided (n={len(feedback_given_dynamic_df)})",
+    color="#28A197",
+)
+
+ax.set_ylabel("Number of Respondents", fontsize=18)
+ax.set_title("Distribution of Open Question Type", fontsize=18)
+ax.set_xticks(x)
+ax.set_xticklabels(labels, fontsize=16)
+ax.set_ylim(0, 550)
+ax.legend(fontsize=12)
+
+total_n = len(sa_coded_dynamic_df)
+feedback_n = len(feedback_given_dynamic_df)
+
+ax.bar_label(
+    rects1,
+    padding=3,
+    fmt=lambda x: f"{int(x)}\n({x/total_n:.0%})" if x > 0 else "",
+    fontsize=14,
+)
+ax.bar_label(
+    rects2,
+    padding=3,
+    fmt=lambda x: f"{int(x)}\n({x/feedback_n:.0%})" if x > 0 else "",
+    fontsize=14,
+)
+
+fig.tight_layout()
+plt.savefig("generic_vs_specific_open_q_dist.png", dpi=275, transparent=True)
+
+
+# %%
+
+bonferroni_sign_thresh = SIGNIFICANCE_THRESHOLD / 3
+
+key_variables = ["generic_open_q", *feedback_score_cols]
+feedback_given_dynamic_df = feedback_given_dynamic_df[key_variables].copy()
+feedback_given_dynamic_df = feedback_given_dynamic_df[
+    feedback_given_dynamic_df.notnull()
+]
+result_ease = mannwhitneyu(
+    feedback_given_dynamic_df[
+        feedback_given_dynamic_df["generic_open_q"] == True  # noqa: E712
+    ]["ease_score"],
+    feedback_given_dynamic_df[
+        feedback_given_dynamic_df["generic_open_q"] == False  # noqa: E712
+    ]["ease_score"],
+    alternative="two-sided",
+)
+result_relevance = mannwhitneyu(
+    feedback_given_dynamic_df[
+        feedback_given_dynamic_df["generic_open_q"] == True  # noqa: E712
+    ]["relevance_score"],
+    feedback_given_dynamic_df[
+        feedback_given_dynamic_df["generic_open_q"] == False  # noqa: E712
+    ]["relevance_score"],
+    alternative="two-sided",
+)
+result_comfort = mannwhitneyu(
+    feedback_given_dynamic_df[
+        feedback_given_dynamic_df["generic_open_q"] == True  # noqa: E712
+    ]["comfort_score"],
+    feedback_given_dynamic_df[
+        feedback_given_dynamic_df["generic_open_q"] == False  # noqa: E712
+    ]["comfort_score"],
+    alternative="two-sided",
+)
+# Common Language Effect Size:
+# CLES = U/n1n2
+
+effect_strength_ease = result_ease.statistic / (
+    len(
+        feedback_given_dynamic_df[
+            feedback_given_dynamic_df["generic_open_q"] == True  # noqa: E712
+        ]
+    )
+    * len(
+        feedback_given_dynamic_df[
+            feedback_given_dynamic_df["generic_open_q"] == False  # noqa: E712
+        ]
+    )
+)
+effect_strength_relevance = result_relevance.statistic / (
+    len(
+        feedback_given_dynamic_df[
+            feedback_given_dynamic_df["generic_open_q"] == True  # noqa: E712
+        ]
+    )
+    * len(
+        feedback_given_dynamic_df[
+            feedback_given_dynamic_df["generic_open_q"] == False  # noqa: E712
+        ]
+    )
+)
+effect_strength_comfort = result_comfort.statistic / (
+    len(
+        feedback_given_dynamic_df[
+            feedback_given_dynamic_df["generic_open_q"] == True  # noqa: E712
+        ]
+    )
+    * len(
+        feedback_given_dynamic_df[
+            feedback_given_dynamic_df["generic_open_q"] == False  # noqa: E712
+        ]
+    )
+)
+eff_sizes = [effect_strength_ease, effect_strength_relevance, effect_strength_comfort]
+p_values_dyn = [result_ease.pvalue, result_relevance.pvalue, result_comfort.pvalue]
+U_ststistics = [
+    result_ease.statistic,
+    result_relevance.statistic,
+    result_comfort.statistic,
+]
+
+fig, ax = plt.subplots(figsize=(7, 3))
+corr_mat = ax.imshow(
+    np.array(
+        [
+            [effect_strength_ease, effect_strength_relevance, effect_strength_comfort],
+        ]
+    ),
+    cmap="PRGn",
+    vmin=0.25,
+    vmax=0.75,
+)
+
+for j in range(3):
+    if p_values_dyn[j] < bonferroni_sign_thresh:
+        ax.text(
+            j,
+            0,
+            r"$U=$"
+            + f"{U_ststistics[j]:.3e}\n"
+            + r"$p=$"
+            + f"{p_values_dyn[j]:.3e}\n"
+            + r"CLES$=$"
+            + f"{eff_sizes[j]:.3f}",
+            ha="center",
+            va="center",
+            color="k",
+            fontsize=10,
+        )
+
+ax.set_xticks(
+    range(3),
+    labels=[k.replace("_", "\n") for k in feedback_score_cols],
+    rotation=0,
+    fontsize=12,
+)
+ax.set_yticks(range(1), labels=["Received\nGeneric\nQuestion"], rotation=0, fontsize=12)
+cbar = fig.colorbar(corr_mat, ax=ax, shrink=0.62, aspect=7, pad=0.01)
+cbar.set_label("Effect Size (CLES)")
+plt.tight_layout()
+plt.savefig(
+    "corr_mat_feedback_generic_or_specific_Q_MW_CLES.png", dpi=275, transparent=True
+)
 # %%
