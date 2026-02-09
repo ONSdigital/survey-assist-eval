@@ -22,14 +22,15 @@ from survey_assist_utils.data_cleaning.sic_codes import (
     parse_numerical_code,
 )
 
-# %matplotlib inline
+# %%
+# Load environmental variables & set data input/output locations:
+### %matplotlib inline
 
 data_bucket = dotenv.get_key(".env", "PREPROD_DATA_BUCKET") or ""
 
 small_nonzero_number = 1e-256
 SIGNIFICANCE_THRESHOLD = 0.05
 
-# %%
 folder = data_bucket + "analysis-interim-results"
 
 out_folder = (
@@ -38,11 +39,13 @@ out_folder = (
 out_folder = None  # type: ignore[assignment]
 
 # %%
-# read data exported from firesore
+# Read data exported from firesore
 eval_df = pd.read_parquet(folder + "/evaluation_df_with_sa_clean_codes.parquet")
 
 # %%
+# pylint: disable=fixme
 # (initial processing to form SIC Section column taken from Iva's notebook)
+# TODO - refactor to use notebooks/november_tests/helper utils when added to main branch
 
 # load combined df with codability levels
 sa_coded_df = pd.read_parquet(folder + "/evaluation_df_with_sa_clean_codes.parquet")
@@ -149,7 +152,6 @@ feedback_given_df = valid_responses_df[
     valid_responses_df["feedback_survey_ease"].apply(len) > 0
 ]
 
-
 ease_map = {
     "very easy": 5,
     "easy": 4,
@@ -192,7 +194,7 @@ feedback_given_df[feedback_score_cols].describe()
 
 # %%
 
-# Aggregated summary statistics:
+# Aggregated summary statistics for quantitative feedback:
 
 midpt_score = 3
 for col in feedback_score_cols:
@@ -440,7 +442,6 @@ plt.tight_layout()
 plt.savefig("corr_mat_feedback_kendall_CI.png", dpi=275, transparent=True)
 
 # %%
-
 # Visulaise impact of dynamic questions on feedback:
 
 responses_by_path = [
@@ -479,7 +480,6 @@ for col_id, col in enumerate(feedback_score_cols):
     )
 
 # %%
-
 # Section-level analysis
 
 min_count_sections = 30
@@ -497,6 +497,7 @@ big_sections = sorted(set(big_sections).difference(lcf_gp_1, lcf_gp_2))
 small_sections = sorted(set(small_sections).difference(lcf_gp_1, lcf_gp_2))
 
 # %%
+# Create 'dummy' columns for SIC codes & group small / suppressed groups
 feedback_given_df_SIC_dummies = pd.get_dummies(
     feedback_given_df, columns=["SIC Section"], prefix="", prefix_sep=""
 )
@@ -541,6 +542,7 @@ key_variables_SIC = feedback_score_cols.copy()
 key_variables_SIC.extend([f"{sec}" for sec in ordered_SIC_sections])
 
 # %%
+# Statistical Tests for Feedback Scores for each SIC / SIC group
 
 results_ease = [
     mannwhitneyu(
@@ -630,6 +632,7 @@ U_statistics = np.array(
 )
 
 # %%
+# Visualising the feedback vs. SIC section analysis results
 
 bonferroni_sign_thresh = SIGNIFICANCE_THRESHOLD / (3 * 9)
 
@@ -703,7 +706,6 @@ plt.savefig(
 )
 
 # %%
-
 # Analysis of LLM wait-time impact on Feedback:
 
 ### Parsing LLM wait times:
@@ -713,12 +715,10 @@ with open("./time-in-dynamic-questions-08-Dec-1530.json", encoding="utf8") as f:
 llm_wait_time_df = pd.DataFrame(llm_time_data)
 llm_wait_time_df.sample(n=10)
 
-# %%
-print(
-    llm_wait_time_df["person_id"].value_counts().max()
-)  # check for multiple llm interaction times per user
+# print(
+#     llm_wait_time_df["person_id"].value_counts().max()
+# )  # check for multiple llm interaction times per user
 
-# %%
 desired_columns = [
     *feedback_given_df.columns.to_list(),
     *llm_wait_time_df.columns.to_list()[1:],
@@ -737,7 +737,6 @@ feedback_given_llm_waittime_df = feedback_given_llm_waittime_df[
     feedback_given_llm_waittime_df["additional_questions_asked"]
 ]
 
-# %%
 bonferroni_sign_thresh = SIGNIFICANCE_THRESHOLD / 3
 
 key_variables = ["time_to_show_dynamic_question", *feedback_score_cols]
@@ -810,6 +809,8 @@ cbar.set_label("Kendall correlation\ncoefficient " + r"($\tau$)")
 plt.savefig("corr_mat_feedback_LLM_waittime_kendall.png", dpi=275, transparent=True)
 
 # %%
+# Visualise distributions of LLM wait time / dynamic question completion time (not for feedback)
+
 plt.figure()
 time_plot = feedback_given_llm_waittime_df["time_to_show_dynamic_question"].plot(
     kind="hist", bins=12
@@ -828,6 +829,8 @@ time_plot.set_ylabel("Number of Respondents")
 plt.savefig("survey_completion_time_hist.png", dpi=275, transparent=True)
 
 # %%
+# Analysis of User Path on Feedback
+
 bonferroni_sign_thresh = SIGNIFICANCE_THRESHOLD / 3
 
 key_variables = ["additional_questions_asked", *feedback_score_cols]
@@ -941,6 +944,7 @@ ordered_age_ranges = ["16-24", "25-34", "35-49", "50-64", "65-plus"]
 key_variables_age = [*feedback_score_cols, *ordered_age_ranges]
 
 # %%
+# Age vs Feedback analysis (v1)
 # Considering age-groups as distinct samples of a population (ignoring order)
 
 age_counts = feedback_given_df["feedback_age_range"].value_counts()
@@ -972,7 +976,7 @@ annot_uncertainties = np.where(
 annot_pvalues = np.where(  # type: ignore[call-overload]
     (p_values > small_nonzero_number) * (p_values < bonferroni_sign_thresh),
     p_values,
-    None,
+    "",
 )
 
 boundary = np.max(np.abs(correlations))
@@ -1006,7 +1010,7 @@ for i in range(correlations.shape[0]):
         colour = (
             "w" if abs(correlations[i, j]) > colour_change_limit * boundary else "k"
         )
-        if annot_pvalues[i, j] is not None:
+        if annot_pvalues[i, j] != "":
             ax.text(
                 j,
                 i,
@@ -1045,7 +1049,9 @@ plt.tight_layout()
 plt.savefig("age_feedback_correlations.png", dpi=275, transparent=True)
 
 # %%
+# Age vs Feedback analysis (v2)
 # Considering age in an ordered way (Kruskal-Wallis):
+
 bonferroni_sign_thresh = SIGNIFICANCE_THRESHOLD / 3
 
 result_ease = kruskal(
@@ -1139,8 +1145,8 @@ plt.tight_layout()
 plt.savefig("corr_mat_feedback_age_KW_eta2.png", dpi=275, transparent=True)
 
 # %%
-
-# Real age distributions (source: https://www.ons.gov.uk/employmentandlabourmarket/peopleinwork/employmentandemployeetypes/datasets/employmentunemploymentandeconomicinactivitybyagegroupseasonallyadjusteda05sa)
+# Comparison of expected/observed age distributions with general working population:
+# (source: https://www.ons.gov.uk/employmentandlabourmarket/peopleinwork/employmentandemployeetypes/datasets/employmentunemploymentandeconomicinactivitybyagegroupseasonallyadjusteda05sa)
 
 employed_16_18 = np.array(
     [
@@ -1256,17 +1262,20 @@ employed_total = (
     employed_16_24 + employed_25_34 + employed_35_49 + employed_50_64 + employed_65_plus
 )
 
-expected_distribution = (877 / employed_total) * np.array(
-    [employed_16_24, employed_25_34, employed_35_49, employed_50_64, employed_65_plus]
+print(
+    f"""
+16-24:   {100*employed_16_24/employed_total:4.1f}% - expectation {877*employed_16_24/employed_total:5.1f} responses
+25-34:   {100*employed_25_34/employed_total:4.1f}% - expectation {877*employed_25_34/employed_total:5.1f} responses
+35-49:   {100*employed_35_49/employed_total:4.1f}% - expectation {877*employed_35_49/employed_total:5.1f} responses
+50-64:   {100*employed_50_64/employed_total:4.1f}% - expectation {877*employed_50_64/employed_total:5.1f} responses
+65+:     {100*employed_65_plus/employed_total:4.1f}% - expectation {877*employed_65_plus/employed_total:5.1f} responses
+"""
 )
-
-for exp in expected_distribution:
-    print(f"{exp:.1f}")
 
 
 # %%
-
-# General / Specific Open Question Analysis:
+# General / Specific Open Question Impact Analysis:
+# (this cell - visualising distributions)
 
 # For total summary stats
 sa_coded_df["generic_open_q"] = sa_coded_df[
@@ -1348,6 +1357,8 @@ plt.savefig("generic_vs_specific_open_q_dist.png", dpi=275, transparent=True)
 
 
 # %%
+# General / Specific Open Question Impact Analysis:
+# (this cell - statistical tests & heatmap visualisation)
 
 bonferroni_sign_thresh = SIGNIFICANCE_THRESHOLD / 3
 
@@ -1472,4 +1483,3 @@ plt.tight_layout()
 plt.savefig(
     "corr_mat_feedback_generic_or_specific_Q_MW_CLES.png", dpi=275, transparent=True
 )
-# %%
