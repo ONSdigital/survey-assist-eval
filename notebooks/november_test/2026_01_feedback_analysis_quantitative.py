@@ -666,7 +666,7 @@ for i in range(effect_strengths_SIC.shape[0]):
             ax.text(
                 j,
                 i,
-                annotation,  # if p_values[i, j] < bonferroni_sign_thresh else "",
+                annotation if p_values[i, j] < bonferroni_sign_thresh else "",
                 ha="center",
                 va="center",
                 color=colour,
