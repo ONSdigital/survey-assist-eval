@@ -80,7 +80,7 @@ def extract_sic_section(row):
     return row["most_likely_sic_section"]
 
 
-eval_df["SIC Section"] = eval_df.apply(extract_sic_section, axis=1)
+eval_df.loc[:, "SIC Section"] = eval_df.apply(extract_sic_section, axis=1)
 
 # %%
 # Convert feedback responses to scores:
@@ -95,7 +95,7 @@ feedback_score_cols = ["ease_score", "relevance_score", "comfort_score"]
 valid_responses_df = eval_df[eval_df["response_valid"]]
 feedback_given_df = valid_responses_df[
     valid_responses_df["feedback_survey_ease"].apply(len) > 0
-]
+].copy()
 
 ease_map = {
     "very easy": 5,
@@ -121,15 +121,15 @@ comfort_map = {
     "very uncomfortable": 1,
 }
 
-feedback_given_df["ease_score"] = feedback_given_df["feedback_survey_ease"].apply(
-    lambda r: ease_map[r]
-)
-feedback_given_df["relevance_score"] = feedback_given_df[
+feedback_given_df.loc[:, "ease_score"] = feedback_given_df[
+    "feedback_survey_ease"
+].apply(lambda r: ease_map[r])
+feedback_given_df.loc[:, "relevance_score"] = feedback_given_df[
     "feedback_survey_relevance"
 ].apply(lambda r: relevance_map[r])
-feedback_given_df["comfort_score"] = feedback_given_df["feedback_survey_comfort"].apply(
-    lambda r: comfort_map[r]
-)
+feedback_given_df.loc[:, "comfort_score"] = feedback_given_df[
+    "feedback_survey_comfort"
+].apply(lambda r: comfort_map[r])
 
 # %%
 print(
@@ -171,7 +171,7 @@ def mark_questions_asked(row):
     return None
 
 
-feedback_given_df["additional_questions_asked"] = feedback_given_df.apply(
+feedback_given_df.loc[:, "additional_questions_asked"] = feedback_given_df.apply(
     mark_questions_asked, axis=1
 )
 
@@ -181,7 +181,7 @@ path_cols = [
     "additional_questions_asked",
 ]
 
-feedback_given_df["survey_assist_classified"] = feedback_given_df[
+feedback_given_df.loc[:, "survey_assist_classified"] = feedback_given_df[
     "survey_assist_classified"
 ].fillna(False)
 
@@ -1221,18 +1221,20 @@ print(
 # (this cell - visualising distributions)
 
 # For total summary stats
-eval_df["generic_open_q"] = eval_df["survey_assist_open_question"].str.startswith(
-    "What is your employer's main business activity?"
-)
-
-# # For feedback analysis
-feedback_given_df["generic_open_q"] = feedback_given_df[
+eval_df.loc[:, "generic_open_q"] = eval_df[
     "survey_assist_open_question"
 ].str.startswith("What is your employer's main business activity?")
 
-eval_df["additional_questions_asked"] = eval_df.apply(mark_questions_asked, axis=1)
+# # For feedback analysis
+feedback_given_df.loc[:, "generic_open_q"] = feedback_given_df[
+    "survey_assist_open_question"
+].str.startswith("What is your employer's main business activity?")
+
+eval_df.loc[:, "additional_questions_asked"] = eval_df.apply(
+    mark_questions_asked, axis=1
+)
 sa_coded_dynamic_df = eval_df[eval_df["additional_questions_asked"]]
-feedback_given_df["additional_questions_asked"] = feedback_given_df.apply(
+feedback_given_df.loc[:, "additional_questions_asked"] = feedback_given_df.apply(
     mark_questions_asked, axis=1
 )
 feedback_given_dynamic_df = feedback_given_df[
