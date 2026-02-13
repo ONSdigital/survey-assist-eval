@@ -6,7 +6,6 @@ Note: ### = commented out to pass linting
 
 # pylint: disable=C0301,C0103,R0801,C0302,C0121
 
-import json
 from textwrap import wrap
 
 import dotenv
@@ -709,12 +708,10 @@ plt.savefig(
 # Analysis of LLM wait-time impact on Feedback:
 
 ### Parsing LLM wait times:
-with open("./time-in-dynamic-questions-08-Dec-1530.json", encoding="utf8") as f:
-    llm_time_data = json.load(f)["users"]
 
-llm_wait_time_df = pd.DataFrame(llm_time_data)
-llm_wait_time_df.sample(n=10)
-
+llm_wait_time_df = pd.read_json(
+    f"{folder}/logs_scraped_timing_data/time-in-dynamic-questions-08-Dec-1530_extracted.json"
+)
 # print(
 #     llm_wait_time_df["person_id"].value_counts().max()
 # )  # check for multiple llm interaction times per user
