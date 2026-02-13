@@ -12,13 +12,13 @@ import dotenv
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from helper_load_data import load_data
 from matplotlib.gridspec import GridSpec
 from scipy.stats import kruskal, mannwhitneyu
 from scipy.stats import t as stats_t  # type: ignore[attr-defined]
 
 from survey_assist_utils.data_cleaning.sic_codes import (
     get_clean_n_digit_codes,
-    parse_numerical_code,
 )
 
 # %%
@@ -42,60 +42,8 @@ out_folder = None  # type: ignore[assignment]
 eval_df = pd.read_parquet(folder + "/evaluation_df_with_sa_clean_codes.parquet")
 
 # %%
-# pylint: disable=fixme
-# (initial processing to form SIC Section column taken from Iva's notebook)
-# TODO - refactor to use notebooks/november_tests/helper utils when added to main branch
-
-# load combined df with codability levels
-sa_coded_df = pd.read_parquet(folder + "/evaluation_df_with_sa_clean_codes.parquet")
-sa_closed_q = pd.read_parquet(
-    folder + "/closed_questions/closed_questions_codes.parquet"
-)
-cc_coded_df = pd.read_parquet(
-    folder + "/clerically-coded/clerical_df_with_cc_clean_codes.parquet"
-)
-
-eval_df = sa_coded_df.merge(
-    sa_closed_q.drop(
-        columns=sa_closed_q.columns.intersection(sa_coded_df.columns).difference(
-            ["unique_id", "user"]
-        )
-    ),
-    on=["unique_id", "user"],
-    how="outer",
-).merge(
-    cc_coded_df.drop(
-        columns=cc_coded_df.columns.intersection(sa_coded_df.columns).difference(
-            ["unique_id", "user"]
-        )
-    ),
-    on=["unique_id", "user"],
-    how="outer",
-)
-
-print(
-    f"Loaded data with {eval_df.shape[0]} records. "
-    f"Merging clerical ({cc_coded_df.shape[0]}) with model data ({sa_coded_df.shape[0]}) "
-    f"and closed q data ({sa_closed_q.shape[0]})."
-)
-
-# parquet doesn't like sets it saves it as arrays, convert back
-set_cols = [
-    "sa_initial_codes",
-    "sa_final_codes_open_q",
-    "cc_initial_codes",
-    "cc_final_codes_open_q",
-]
-
-for col in set_cols:
-    msk = eval_df[col].notna()
-    eval_df.loc[msk, col] = eval_df.loc[msk, col].apply(set)
-    eval_df.loc[~msk, col] = [set() for _ in range(msk.sum(), eval_df.shape[0])]
-
-# and convert closed q codes to set for consistency
-eval_df["sa_final_codes_closed_q"] = eval_df[
-    "survey_assist_closed_question_response_code"
-].apply(lambda x: get_clean_n_digit_codes(parse_numerical_code(x), n=5)[0])
+# load & merge evaluation datasets
+eval_df = load_data(folder)
 
 
 # update sic_section column based on final clerical codes
@@ -134,9 +82,7 @@ def extract_sic_section(row):
 
 eval_df["SIC Section"] = eval_df.apply(extract_sic_section, axis=1)
 
-
 # %%
-
 # Convert feedback responses to scores:
 
 feedback_cols = [
@@ -1275,19 +1221,17 @@ print(
 # (this cell - visualising distributions)
 
 # For total summary stats
-sa_coded_df["generic_open_q"] = sa_coded_df[
-    "survey_assist_open_question"
-].str.startswith("What is your employer's main business activity?")
+eval_df["generic_open_q"] = eval_df["survey_assist_open_question"].str.startswith(
+    "What is your employer's main business activity?"
+)
 
 # # For feedback analysis
 feedback_given_df["generic_open_q"] = feedback_given_df[
     "survey_assist_open_question"
 ].str.startswith("What is your employer's main business activity?")
 
-sa_coded_df["additional_questions_asked"] = sa_coded_df.apply(
-    mark_questions_asked, axis=1
-)
-sa_coded_dynamic_df = sa_coded_df[sa_coded_df["additional_questions_asked"]]
+eval_df["additional_questions_asked"] = eval_df.apply(mark_questions_asked, axis=1)
+sa_coded_dynamic_df = eval_df[eval_df["additional_questions_asked"]]
 feedback_given_df["additional_questions_asked"] = feedback_given_df.apply(
     mark_questions_asked, axis=1
 )
@@ -1480,3 +1424,5 @@ plt.tight_layout()
 plt.savefig(
     "corr_mat_feedback_generic_or_specific_Q_MW_CLES.png", dpi=275, transparent=True
 )
+
+# %%
