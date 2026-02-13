@@ -1020,10 +1020,6 @@ result_comfort = kruskal(
     ]
 )
 
-# ets^2 Effect Size:
-# eta2[H] = (H - k + 1)/(n - k)
-# https://search.r-project.org/CRAN/refmans/rstatix/html/kruskal_effsize.html
-
 effect_strength_ease = (result_ease.statistic - 10 + 1) / (
     len(feedback_given_df_age_dummies) - 10
 )
