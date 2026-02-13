@@ -1239,64 +1239,12 @@ feedback_given_dynamic_df = feedback_given_df[
     feedback_given_df["additional_questions_asked"]
 ]
 
-
 print(
     f"total generic open questions: {sa_coded_dynamic_df['generic_open_q'].value_counts()}, {sa_coded_dynamic_df['generic_open_q'].value_counts()/len(sa_coded_dynamic_df)}%"
 )
 print(
     f"feedback-given generic open questions: {feedback_given_dynamic_df['generic_open_q'].value_counts()}, {feedback_given_dynamic_df['generic_open_q'].value_counts()/len(feedback_given_dynamic_df)}"
 )
-
-total_counts = sa_coded_dynamic_df["generic_open_q"].value_counts()
-feedback_counts = feedback_given_dynamic_df["generic_open_q"].value_counts()
-
-labels = ["Specific Question", "Generic Question"]
-x = np.arange(len(labels))
-width = 0.35
-
-fig, ax = plt.subplots(figsize=(10, 8))
-rects1 = ax.bar(
-    x - width / 2,
-    [total_counts.get(False, 0), total_counts.get(True, 0)],
-    width,
-    label=f"All Open Questions (n={len(sa_coded_dynamic_df)})",
-    color="#12436D",
-)
-rects2 = ax.bar(
-    x + width / 2,
-    [feedback_counts.get(False, 0), feedback_counts.get(True, 0)],
-    width,
-    label=f"Open Questions - Responses Where\nFeedback Was Provided (n={len(feedback_given_dynamic_df)})",
-    color="#28A197",
-)
-
-ax.set_ylabel("Number of Respondents", fontsize=18)
-ax.set_title("Distribution of Open Question Type", fontsize=18)
-ax.set_xticks(x)
-ax.set_xticklabels(labels, fontsize=16)
-ax.set_ylim(0, 550)
-ax.legend(fontsize=12)
-
-total_n = len(sa_coded_dynamic_df)
-feedback_n = len(feedback_given_dynamic_df)
-
-ax.bar_label(
-    rects1,
-    padding=3,
-    fmt=lambda x: f"{int(x)}\n({x/total_n:.0%})" if x > 0 else "",
-    fontsize=14,
-)
-ax.bar_label(
-    rects2,
-    padding=3,
-    fmt=lambda x: f"{int(x)}\n({x/feedback_n:.0%})" if x > 0 else "",
-    fontsize=14,
-)
-
-fig.tight_layout()
-plt.savefig("generic_vs_specific_open_q_dist.png", dpi=275, transparent=True)
-
-
 # %%
 # General / Specific Open Question Impact Analysis:
 # (this cell - statistical tests & heatmap visualisation)
@@ -1424,5 +1372,3 @@ plt.tight_layout()
 plt.savefig(
     "corr_mat_feedback_generic_or_specific_Q_MW_CLES.png", dpi=275, transparent=True
 )
-
-# %%
