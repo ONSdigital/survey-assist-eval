@@ -1087,115 +1087,16 @@ plt.savefig("corr_mat_feedback_age_KW_eta2.png", dpi=275, transparent=True)
 # Comparison of expected/observed age distributions with general working population:
 # (source: https://www.ons.gov.uk/employmentandlabourmarket/peopleinwork/employmentandemployeetypes/datasets/employmentunemploymentandeconomicinactivitybyagegroupseasonallyadjusteda05sa)
 
-employed_16_18 = np.array(
-    [
-        346,
-        327,
-        338,
-        339,
-        325,
-        314,
-        320,
-        337,
-        338,
-        345,
-        330,
-        326,
-        316,
-    ]
-).mean()
+df_expected_ages = pd.read_csv(f"{folder}/LFS_age_distributions.csv")
 
-employed_18_24 = np.array(
-    [
-        3_365,
-        3_385,
-        3_397,
-        3_435,
-        3_429,
-        3_436,
-        3_476,
-        3_513,
-        3_527,
-        3_530,
-        3_563,
-        3_529,
-        3_548,
-    ]
-).mean()
-
+employed_16_18 = df_expected_ages["employed_16_18"].mean()
+employed_18_24 = df_expected_ages["employed_18_24"].mean()
 employed_16_24 = employed_16_18 + employed_18_24
+employed_25_34 = df_expected_ages["employed_25_34"].mean()
+employed_35_49 = df_expected_ages["employed_35_49"].mean()
+employed_50_64 = df_expected_ages["employed_50_64"].mean()
+employed_65_plus = df_expected_ages["employed_65_plus"].mean()
 
-employed_25_34 = np.array(
-    [
-        7_629,
-        7_643,
-        7_675,
-        7_670,
-        7_669,
-        7_675,
-        7_715,
-        7_716,
-        7_714,
-        7_666,
-        7_672,
-        7_675,
-        7_711,
-    ]
-).mean()
-
-employed_35_49 = np.array(
-    [
-        11_402,
-        11_430,
-        11_456,
-        11_450,
-        11_499,
-        11_495,
-        11_507,
-        11_515,
-        11_505,
-        11_471,
-        11_473,
-        11_485,
-        11_525,
-    ]
-).mean()
-
-employed_50_64 = np.array(
-    [
-        9_488,
-        9_513,
-        9_476,
-        9_497,
-        9_461,
-        9_510,
-        9_513,
-        9_484,
-        9_462,
-        9_503,
-        9_487,
-        9_472,
-        9_480,
-    ]
-).mean()
-
-employed_65_plus = np.array(
-    [
-        1_559,
-        1_565,
-        1_580,
-        1_606,
-        1_592,
-        1_581,
-        1_598,
-        1_648,
-        1_696,
-        1_705,
-        1_668,
-        1_740,
-        1_722,
-    ]
-).mean()
 
 employed_total = (
     employed_16_24 + employed_25_34 + employed_35_49 + employed_50_64 + employed_65_plus
