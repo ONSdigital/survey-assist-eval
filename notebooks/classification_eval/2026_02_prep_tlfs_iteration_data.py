@@ -119,3 +119,8 @@ combined_df.loc[~combined_df["kb_used"], "kb_initial_codes"] = combined_df.loc[
 
 
 # %%
+combined_df.to_parquet(
+    f"{bucket_prefix}two_prompt_pipeline/2026_02_tlfs_it9_gemini25/sa_cc_combined.parquet",
+    index=False,
+)
+# %%

@@ -23,19 +23,27 @@ from survey_assist_utils.evaluation.metrics import (
 )
 
 # %%
-data_bucket = dotenv.get_key(".env", "PREPROD_DATA_BUCKET") or ""
-work_dir = data_bucket + "analysis-interim-results"
+bucket_prefix = dotenv.get_key(".env", "BUCKET_PREFIX")
 out_dir = (
     "data/figures/"  # needs local folder unfortunately, set to None to skip saving
 )
 if out_dir:
     os.makedirs(out_dir, exist_ok=True)
 
-# %%
-# combined_df_copy = combined_df.copy()
-thr = sum(combined_df_copy["sic_section"] == "-9") + 1
+
+# %% read data prepared in 2026_02_prep_tlfs_iteration_data.py
+combined_df = pd.read_parquet(
+    f"{bucket_prefix}two_prompt_pipeline/2026_02_tlfs_it9_gemini25/sa_cc_combined.parquet"
+)
+# ensure code columns are sets (they were saved as arrays in parquet)
+for col in [col for col in combined_df.columns if "codes" in col.lower()]:
+    combined_df[col] = combined_df[col].apply(set)
+
+
+# %% create groups by SIC sections
+thr = sum(combined_df["sic_section"] == "-9") + 1
 combined_df_sic = combine_small_groups(
-    combined_df_copy, "sic_section", group_size_threshold=thr
+    combined_df, "sic_section", group_size_threshold=thr
 )
 
 # %% calculate metrics at different digit levels for different methods
@@ -43,7 +51,6 @@ eval_metrics = {}
 stage_cols = {
     "SA only": ("cc_initial_codes", "sa_initial_codes"),
     "SA+lookup": ("cc_initial_codes", "kb_initial_codes"),
-    #    "Final Closed Q": ("cc_final_codes_open_q", "sa_final_codes_closed_q"),
 }
 for sic in combined_df_sic["sic_section"].unique():
     combined_df = combined_df_sic[combined_df_sic["sic_section"] == sic].copy()
@@ -82,20 +89,29 @@ plot_df_f1 = pd.DataFrame(
             "precision": v.ambiguity_metrics.precision if k[2] == "sa_cc" else None,
             "recall": v.ambiguity_metrics.recall if k[2] == "sa_cc" else None,
             "accuracy": v.ambiguity_metrics.accuracy if k[2] == "sa_cc" else None,
+            "confusion_matrix": (
+                f"TP={v.ambiguity_metrics.TP}, FP={v.ambiguity_metrics.FP}, FN={v.ambiguity_metrics.FN}, TN={v.ambiguity_metrics.TN}"
+                if k[2] == "sa_cc"
+                else None
+            ),
         }
         for k, v in eval_metrics.items()
     ]
 )
 # drop "CC Final Closed Q" (as we used the open_q clerical codes for that)
 plot_df_f1 = plot_df_f1[plot_df_f1.method != "CC SA only"].copy()
+plot_df_f1["method"] = (
+    plot_df_f1["method"].str.replace("CC SA+lookup", "CC").str.replace("SA SA", "SA")
+)
+
 
 # melt for easier plotting
 plot_df_f1 = plot_df_f1.melt(
-    id_vars=["digits", "method", "sic_section"],
+    id_vars=["digits", "method", "sic_section", "confusion_matrix"],
     value_vars=["codability", "precision", "recall", "f1", "accuracy"],
     var_name="metrics",
     value_name="value",
-)
+).sort_values(["method", "sic_section"], ascending=[False, True])
 
 # add wald CI for codability
 n = combined_df.shape[0]
@@ -112,6 +128,7 @@ fig = px.line(
     title="Ambiguity Decision Metrics by Number of Digits and Method",
     markers=True,
     template="simple_white",
+    hover_data={"confusion_matrix": True, "value": ":.2%"},
     # error_y="ci",
 )
 # drop first part of facet annotation
@@ -140,7 +157,7 @@ Accuracy: Overall percentage of correct codability/ambiguity decisions.
     showarrow=False,
     font={"size": 10},
 )
-fig.update_layout(height=500, width=1000)
+fig.update_layout(height=500, width=1200)
 fig.show()
 
 if out_dir:
@@ -154,7 +171,7 @@ plot_df_accu = pd.DataFrame(
         {
             "sic_section": k[3],
             "digits": str(k[0]) if k[0] > 0 else "S",
-            "Stage": k[1],
+            "method": k[1],
             "OO Accuracy": (
                 v.initial_accuracy_metrics.accuracy_oo_unambiguous,
                 v.initial_accuracy_metrics.matches_oo,
@@ -183,11 +200,11 @@ plot_df_accu = pd.DataFrame(
 
 # melt for easier plotting
 plot_df_accu = plot_df_accu.melt(
-    id_vars=["digits", "Stage", "sic_section"],
+    id_vars=["digits", "method", "sic_section"],
     value_vars=["OO Accuracy", "OM Accuracy", "MO Accuracy", "MM Accuracy"],
     var_name="metrics",
     value_name="value_tuple",
-)
+).sort_values(["method", "sic_section"], ascending=[False, True])
 # unwrap tuple into three columns
 plot_df_accu[["accu_value", "matches", "total"]] = pd.DataFrame(
     plot_df_accu["value_tuple"].tolist(), index=plot_df_accu.index
@@ -198,7 +215,7 @@ fig = px.line(
     x="digits",
     y="accu_value",
     color="sic_section",
-    line_dash="Stage",
+    line_dash="method",
     facet_col="metrics",
     title="Classification Accuracy Metrics by Number of Digits and Stage",
     markers=True,
@@ -230,7 +247,7 @@ MM: Many-to-Many match on the full set. (Is there any overlap between the cleric
     showarrow=False,
     font={"size": 10},
 )
-fig.update_layout(height=500, width=770)
+fig.update_layout(height=500, width=1000)
 fig.show()
 
 if out_dir:
