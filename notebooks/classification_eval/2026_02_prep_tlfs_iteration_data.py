@@ -1,4 +1,4 @@
-"""Work in progress notebook to visualize metrics for different models.
+"""Notebook to prepare data for TLFS iteration evaluation.
 
 It loads specific clerical coding data and model outputs from bucket.
 The bucket name and folder (on line 32) can be manually entered or it is read from
@@ -8,7 +8,7 @@ BUCKET_PREFIX = "gs://<bucket-name>/<folder>/"
 Disabled check for too long lines (f strings) and variables names (uppercase for constants)
 """
 
-# pylint: disable=C0301,C0103,R0801
+# pylint: disable=C0301,C0103
 
 # %%
 import dotenv

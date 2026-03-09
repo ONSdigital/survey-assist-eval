@@ -2,12 +2,12 @@
 
 Loads preprocessed data with both clerical and SA codings,
 calculates various metrics and visualises them.
-Expects environment variable PREPROD_DATA_BUCKET to be set.
+Expects environment variable BUCKET_PREFIX to be set.
 
 Disabled check for too long lines (f strings) and variables names (uppercase for constants)
 """
 
-# pylint: disable=C0301,C0103,R0801,W0104
+# pylint: disable=C0301,C0103,W0104
 
 # %%
 import os
@@ -39,6 +39,16 @@ combined_df = pd.read_parquet(
 for col in [col for col in combined_df.columns if "codes" in col.lower()]:
     combined_df[col] = combined_df[col].apply(set)
 
+# %% create code columns at each digit level for clerical and SA initial codes
+stage_cols = {
+    "SA only": ("cc_initial_codes", "sa_initial_codes"),
+    "SA+lookup": ("cc_initial_codes", "kb_initial_codes"),
+}
+for col in set().union(*stage_cols.values()):
+    for DIGITS in [0, 2, 3, 4, 5]:
+        combined_df[f"{col}_to_{DIGITS}digits"] = combined_df[col].apply(
+            lambda x, n=DIGITS: get_clean_n_digit_codes(x, n=n)[0]
+        )
 
 # %% create groups by SIC sections
 thr = sum(combined_df["sic_section"] == "-9") + 1
@@ -48,29 +58,19 @@ combined_df_sic = combine_small_groups(
 
 # %% calculate metrics at different digit levels for different methods
 eval_metrics = {}
-stage_cols = {
-    "SA only": ("cc_initial_codes", "sa_initial_codes"),
-    "SA+lookup": ("cc_initial_codes", "kb_initial_codes"),
-}
-for sic in combined_df_sic["sic_section"].unique():
-    combined_df = combined_df_sic[combined_df_sic["sic_section"] == sic].copy()
-    for stage, col_names in stage_cols.items():
-        for DIGITS in [0, 2, 3, 4, 5]:
-            for col in col_names:
-                print(
-                    f"Processing {stage} codes to {DIGITS} digits for column {col}..."
-                )
-                combined_df[f"{col}_to_{DIGITS}digits"] = combined_df[col].apply(
-                    lambda x, n=DIGITS: get_clean_n_digit_codes(x, n=n)[0]
-                )
+for stage, col_names in stage_cols.items():
+    for DIGITS in [0, 2, 3, 4, 5]:
+        for sic in sorted(combined_df_sic["sic_section"].unique()):
+            print(f"Processing {stage} codes to {DIGITS} digits for section {sic}...")
+            sub_df = combined_df_sic[combined_df_sic["sic_section"] == sic].copy()
             eval_metrics[(DIGITS, stage, "sa_cc", sic)] = calc_simple_metrics(
-                combined_df,
+                sub_df,
                 truth_col=f"{col_names[0]}_to_{DIGITS}digits",
                 initial_model_col=f"{col_names[1]}_to_{DIGITS}digits",
                 final_model_col=None,
             )
             eval_metrics[(DIGITS, stage, "cc_cc", sic)] = calc_simple_metrics(
-                combined_df,
+                sub_df,
                 truth_col=f"{col_names[0]}_to_{DIGITS}digits",
                 initial_model_col=f"{col_names[0]}_to_{DIGITS}digits",
                 final_model_col=None,
@@ -349,15 +349,17 @@ for DIGITS in [5, 2, 0]:
 
 # %%
 # get examples
-digits = 2
+digits = 5
+tmp_df = combined_df[combined_df.sic_section == "G"].copy()
+min_mistakes = 5
 
 col_cc = f"cc_initial_codes_to_{digits}digits"
-col_sa = f"sa_initial_codes_to_{digits}digits"
-mask_diff = combined_df[col_sa] != combined_df[col_cc]
-mask_excl = combined_df.apply(
+col_sa = f"kb_initial_codes_to_{digits}digits"
+mask_diff = tmp_df[col_sa] != tmp_df[col_cc]
+mask_excl = tmp_df.apply(
     lambda row: len(row[col_cc].intersection(row[col_sa])) == 0, axis=1
 )
-tmp_df = combined_df[mask_diff].copy()
+tmp_df = tmp_df[mask_excl].copy()
 tmp_df["cc_codes_str"] = tmp_df[col_cc].apply(lambda x: ", ".join(sorted(x)))
 tmp_df["sa_codes_str"] = tmp_df[col_sa].apply(lambda x: ", ".join(sorted(x)))
 frequent_mistakes = (
@@ -366,19 +368,16 @@ frequent_mistakes = (
     .sort_values(ascending=False)
     .reset_index(name="count")
 )
-min_mistakes = 4
 print(frequent_mistakes[frequent_mistakes["count"] > min_mistakes])
 
 examples = pd.DataFrame()
 columns = [
-    "user",
-    "job_title",
-    "job_description",
-    "org_description",
+    "unique_id",
+    "soc2020_job_title",
+    "soc2020_job_description",
+    "merged_industry_desc",
     "cc_codes_str",
     "sa_codes_str",
-    "survey_assist_open_question",
-    "survey_assist_open_question_response",
 ]
 for _, row in frequent_mistakes[frequent_mistakes["count"] > min_mistakes].iterrows():
     msk = (tmp_df["sa_codes_str"] == row.sa_codes_str) & (
@@ -391,96 +390,8 @@ pd.set_option("display.max_columns", None)
 pd.set_option("display.max_colwidth", None)
 print(examples)
 
+
 # %%
-# look at examples where clerical coders were initially sure and sa not
-mask_not_needed = (combined_df["sa_initial_codes"].apply(len) > 1) & (
-    combined_df["cc_initial_codes"].apply(len) == 1
-)
-tmp_df = combined_df[mask_not_needed].copy()
-print(tmp_df["cc_initial_codes"].value_counts())
-top_two = tmp_df["cc_initial_codes"].value_counts().index[:2]
-# %%
-msk = tmp_df["cc_initial_codes"].isin(top_two) & (
-    tmp_df["sa_initial_codes"].apply(len) > 1
-)
-print(msk.sum())
-print(
-    f"cc_final_open_q == {top_two} for {(tmp_df.loc[msk,'cc_final_codes_open_q']!={'88990'}).sum()}"
-)
-sub_df = tmp_df.loc[
-    msk,
-    [
-        *columns[:4],
-        "sa_initial_codes",
-        "sa_final_codes_open_q",
-        "sa_final_codes_closed_q",
-        "cc_initial_codes",
-        "cc_final_codes_open_q",
-        "clerical_code_initial",
-    ],
+tmp_df[(tmp_df.cc_codes_str == "47710") & (tmp_df.sa_codes_str == "47110")][
+    [*columns, "sic_ind_occ1"]
 ]
-print(sub_df)
-sub_df["cc_changed"] = sub_df["cc_initial_codes"] != sub_df["cc_final_codes_open_q"]
-sub_df["sa_final_agree_open_q"] = (
-    sub_df["cc_initial_codes"] == sub_df["sa_final_codes_open_q"]
-)
-sub_df["sa_final_agree_closed_q"] = (
-    sub_df["cc_initial_codes"] == sub_df["sa_final_codes_closed_q"]
-)
-sub_df["nota"] = sub_df["sa_final_codes_closed_q"] == set()
-print(
-    sub_df.groupby(["clerical_code_initial"])[
-        ["cc_changed", "sa_final_agree_open_q", "sa_final_agree_closed_q", "nota"]
-    ].sum()
-)
-
-# %%
-# some more examples for the report
-msk = combined_df.cc_initial_codes_to_0digits.map(
-    lambda x: "J" in x
-) & combined_df.sa_initial_codes_to_0digits.map(lambda x: "M" in x)
-combined_df.loc[
-    msk,
-    [
-        "job_title",
-        "job_description",
-        "org_description",
-        "cc_initial_codes_to_0digits",
-        "clerical_code_initial",
-        "sa_initial_codes_to_0digits",
-        "sa_initial_codes",
-    ],
-]
-
-
-# %%
-# section M sees decrease in CC codability at 2-digits levels
-msk = (combined_df["SIC Section"] == "M") & (
-    combined_df["cc_codability_gain_open_q"] < -1
-)
-combined_df.loc[
-    msk,
-    [
-        "job_title",
-        "job_description",
-        "org_description",
-        "cc_initial_codes_to_2digits",
-        "clerical_code_initial",
-        "cc_final_codes_open_q_to_2digits",
-        "sa_initial_codes",
-        "survey_assist_open_question",
-        "survey_assist_open_question_response",
-        "sa_final_codes_open_q",
-    ],
-]
-
-# %%
-msk = (combined_df.sa_final_codes_open_q.map(len) == 1) & (
-    combined_df.sa_initial_codes.map(len) > 1
-)
-combined_df["cc_shortlist"] = combined_df.apply(
-    lambda row: row.sa_final_codes_open_q.issubset(row.sa_initial_codes), axis=1
-)
-combined_df.loc[msk, "cc_shortlist"].value_counts()
-
-# %%
