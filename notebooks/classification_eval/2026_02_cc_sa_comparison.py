@@ -24,20 +24,30 @@ from survey_assist_utils.evaluation.metrics import (
 
 # %%
 bucket_prefix = dotenv.get_key(".env", "BUCKET_PREFIX")
-out_dir = (
-    "data/figures/"  # needs local folder unfortunately, set to None to skip saving
-)
+out_dir = "data/figures/tlfs_it11/"  # needs local folder unfortunately, set to None to skip saving
 if out_dir:
     os.makedirs(out_dir, exist_ok=True)
 
-
-# %% read data prepared in 2026_02_prep_tlfs_iteration_data.py
-combined_df = pd.read_parquet(
-    f"{bucket_prefix}two_prompt_pipeline/2026_02_tlfs_it9_gemini25/sa_cc_combined.parquet"
+work_folder = (
+    f"{bucket_prefix}two_prompt_pipeline/2026_03_tlfs_it11_gemini25_europe_west9/"
 )
+
+# %% read data prepared in 2026_02_prep_tlfs_iteration_data.py script
+combined_df = pd.read_parquet(f"{work_folder}sa_cc_combined.parquet")
 # ensure code columns are sets (they were saved as arrays in parquet)
 for col in [col for col in combined_df.columns if "codes" in col.lower()]:
+    print(f"Converting {col} to sets...")
     combined_df[col] = combined_df[col].apply(set)
+
+# %%
+# OPTIONAL: add cc for known sections, it impacts mostly F (10%) and a bit G (3%), N(2%)
+msk = combined_df["cc_initial_codes"].map(len) == 0
+combined_df["cc_initial_codes_add_section"] = combined_df["cc_initial_codes"]
+combined_df.loc[msk, "cc_initial_codes_add_section"] = combined_df.loc[
+    msk, "sic_section"
+].apply(lambda x: get_clean_n_digit_codes(x, n=5)[0])
+
+combined_df["cc_initial_codes"] = combined_df["cc_initial_codes_add_section"]
 
 # %% create code columns at each digit level for clerical and SA initial codes
 stage_cols = {
@@ -299,6 +309,16 @@ for DIGITS in [5, 2, 0]:
             )
             continue
 
+        # Compute min/max for color scale excluding diagonal
+        non_diag_values = [
+            plot_df.loc[i, c]
+            for i in plot_df.index
+            for c in plot_df.columns
+            if plot_df.loc[i, c] not in ("", None, 0) and i != c
+        ]
+        color_min = min(non_diag_values)
+        color_max = max(non_diag_values)
+
         fig = px.imshow(
             plot_df,
             text_auto=True,
@@ -306,6 +326,8 @@ for DIGITS in [5, 2, 0]:
             color_continuous_scale="Blues",
             title=f"Confusion matrix for SIC section, Clerical vs SurveyAssist<br><b>{lab}</b>",
             template="simple_white",
+            zmin=color_min,
+            zmax=color_max,
         )
         # reorder x axis values
         fig.update_xaxes(
@@ -350,7 +372,7 @@ for DIGITS in [5, 2, 0]:
 # %%
 # get examples
 digits = 5
-tmp_df = combined_df[combined_df.sic_section == "G"].copy()
+tmp_df = combined_df[combined_df.sic_section == "C"].copy()
 min_mistakes = 5
 
 col_cc = f"cc_initial_codes_to_{digits}digits"
@@ -362,8 +384,11 @@ mask_excl = tmp_df.apply(
 tmp_df = tmp_df[mask_excl].copy()
 tmp_df["cc_codes_str"] = tmp_df[col_cc].apply(lambda x: ", ".join(sorted(x)))
 tmp_df["sa_codes_str"] = tmp_df[col_sa].apply(lambda x: ", ".join(sorted(x)))
+tmp_df["sa_section"] = tmp_df["kb_initial_codes_to_0digits"].apply(
+    lambda x: ", ".join(sorted(x))
+)
 frequent_mistakes = (
-    tmp_df.groupby(["cc_codes_str", "sa_codes_str"])
+    tmp_df.groupby(["cc_codes_str", "sa_codes_str", "sa_section"])
     .size()
     .sort_values(ascending=False)
     .reset_index(name="count")
@@ -378,6 +403,7 @@ columns = [
     "merged_industry_desc",
     "cc_codes_str",
     "sa_codes_str",
+    "sa_section",
 ]
 for _, row in frequent_mistakes[frequent_mistakes["count"] > min_mistakes].iterrows():
     msk = (tmp_df["sa_codes_str"] == row.sa_codes_str) & (
@@ -392,6 +418,6 @@ print(examples)
 
 
 # %%
-tmp_df[(tmp_df.cc_codes_str == "47710") & (tmp_df.sa_codes_str == "47110")][
-    [*columns, "sic_ind_occ1"]
+tmp_df[(tmp_df.cc_codes_str == "43999") & (tmp_df.sa_codes_str == "41202")][
+    [*columns, "sic_ind_occ1", "sic_ind1"]
 ]

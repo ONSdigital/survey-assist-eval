@@ -1,6 +1,7 @@
 """Test SIC code parsing and validation."""
 
 # pylint: disable=C0116
+# ruff: noqa: PLR2004
 
 import pytest
 
@@ -47,7 +48,6 @@ def test_expand_to_n_digit_str():
 
 
 def test_get_clean_n_digit_one_code():
-    print(get_clean_n_digit_one_code("86", 5))
     assert get_clean_n_digit_one_code("861012", 5) == {"86101"}
     assert get_clean_n_digit_one_code("86101", 5) == {"86101"}
     group86 = {"86100", "86102", "86230", "86220", "86900", "86101", "86210"}
@@ -55,6 +55,13 @@ def test_get_clean_n_digit_one_code():
     assert get_clean_n_digit_one_code("86", 5) == group86
     assert get_clean_n_digit_one_code("861012", 3) == {"861"}
     assert get_clean_n_digit_one_code("86101", 0) == {"Q"}
+
+
+def test_get_clean_n_digit_codes_from_section():
+    assert get_clean_n_digit_codes("C", 0)[0] == {"C"}
+    assert len(get_clean_n_digit_codes("I", 5)[0]) == 16
+    assert len(get_clean_n_digit_codes("M", 2)[0]) == 7
+    assert get_clean_n_digit_codes("Z", 0)[1] == {"Z"}
 
 
 def test_get_clean_n_digit_codes_with_invalid():
@@ -65,13 +72,13 @@ def test_get_clean_n_digit_codes_with_invalid():
     # Check valid codes are processed
     assert "86101" in valid
     assert "86210" in valid
-    assert len(valid) == 2  # noqa: PLR2004
+    assert len(valid) == 2
 
     # Check invalid codes are captured correctly
     assert "NotACode" in invalid
     # "123456789" will likely fail the .isdigit() check or validation check
     assert "123456789" in invalid
-    assert len(invalid) == 2  # noqa: PLR2004
+    assert len(invalid) == 2
 
     # Case 2: Purely invalid codes
     bad_input = ["Bad1", "Bad2"]

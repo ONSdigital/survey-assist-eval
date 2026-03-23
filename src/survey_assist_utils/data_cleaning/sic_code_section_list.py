@@ -831,3 +831,15 @@ def generate_section_lookup(section_list: tuple) -> dict:
 
 
 SECTION_LOOKUP = generate_section_lookup(SIC_CODE_SECTION_LIST)
+
+
+def generate_section_unwrapped(section_list: tuple) -> dict:
+    """Generate a lookup dictionary mapping SIC codes prefix to their section letters."""
+    section_unwrapped: dict[str, set[str]] = {}
+    for section, code in section_list:
+        section_unwrapped[section] = section_unwrapped.get(section, set())
+        section_unwrapped[section].add(code)
+    return section_unwrapped
+
+
+SECTION_UNWRAPPED = generate_section_unwrapped(SIC_CODE_SECTION_LIST)

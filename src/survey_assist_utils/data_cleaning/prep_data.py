@@ -83,11 +83,19 @@ def prep_clerical_codes(
             how="outer",
             suffixes=("", "_4plus"),
         )
-        msk = df[f"{clerical_col}_4plus"].notna()
-        logging.info(
-            "Merging clerical codes from '4+' DataFrame for %d entries.", msk.sum()
-        )
-        df.loc[msk, clerical_col] = df.loc[msk, f"{clerical_col}_4plus"]
+        msk_4plus_needed = df[clerical_col + "1"].isin(["4", "4+", "4plus", "+4"])
+        msk_4plus_available = df[f"{clerical_col}_4plus"].notna()
+        if (msk_4plus_needed & ~msk_4plus_available).any():
+            logger.warning(
+                "There are %d entries that require '4+' but are missing in the secondary data.",
+                (msk_4plus_needed & ~msk_4plus_available).sum(),
+            )
+        msk = msk_4plus_needed & msk_4plus_available
+        if msk.any():
+            logger.info(
+                "Merging clerical codes from '4+' DataFrame for %d entries.", msk.sum()
+            )
+            df.loc[msk, clerical_col] = df.loc[msk, f"{clerical_col}_4plus"]
 
     df[[out_col, invalid_col]] = (
         df[clerical_col]
