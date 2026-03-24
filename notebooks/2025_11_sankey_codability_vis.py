@@ -10,8 +10,8 @@ import dotenv
 import pandas as pd
 import plotly.graph_objects as go
 
-from survey_assist_utils.data_cleaning.prep_data import prep_model_codes
-from survey_assist_utils.data_cleaning.sic_codes import get_codability_level
+from survey_assist_eval.data_cleaning.prep_data import prep_model_codes
+from survey_assist_eval.data_cleaning.sic_codes import get_codability_level
 
 # %%
 logger = logging.getLogger(__name__)

@@ -7,7 +7,7 @@ import logging
 import pandas as pd
 
 # Assuming these are imported from your utils
-from survey_assist_utils.data_cleaning.sic_codes import (
+from survey_assist_eval.data_cleaning.sic_codes import (
     extract_alt_candidates_n_digit_codes,
     get_clean_n_digit_codes,
     parse_numerical_code,

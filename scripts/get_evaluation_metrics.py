@@ -20,11 +20,11 @@ from argparse import ArgumentParser as AP
 
 import pandas as pd
 
-from survey_assist_utils.data_cleaning.prep_data import (
+from survey_assist_eval.data_cleaning.prep_data import (
     prep_clerical_codes,
     prep_model_codes,
 )
-from survey_assist_utils.evaluation.metrics import (
+from survey_assist_eval.evaluation.metrics import (
     calc_simple_metrics,
 )
 

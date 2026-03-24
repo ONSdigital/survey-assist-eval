@@ -2,7 +2,7 @@
 
 import pytest
 
-from survey_assist_utils.evaluation.code_comparison import (
+from survey_assist_eval.evaluation.code_comparison import (
     INVALID_VALUES,
     cast_code_to_set,
     compare_codes,

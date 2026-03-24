@@ -25,7 +25,7 @@ from scipy.stats import (
     ttest_ind,
 )
 
-from survey_assist_utils.data_cleaning.sic_codes import get_clean_n_digit_codes
+from survey_assist_eval.data_cleaning.sic_codes import get_clean_n_digit_codes
 
 # %%
 preprod_bucket = dotenv.get_key(".env", "PREPROD_DATA_BUCKET")

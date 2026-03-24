@@ -24,7 +24,7 @@ from helper_load_data import load_data
 from matplotlib_venn import venn3
 from sklearn.metrics.pairwise import cosine_similarity
 
-from survey_assist_utils.data_cleaning.sic_codes import (
+from survey_assist_eval.data_cleaning.sic_codes import (
     get_clean_n_digit_codes,
     get_codability_level,
 )

@@ -60,7 +60,8 @@ from survey_assist_utils.api_token.jwt_utils import (
     resolve_jwt_secret_path,
 )
 from survey_assist_utils.cloud_store.gcs_utils import download_from_gcs, upload_to_gcs
-from survey_assist_utils.logging import get_logger
+
+from survey_assist_eval import get_logger
 
 # Create a logger instance
 logger = get_logger(__name__)
