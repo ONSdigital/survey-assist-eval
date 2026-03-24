@@ -17,7 +17,7 @@ import plotly.express as px
 from scipy.stats import binomtest
 
 from notebooks.november_test.helper_load_data import combine_small_groups
-from survey_assist_utils.data_cleaning.sic_codes import (
+from survey_assist_eval.data_cleaning.sic_codes import (
     CODABILITY_LEVELS,
     get_clean_n_digit_codes,
     parse_numerical_code,

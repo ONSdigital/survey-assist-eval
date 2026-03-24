@@ -21,7 +21,7 @@ from matplotlib.gridspec import GridSpec
 from scipy.stats import kruskal, mannwhitneyu
 from scipy.stats import t as stats_t  # type: ignore[attr-defined]
 
-from survey_assist_utils.data_cleaning.sic_codes import (
+from survey_assist_eval.data_cleaning.sic_codes import (
     get_clean_n_digit_codes,
 )
 

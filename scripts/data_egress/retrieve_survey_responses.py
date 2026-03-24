@@ -15,9 +15,7 @@ import pandas as pd
 from firebase_admin import firestore, initialize_app
 from google.cloud import storage
 
-from survey_assist_utils.logging import (
-    get_logger,
-)
+from survey_assist_eval import get_logger
 
 LOG_LEVEL = os.getenv("LOG_LEVEL", "DEBUG")
 

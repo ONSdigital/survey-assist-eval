@@ -2,7 +2,7 @@
 
 import pandas as pd
 
-from survey_assist_utils.data_cleaning.prep_data import (
+from survey_assist_eval.data_cleaning.prep_data import (
     get_clean_n_digit_codes,
     parse_numerical_code,
 )

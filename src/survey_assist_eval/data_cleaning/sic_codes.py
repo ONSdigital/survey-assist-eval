@@ -6,7 +6,7 @@ from collections.abc import Iterable
 
 import pandas as pd
 
-from survey_assist_utils.data_cleaning.sic_code_section_list import (
+from survey_assist_eval.data_cleaning.sic_code_section_list import (
     SECTION_LOOKUP,
     SECTION_UNWRAPPED,
     VALID_SIC_CODES,

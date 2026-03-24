@@ -5,7 +5,7 @@
 
 import pytest
 
-from survey_assist_utils.data_cleaning.sic_codes import (
+from survey_assist_eval.data_cleaning.sic_codes import (
     asses_codability_gain,
     expand_to_n_digit_str,
     extract_alt_candidates_n_digit_codes,

@@ -3,7 +3,7 @@
 import pandas as pd
 import pytest
 
-from survey_assist_utils.evaluation.metrics import (
+from survey_assist_eval.evaluation.metrics import (
     calc_accuracy_metrics,
     calc_ambiguity_metrics,
     calc_codability_metrics,
