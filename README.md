@@ -29,8 +29,8 @@ Ensure you have the following installed on your local machine:
 
 1.  **Clone the repository**
     ```bash
-    git clone [https://github.com/ONSdigital/survey-assist-utils.git](https://github.com/ONSdigital/survey-assist-utils.git)
-    cd survey-assist-utils
+    git clone [https://github.com/ONSdigital/survey-assist-eval.git](https://github.com/ONSdigital/survey-assist-eval.git)
+    cd survey-assist-eval
     ```
 
 2. **Create and activate a virtual environment**

@@ -2,7 +2,7 @@
 name = "survey-assist-eval"
 version = "0.0.1"
 description = "Evaluation module for Survey Assist"
-authors = ["Steve Gibbard <steve.gibbard@ons.gov.uk>"]
+authors = ["ONS Data Science Campus <datasciencecampus@ons.gov.uk>"]
 license = "MIT"
 readme = "README.md"
 

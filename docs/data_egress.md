@@ -24,7 +24,7 @@ As a result, further validation checks are performed in the `reformat_and_make_c
 
 ## Prerequisites
 
-1.  **Python Virtual Environment**: Activate the `survey-assist-utils` virtual environment.
+1.  **Python Virtual Environment**: Activate the `survey-assist-eval` virtual environment.
 
 2.  **Google Cloud Authentication**: You must be authenticated to the Google Cloud project containing the Firestore database.
     ```sh

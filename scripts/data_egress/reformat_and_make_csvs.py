@@ -22,8 +22,8 @@ from datetime import datetime
 
 import pandas as pd
 from google.cloud import storage
+from survey_assist_utils import get_logger
 
-from survey_assist_eval import get_logger
 from survey_assist_eval.data_cleaning.data_egress_validity_utils import (
     assign_response_unique,
     assign_response_valid,

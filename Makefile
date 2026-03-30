@@ -19,7 +19,7 @@ check-python: ## Format the python code (auto fix)
 	poetry run ruff check . --fix
 	poetry run mypy --follow-untyped-imports  .
 	poetry run pylint --verbose .
-	poetry run bandit -r src/survey_assist_utils
+	poetry run bandit -r src/survey_assist_eval
 
 check-python-nofix: ## Format the python code (no fix)
 	poetry run isort . --check --verbose
@@ -27,7 +27,7 @@ check-python-nofix: ## Format the python code (no fix)
 	poetry run ruff check .
 	poetry run mypy --follow-untyped-imports  .
 	poetry run pylint --verbose .
-	poetry run bandit -r src/survey_assist_utils
+	poetry run bandit -r src/survey_assist_eval
 
 black: ## Run black
 	poetry run black .
