@@ -4,7 +4,7 @@ This module allows user to evaluate the quality of the Survey Assist (**SA**) St
 
 The individual scripts are designed to handle different data pre-processing steps, but share the same evaluation logic.
 
-The input data are expected to be in a parquet format, created by evaluation pipeline scripts in the `sic-classification-eval` repo, see notes at the end of this document.
+The input data are expected to be in a parquet format, created by evaluation pipeline scripts in the `sic-classification-utils` repo, see notes at the end of this document.
 
 Additionally, examples of visualizations of the evaluation metrics are available in the `notebooks/2025-10_semantic_vis.py` notebook.
 
@@ -52,7 +52,7 @@ This section provides additional information on preparing the data for metrics c
 To access the data, use the TLFS data. You can find it in the GCP bucket.
 1. Start up the vector store (`sic-classification-vector-store` repo, run `make run-vector-store`).
 
-In the `sic-classification-eval` repo (steps 2-4):
+In the `sic-classification-utils` repo (steps 2-4):
 
 2. Authenticate/re-authenticate gcloud `gcloud auth application-default login`.
 3. Create the metadata file (template is available in `sic-classification-utils` repo in `scripts/stage_1_add_semantic_search.py` within the module-level docstring)
