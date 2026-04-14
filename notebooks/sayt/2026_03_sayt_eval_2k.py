@@ -1,4 +1,9 @@
-"""Run small tests for industry/organisation descriptions SAYT."""
+"""Run small tests for industry/organisation descriptions SAYT.
+
+This notebook depends on the `sic-classification-utils` in optional `local-dev` group
+in pyproject.toml. To set up, run `make install-local-dev` from the root of this repo
+after cloning the `sic-classification-utils` repo at the same level as this one.
+"""
 
 # ruff: noqa: PLR2004
 # pylint: disable=protected-access,redefined-outer-name,C0103
