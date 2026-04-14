@@ -9,12 +9,9 @@ from pathlib import Path
 
 import requests
 from dotenv import load_dotenv
-
+from survey_assist_utils import get_logger
 from survey_assist_utils.api_token.jwt_utils import (  # pylint: disable=C0411
     generate_jwt,
-)
-from survey_assist_utils.logging import (
-    get_logger,
 )
 
 from .export_to_bq import confirm_bq_table_exists, schema_entry, write_to_bq

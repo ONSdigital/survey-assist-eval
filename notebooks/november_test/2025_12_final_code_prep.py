@@ -19,8 +19,8 @@ For production runs, set `out_dir` equal to `work_dir`.
 import dotenv
 import pandas as pd
 
-from survey_assist_utils.data_cleaning.prep_data import prep_model_codes
-from survey_assist_utils.data_cleaning.sic_codes import (
+from survey_assist_eval.data_cleaning.prep_data import prep_model_codes
+from survey_assist_eval.data_cleaning.sic_codes import (
     asses_codability_gain,
     get_clean_n_digit_codes,
     get_codability_level,

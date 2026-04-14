@@ -6,7 +6,7 @@ import json
 import pandas as pd
 import pytest
 
-from survey_assist_utils.data_cleaning.data_egress_validity_utils import (
+from survey_assist_eval.data_cleaning.data_egress_validity_utils import (
     assign_response_unique,
     assign_response_valid,
 )

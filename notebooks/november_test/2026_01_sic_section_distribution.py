@@ -17,7 +17,7 @@ import plotly.express as px
 from scipy.stats import binomtest
 
 from notebooks.november_test.helper_load_data import load_data
-from survey_assist_utils.data_cleaning.prep_data import get_clean_n_digit_codes
+from survey_assist_eval.data_cleaning.prep_data import get_clean_n_digit_codes
 
 # %%
 data_bucket = dotenv.get_key(".env", "PREPROD_DATA_BUCKET") or ""

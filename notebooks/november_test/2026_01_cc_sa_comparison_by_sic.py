@@ -17,8 +17,8 @@ import pandas as pd
 import plotly.express as px
 
 from notebooks.november_test.helper_load_data import combine_small_groups, load_data
-from survey_assist_utils.data_cleaning.prep_data import get_clean_n_digit_codes
-from survey_assist_utils.evaluation.metrics import (
+from survey_assist_eval.data_cleaning.prep_data import get_clean_n_digit_codes
+from survey_assist_eval.evaluation.metrics import (
     calc_simple_metrics,
 )
 

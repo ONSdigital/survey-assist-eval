@@ -14,8 +14,8 @@ Disabled check for too long lines (f strings) and variables names (uppercase for
 import dotenv
 import pandas as pd
 
-from survey_assist_utils.data_cleaning.prep_data import prep_clerical_codes
-from survey_assist_utils.data_cleaning.sic_codes import (
+from survey_assist_eval.data_cleaning.prep_data import prep_clerical_codes
+from survey_assist_eval.data_cleaning.sic_codes import (
     asses_codability_gain,
     get_codability_level,
 )
