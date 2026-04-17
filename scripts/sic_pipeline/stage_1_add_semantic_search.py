@@ -13,12 +13,13 @@ from re import sub as regex_sub
 import numpy as np
 import pandas as pd
 from industrial_classification_utils.embed.embedding import EmbeddingHandler
-from industrial_classification_utils.utils.shared_evaluation_pipeline_components import (
+from tqdm import tqdm
+
+from survey_assist_eval.pipeline.shared_components import (
     parse_args,
     persist_results,
     set_up_initial_state,
 )
-from tqdm import tqdm
 
 #####################################################
 # Default values and constants:
@@ -107,20 +108,14 @@ def _make_embedding_handler(in_metadata: dict) -> EmbeddingHandler:
     """Create an :class:`EmbeddingHandler` using settings from metadata where possible."""
     new_embedding_handler = EmbeddingHandler(
         embedding_model_name=in_metadata["embedding_model_name"],
-        db_dir=in_metadata["db_dir"],
-        k_matches=in_metadata["k_matches"],
+        db_dir=in_metadata["embedding_db_dir"],
+        k_matches=in_metadata["embedding_k_matches"],
     )
 
     new_embedding_handler.embed_index(
         from_empty=True,
-        sic_index_file=(
-            "industrial_classification_utils.data.sic_index",
-            in_metadata["sic_index_file"],
-        ),
-        sic_structure_file=(
-            "industrial_classification_utils.data.sic_index",
-            in_metadata["sic_structure_file"],
-        ),
+        sic_index_file=in_metadata["sic_index_file"],
+        sic_structure_file=in_metadata["sic_structure_file"],
     )
 
     return new_embedding_handler

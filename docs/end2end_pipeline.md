@@ -29,7 +29,7 @@ Stage 1 -> Stage 2 -> Stage 3 -> Stage 4 -> Stage 5 -> Stage 6 (use the script f
 - Authentication to gcloud with gcloud `gcloud auth application-default login`
 
 ### Running the pipeline
-To run the whole pipeline (two prompts approach), use `run_full_pipeline.sh`, available in `sic_classification_utils/scripts`:
+To run the whole pipeline (two prompts approach), use `run_full_pipeline.sh`, available in `survey_assist_eval/scripts`:
 
 ```bash
 ./run_full_pipeline.sh [-p <1|2>] -i </path/to/tlfs_data.{csv|parquet}> -o </path/to/output/folder> [-m </path/to/tlfs_data_metadata.json>] [-b 20]
@@ -69,12 +69,13 @@ The following fields are stored in the metadata file:
 |--|--|--|
 | original_dataset_name | <path/to/input/file.{csv/parquet}> | Path to the original dataset |
 | embedding_model_name | all-MiniLM-L6-v2 | Embedding model used for semantic search |
-| db_dir | src/industrial_classification_utils/data/vector_store | Directory for vector store database |
-| k_matches | 20 | Number of semantic search matches |
+| embedding_db_dir | data/vector_store | Directory for vector store database |
+| embedding_k_matches | 20 | Number of semantic search matches |
+| llm_model_name | gemini-2.5-flash | LLM model used for classification |
+| llm_model_location | europe-west2 | Location of the LLM model |
+| llm_candidates_limit | 10 | Maximum number of SIC candidates |
+| sic_code_digits | 5 | Number of digits in SIC code |
 | sic_index_file | extended_SIC_index.xlsx | SIC index file |
 | sic_structure_file | publisheduksicsummaryofstructureworksheet.xlsx | SIC structure file |
-| model_name | gemini-2.5-flash | LLM model used for classification |
-| code_digits | 5 | Number of digits in SIC code |
-| candidates_limit | 10 | Maximum number of SIC candidates |
 | batch_size | 100 | Processing batch size |
 | batch_size_async | 10 | Batch size for asynchronous processing |

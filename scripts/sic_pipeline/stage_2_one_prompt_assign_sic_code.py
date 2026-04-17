@@ -16,12 +16,13 @@ from typing import Any
 import numpy as np
 import pandas as pd
 from industrial_classification_utils.llm.llm import ClassificationLLM
-from industrial_classification_utils.utils.shared_evaluation_pipeline_components import (
+from tqdm import tqdm
+
+from survey_assist_eval.pipeline.shared_components import (
     parse_args,
     persist_results,
     set_up_initial_state,
 )
-from tqdm import tqdm
 
 #####################################################
 # Constants:
@@ -182,8 +183,8 @@ if __name__ == "__main__":
         df["followup_question"] = ""
 
     uni_chat = ClassificationLLM(
-        model_name=metadata["model_name"],
-        model_location=metadata["model_location"],
+        model_name=metadata["llm_model_name"],
+        model_location=metadata["llm_model_location"],
         verbose=False,
     )
 

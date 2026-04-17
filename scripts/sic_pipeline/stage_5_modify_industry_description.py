@@ -13,12 +13,13 @@ import pandas as pd
 from industrial_classification_utils.synthetic_responses.synthetic_response_utils import (
     SyntheticResponder,
 )
-from industrial_classification_utils.utils.shared_evaluation_pipeline_components import (
+from tqdm import tqdm
+
+from survey_assist_eval.pipeline.shared_components import (
     parse_args,
     persist_results,
     set_up_initial_state,
 )
-from tqdm import tqdm
 
 #####################################################
 # Constants:
@@ -80,7 +81,7 @@ if __name__ == "__main__":
     sr = SyntheticResponder(
         persona=None,
         get_question_function=None,
-        model_name=metadata["model_name"],
+        model_name=metadata["llm_model_name"],
     )
 
     print(
