@@ -13,7 +13,7 @@ numpy = "^2.3.3"
 pandas = "^2.3.3"
 python = "^3.12"
 toml = "^0.10.2"
-survey-assist-utils = { git = "https://github.com/ONSdigital/survey-assist-utils.git", tag = "v0.0.7" }
+survey-assist-utils = { git = "https://github.com/ONSdigital/survey-assist-utils.git", tag = "v0.0.8" }
 
 [tool.poetry.group.dev.dependencies]
 bandit = "^1.8.3"
@@ -41,7 +41,7 @@ ruff = "^0.9.10"
 scikit-learn = "^1.8.0"
 scipy = "^1.16.3"
 types-toml = "^0.10.8"
-sic-classification-utils = { git = "https://github.com/ONSdigital/sic-classification-utils.git", tag = "v0.1.9" }
+sic-classification-utils = { git = "https://github.com/ONSdigital/sic-classification-utils.git", rev = "0c89717"}  # Placeholder before a tag is created
 
 [tool.isort]
 profile = "black"

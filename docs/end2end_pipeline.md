@@ -29,7 +29,7 @@ Stage 1 -> Stage 2 -> Stage 3 -> Stage 4 -> Stage 5 -> Stage 6 (use the script f
 - Authentication to gcloud with gcloud `gcloud auth application-default login`
 
 ### Running the pipeline
-To run the whole pipeline (two prompts approach), use `run_full_pipeline.sh`, available in `survey_assist_eval/scripts`:
+To run the whole pipeline (two prompts approach), use `run_full_pipeline.sh`, available in `survey_assist_eval/sic_pipeline/scripts`:
 
 ```bash
 ./run_full_pipeline.sh [-p <1|2>] -i </path/to/tlfs_data.{csv|parquet}> -o </path/to/output/folder> [-m </path/to/tlfs_data_metadata.json>] [-b 20]
@@ -48,7 +48,7 @@ Where:
 
 2. Run:
 ```bash
-poetry run python path/to/stage/to/run.py -i <path/to/input/file.{csv|parquet}> -o <path/to/output/folder> [-m <path/to/metadata.json>] [-n <output_shortname>] [-b <batch_size>] [-s] [-r]
+poetry run python survey_assist_eval/sic_pipeline/path/to/stage/to/run.py -i <path/to/input/file.{csv|parquet}> -o <path/to/output/folder> [-m <path/to/metadata.json>] [-n <output_shortname>] [-b <batch_size>] [-s] [-r]
 ```
 Where:
 - `path/to/stage/to/run.py`: relative path to the script.
