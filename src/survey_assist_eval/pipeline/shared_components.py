@@ -22,20 +22,12 @@ import json
 import os
 import shutil
 from argparse import ArgumentParser, Namespace
-from datetime import UTC, datetime
-from typing import Any, Optional
+from typing import Optional
 
 import gcsfs
 import pandas as pd
-from industrial_classification_utils.utils.constants import get_default_config
 
-default_config = get_default_config()
-
-#####################################################
-# Default values and constants:
-BATCH_SIZE = 100
-MAX_ASYNC_BATCH_SIZE = 10
-#######################################################
+from survey_assist_eval.pipeline.metadata import update_metadata_with_args_and_defaults
 
 
 def parse_args(default_output_shortname: str = "STGK") -> Namespace:
@@ -296,7 +288,7 @@ def set_up_initial_state(
         )
         metadata = {}
 
-    metadata = _update_metadata_with_args_and_defaults(
+    metadata = update_metadata_with_args_and_defaults(
         parsed_args,
         metadata,
     )
@@ -310,89 +302,3 @@ def set_up_initial_state(
     print("Input loaded")
 
     return df, metadata, 0
-
-
-def _update_metadata_with_args_and_defaults(
-    parsed_args: Namespace,
-    in_metadata: Optional[dict],
-) -> dict[str, Any]:
-    """Updates a metadata dict with CLI args and stage-specific defaults.
-
-    This is intended to be used by pipeline stage scripts to keep metadata
-    consistent across stages.
-
-    Behavior:
-    - Always ensures `batch_size` in metadata matches `parsed_args.batch_size`.
-    - Optionally sets/updates `original_dataset_name` from `parsed_args.input_file`
-      (recommended only for stage 1).
-    - Applies provided `defaults` only when metadata keys are missing.
-    - Optionally sets `batch_size_async` capped by `max_async_batch_size`.
-
-    Args:
-        parsed_args: The command-line arguments parsed by `parse_args()`.
-        in_metadata: The initial metadata dictionary loaded from input JSON.
-
-    Returns:
-        Updated metadata dictionary.
-    """
-    updated_metadata: dict[str, Any] = in_metadata.copy() if in_metadata else {}
-
-    if (parsed_args.output_shortname == "STG1") and not parsed_args.second_run:
-        if (
-            "original_dataset_name" in updated_metadata
-            and updated_metadata.get("original_dataset_name") != parsed_args.input_file
-        ):
-            print(
-                "Warning: The original dataset name in the input metadata "
-                f"({updated_metadata.get('original_dataset_name')}) does not match the input "
-                f"file specified in the arguments ({parsed_args.input_file}). "
-                "The metadata will be updated with the input file name."
-            )
-        updated_metadata["original_dataset_name"] = parsed_args.input_file
-
-    defaults = {
-        "embedding_model_name": default_config["embedding"]["embedding_model_name"],
-        "db_dir": default_config["embedding"]["db_dir"],
-        "k_matches": default_config["embedding"]["k_matches"],
-        "sic_index_file": default_config["lookups"]["sic_index"][1],
-        "sic_structure_file": default_config["lookups"]["sic_structure"][1],
-        "model_name": default_config["llm"]["llm_model_name"],
-        "model_location": default_config["llm"]["model_location"],
-        "code_digits": default_config["llm"]["code_digits"],
-        "candidates_limit": default_config["llm"]["candidates_limit"],
-    }
-    for key, value in defaults.items():
-        if key not in updated_metadata:
-            updated_metadata[key] = value
-
-    if "batch_size" in updated_metadata and parsed_args.batch_size is not None:
-        if updated_metadata.get("batch_size") != parsed_args.batch_size:
-            print(
-                f"""Warning: The batch size in the input metadata ({
-                updated_metadata.get('batch_size')
-                }) does not match the batch size specified in the arguments ({
-                parsed_args.batch_size
-                }). The metadata will be updated with the batch size."""
-            )
-            updated_metadata["batch_size"] = parsed_args.batch_size
-    elif "batch_size" not in updated_metadata:
-        updated_metadata["batch_size"] = (
-            BATCH_SIZE if parsed_args.batch_size is None else parsed_args.batch_size
-        )
-
-    if "batch_size_async" not in updated_metadata:
-        updated_metadata["batch_size_async"] = min(
-            updated_metadata["batch_size"], MAX_ASYNC_BATCH_SIZE
-        )
-
-    updated_metadata[f"{parsed_args.output_shortname}_input_file"] = (
-        parsed_args.input_file
-    )
-    updated_metadata[f"{parsed_args.output_shortname}_start_timestamp"] = datetime.now(
-        UTC
-    ).timestamp()
-    updated_metadata[f"{parsed_args.output_shortname}_start_time_readable"] = (
-        datetime.now(UTC).strftime("%Y/%m/%d_%H:%M:%S")
-    )
-
-    return updated_metadata
