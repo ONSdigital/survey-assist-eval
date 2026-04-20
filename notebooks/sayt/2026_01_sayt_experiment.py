@@ -1,7 +1,6 @@
 """Experimenting with different approaches to improve SAYT results.
 
 This is initial experiment not using the SAYTSuggester class.
-
 """
 
 # ruff: noqa: PLR2004

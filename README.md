@@ -49,16 +49,13 @@ Ensure you have the following installed on your local machine:
     poetry install
     ```
 
-    If you plan to run evaluation scripts that depend on `sic-classification-utils`, make sure to install the optional `local-dev` dependencies. To do this:
+    Note this installs partner repos (e.g. `sic-classification-utils`, at a pinned version). To evaluate concurrent changes to the codebase locally, it may be preferable to install from a local path instead. To do this:
 
     1. Clone the `sic-classification-utils` repository at the same directory level as this repository.
-    2. From the root of this repository, run:
-
+    2. From the root of this repository (with the virtual environment activated), run:
         ```bash
-        poetry install --with local-dev
+        python -m pip install --no-deps --editable ../sic-classification-utils
         ```
-
-    This will allow you to evaluate concurrent changes to the `sic-classification-utils` codebase locally.
 
 4. **Generate an API Token**
 

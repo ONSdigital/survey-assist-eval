@@ -44,9 +44,6 @@ install: ## Install the dependencies
 install-dev: ## Install the dev dependencies
 	poetry install --no-root
 
-install-local-dev: ## Install the local dev dependencies
-	poetry install --with local-dev
-
 # Note: You need API_GATEWAY and SA_EMAIL
 generate-api-token:
 	poetry run generate-api-token
