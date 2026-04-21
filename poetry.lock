@@ -7764,8 +7764,8 @@ torch = "2.7.1"
 [package.source]
 type = "git"
 url = "https://github.com/ONSdigital/sic-classification-utils.git"
-reference = "0c897170301be6d2c2f13a178f2a1727ef7d0fd5"
-resolved_reference = "0c897170301be6d2c2f13a178f2a1727ef7d0fd5"
+reference = "7ab9ce3"
+resolved_reference = "7ab9ce32cb1e30d031724694698877caa3bc61d8"
 
 [[package]]
 name = "simplejson"
@@ -9288,4 +9288,4 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.12"
-content-hash = "781ab5a891dcab3e58922db2a1b455bdee0dc49e3efd01014201dbd65779ca78"
+content-hash = "3d856e024d1275201cfd40551f56fc30f46f966334a4b74d4ccf3279871fc56c"
