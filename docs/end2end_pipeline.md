@@ -32,7 +32,7 @@ Stage 1 -> Stage 2 -> Stage 3 -> Stage 4 -> Stage 5 -> Stage 6 (use the script f
 To run the whole pipeline (two prompts approach), use `run_full_pipeline.sh`, available in `survey_assist_eval/sic_pipeline/scripts`:
 
 ```bash
-.scripts/sic_pipeline/run_full_pipeline.sh [-p <1|2>] -i </path/to/tlfs_data.{csv|parquet}> -o </path/to/output/folder> [-m </path/to/tlfs_data_metadata.json>] [-b 20]
+./scripts/sic_pipeline/run_full_pipeline.sh [-p <1|2>] -i </path/to/tlfs_data.{csv|parquet}> -o </path/to/output/folder> [-m </path/to/tlfs_data_metadata.json>] [-b 20]
 ```
 
 Where:
