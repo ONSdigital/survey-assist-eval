@@ -30,9 +30,9 @@ suggester = SAYTSuggester(small_corpus)
 
 for q in ["car", "cars", "waxi", "grom", "wash", "duplicate", "auto"]:
     print("searching for:", q)
-    print("prefix", "->", suggester._get_prefix_suggestions(q))
-    print("ngram", "->", suggester._get_ngram_suggestions(q))
-    print("semantic", "->", suggester._get_semantic_suggestions(q))
+    print("prefix", "->", suggester._prefix_retriever.suggest(q, 5))
+    print("ngram", "->", suggester._ngram_retriever.suggest(q, 5))
+    print("semantic", "->", suggester._semantic_retriever.suggest(q, 5))
     print("combined", "->", suggester.suggest(q))
     print()
 
@@ -50,30 +50,30 @@ sayt_suggester = SAYTSuggester(sayt_corpus, min_chars=3)
 # %%
 for q in ["car", "cars", "waxi", "auto", "hea", "heal", "health"]:
     print("searching for:", q)
-    print("prefix", "->", sayt_suggester._get_prefix_suggestions(q))
-    print("ngram", "->", sayt_suggester._get_ngram_suggestions(q))
-    print("semantic", "->", sayt_suggester._get_semantic_suggestions(q))
+    print("prefix", "->", sayt_suggester._prefix_retriever.suggest(q, 5))
+    print("ngram", "->", sayt_suggester._ngram_retriever.suggest(q, 5))
+    print("semantic", "->", sayt_suggester._semantic_retriever.suggest(q, 5))
     print("combined", "->", sayt_suggester.suggest(q))
     print()
 
 # %%
 ############### now try with our long lookup and rephrased titles #############
 rephrased_df = pd.read_csv(
-    f"{data_bucket}sic_knowledgebase/sic_rephrased_descriptions_2025_02_03.csv",
+    f"{data_bucket}sic_knowledgebase/sic_rephrased_2025_02_03_v2.csv",
     dtype=str,
 )
 sic_index_df = pd.read_excel(
     f"{data_bucket}sic_knowledgebase/extended_SIC_index.xlsx", skiprows=2, dtype=str
 )
 
-rephrased_df["code"] = rephrased_df["input_code"].apply(
+rephrased_df["code"] = rephrased_df["sic_code"].apply(
     lambda x: x if len(x) == 5 else f"0{x}"
 )
 sic_index_df["code"] = sic_index_df["UK SIC 2007"].apply(
     lambda x: x if len(x) == 5 else f"0{x}"
 )
 rephrased_df["display_text"] = (
-    rephrased_df["reviewed_description"] + ": " + rephrased_df["code"]
+    rephrased_df["rephrased_description"] + ": " + rephrased_df["code"]
 )
 merged_df = sic_index_df.merge(
     rephrased_df[["code", "display_text"]], on="code", how="outer", indicator=True
@@ -86,9 +86,9 @@ activities_suggester = SAYTSuggester(activities_corpus, min_chars=3)
 # %%
 for q in ["car", "cars", "waxi", "auto", "hea", "heal", "health"]:
     print("searching for:", q)
-    print("prefix", "->", activities_suggester._get_prefix_suggestions(q))
-    print("ngram", "->", activities_suggester._get_ngram_suggestions(q))
-    print("semantic", "->", activities_suggester._get_semantic_suggestions(q))
+    print("prefix", "->", activities_suggester._prefix_retriever.suggest(q, 5))
+    print("ngram", "->", activities_suggester._ngram_retriever.suggest(q, 5))
+    print("semantic", "->", activities_suggester._semantic_retriever.suggest(q, 5))
     print("combined", "->", activities_suggester.suggest_with_scores(q))
     print("combined", "->", activities_suggester.suggest(q))
     print()

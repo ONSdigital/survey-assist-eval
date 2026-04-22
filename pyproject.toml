@@ -41,7 +41,7 @@ ruff = "^0.9.10"
 scikit-learn = "^1.8.0"
 scipy = "^1.16.3"
 types-toml = "^0.10.8"
-sic-classification-utils = { git = "https://github.com/ONSdigital/sic-classification-utils.git", rev = "e8e8cec"}  # Placeholder before a tag is created
+sic-classification-utils = { git = "https://github.com/ONSdigital/sic-classification-utils.git", rev = "95ac637"}  # Placeholder before a tag is created
 
 [tool.isort]
 profile = "black"
