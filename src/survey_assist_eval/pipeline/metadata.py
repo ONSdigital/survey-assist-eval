@@ -29,6 +29,14 @@ def _get_default_metadata() -> dict:
             "industrial_classification_utils.data.sic_index",
             "publisheduksicsummaryofstructureworksheet.xlsx",
         ),
+        "soc_index_file": (
+            "occupational_classification_utils.data.soc_index",
+            "soc2020volume2thecodingindexexcel16102024.xlsx",
+        ),
+        "soc_structure_file": (
+            "occupational_classification_utils.data.soc_index",
+            "soc2020volume1structureanddescriptionofunitgroupsexcel16102024.xlsx",
+        ),
         "batch_size": 100,
         "batch_size_async": 10,
     }
