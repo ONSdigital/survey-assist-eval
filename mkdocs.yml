@@ -1,6 +1,7 @@
-site_name: Survey Assist Utilities
+site_name: "Evaluation module for Survey Assist"
 nav:
   - Home: index.md
-  - Guide: guide.md
+  - Data Eggress: data_egress.md
+  - Evaluation Metrics: evaluation_metrics.md
 theme:
   name: material  # Optional, you can change it

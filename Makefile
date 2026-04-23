@@ -19,7 +19,7 @@ check-python: ## Format the python code (auto fix)
 	poetry run ruff check . --fix
 	poetry run mypy --follow-untyped-imports  .
 	poetry run pylint --verbose .
-	poetry run bandit -r src/survey_assist_utils
+	poetry run bandit -r src/survey_assist_eval
 
 check-python-nofix: ## Format the python code (no fix)
 	poetry run isort . --check --verbose
@@ -27,7 +27,7 @@ check-python-nofix: ## Format the python code (no fix)
 	poetry run ruff check .
 	poetry run mypy --follow-untyped-imports  .
 	poetry run pylint --verbose .
-	poetry run bandit -r src/survey_assist_utils
+	poetry run bandit -r src/survey_assist_eval
 
 black: ## Run black
 	poetry run black .
@@ -36,7 +36,7 @@ unit-tests: ## Run the example unit tests
 	poetry run pytest -m utils --cov=utils --cov-report=term-missing --cov-fail-under=80 --cov-config=.coveragerc
 
 all-tests:
-	poetry run pytest --cov=src --cov-report=term-missing --cov-fail-under=65 --cov-config=.coveragerc
+	poetry run pytest --cov=src --cov-report=term-missing --cov-fail-under=85 --cov-config=.coveragerc
 
 install: ## Install the dependencies
 	poetry install --only main --no-root
