@@ -17,23 +17,21 @@ import pandas as pd
 import plotly.express as px
 
 from notebooks.november_test.helper_load_data import combine_small_groups
-from survey_assist_utils.data_cleaning.prep_data import get_clean_n_digit_codes
-from survey_assist_utils.evaluation.metrics import (
+from survey_assist_eval.data_cleaning.prep_data import get_clean_n_digit_codes
+from survey_assist_eval.evaluation.metrics import (
     calc_simple_metrics,
 )
 
 # %%
-bucket_prefix = dotenv.get_key(".env", "BUCKET_PREFIX")
+bucket_prefix = dotenv.get_key(".env", "EVALUATION_BUCKET")
 out_dir = "data/figures/tlfs_it11/"  # needs local folder unfortunately, set to None to skip saving
 if out_dir:
     os.makedirs(out_dir, exist_ok=True)
 
-work_folder = (
-    f"{bucket_prefix}two_prompt_pipeline/2026_03_tlfs_it11_gemini25_europe_west9/"
-)
+work_folder = f"{bucket_prefix}evaluation-pipeline/two_prompt_pipeline/2026_03_tlfs_it11_gemini25_europe_west9/"
 
 # %% read data prepared in 2026_02_prep_tlfs_iteration_data.py script
-combined_df = pd.read_parquet(f"{work_folder}sa_cc_combined.parquet")
+combined_df = pd.read_parquet(f"{work_folder}sa_cc_cims_combined.parquet")
 # ensure code columns are sets (they were saved as arrays in parquet)
 for col in [col for col in combined_df.columns if "codes" in col.lower()]:
     print(f"Converting {col} to sets...")
@@ -53,6 +51,7 @@ combined_df["cc_initial_codes"] = combined_df["cc_initial_codes_add_section"]
 stage_cols = {
     "SA only": ("cc_initial_codes", "sa_initial_codes"),
     "SA+lookup": ("cc_initial_codes", "kb_initial_codes"),
+    "CIMS": ("cc_initial_codes", "cims_initial_codes"),
 }
 for col in set().union(*stage_cols.values()):
     for DIGITS in [0, 2, 3, 4, 5]:
@@ -108,10 +107,16 @@ plot_df_f1 = pd.DataFrame(
         for k, v in eval_metrics.items()
     ]
 )
-# drop "CC Final Closed Q" (as we used the open_q clerical codes for that)
-plot_df_f1 = plot_df_f1[plot_df_f1.method != "CC SA only"].copy()
+
+# drop "CC ***" (as we only need one clerical stats)
+plot_df_f1 = plot_df_f1[
+    ~plot_df_f1.method.str.startswith("CC") | plot_df_f1.method.str.endswith("lookup")
+].copy()
 plot_df_f1["method"] = (
-    plot_df_f1["method"].str.replace("CC SA+lookup", "CC").str.replace("SA SA", "SA")
+    plot_df_f1["method"]
+    .str.replace("CC SA+lookup", "CC")
+    .str.replace("SA SA", "SA")
+    .str.replace("SA CIMS", "CIMS")
 )
 
 
@@ -171,8 +176,8 @@ fig.update_layout(height=500, width=1200)
 fig.show()
 
 if out_dir:
-    fig.write_image(f"{out_dir}/cc_sa_initial_codes_ambiguity_decision.png")
-    fig.write_html(f"{out_dir}/cc_sa_initial_codes_ambiguity_decision.html")
+    fig.write_image(f"{out_dir}/cc_sa_cims_initial_codes_ambiguity_decision.png")
+    fig.write_html(f"{out_dir}/cc_sa_cims_initial_codes_ambiguity_decision.html")
 
 
 # %%
@@ -261,8 +266,8 @@ fig.update_layout(height=500, width=1000)
 fig.show()
 
 if out_dir:
-    fig.write_image(f"{out_dir}/cc_sa_initial_codes_accuracy_metrics.png")
-    fig.write_html(f"{out_dir}/cc_sa_initial_codes_accuracy_metrics.html")
+    fig.write_image(f"{out_dir}/cc_sa_cims_initial_codes_accuracy_metrics.png")
+    fig.write_html(f"{out_dir}/cc_sa_cims_initial_codes_accuracy_metrics.html")
 
 # %%
 # create confusion matrix for section (0-digit) and subset of 5-digit

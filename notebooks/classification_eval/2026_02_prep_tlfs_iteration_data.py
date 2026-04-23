@@ -11,44 +11,41 @@ Disabled check for too long lines (f strings) and variables names (uppercase for
 # pylint: disable=C0301,C0103
 
 # %%
-import logging
-
 import dotenv
 import pandas as pd
+from survey_assist_utils import get_logger
 
-from survey_assist_utils.data_cleaning.prep_data import (
+from survey_assist_eval.data_cleaning.prep_data import (
     prep_clerical_codes,
     prep_model_codes,
 )
-from survey_assist_utils.data_cleaning.sic_codes import (
+from survey_assist_eval.data_cleaning.sic_codes import (
     get_clean_n_digit_codes,
     parse_numerical_code,
 )
 
 # %%
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+logger = get_logger(__name__)
 
-bucket_prefix = dotenv.get_key(".env", "BUCKET_PREFIX")
-api_data_bucket = dotenv.get_key(".env", "API_DATA_BUCKET")
+bucket_prefix = dotenv.get_key(".env", "EVALUATION_BUCKET")
 if not bucket_prefix:
-    raise ValueError("BUCKET_PREFIX not found in .env file. Please set it.")
+    raise ValueError("EVALUTION_BUCKET not found in .env file. Please set it.")
 
-work_folder = (
-    f"{bucket_prefix}two_prompt_pipeline/2026_03_tlfs_it11_gemini25_europe_west9/"
+work_folder = f"{bucket_prefix}evaluation-pipeline/two_prompt_pipeline/2026_03_tlfs_it11_gemini25_europe_west9/"
+
+cc_data_folder = (
+    f"{bucket_prefix}evaluation-pipeline/original_datasets/TLFS_evaluation_data/"
 )
 
-cc_data_folder = f"{bucket_prefix}original_datasets/TLFS_evaluation_data/"
+cims_folder = f"{bucket_prefix}evaluation-pipeline/CIMS/"
 
 # %%
 # load clerical data
 clerical_file = f"{cc_data_folder}TLFS_evaluation_data_IT11.csv"
-clerical_4plus_file = f"{cc_data_folder}Codes_for_4_plus_IT11.csv"
-clerical_errors_file = f"{cc_data_folder}tlfs_it9_invalid_code_correction_to_47110.csv"
+clerical_4plus_file = f"{cc_data_folder}Codes_for_4_plus_IT11_v3.csv"
+# clerical_errors_file = f"{cc_data_folder}tlfs_it9_invalid_code_correction_to_47110.csv"
 cc_df = pd.read_csv(clerical_file)
 cc_4plus_df = pd.read_csv(clerical_4plus_file)
-cc_err_df = pd.read_csv(clerical_errors_file)
 
 # %%
 clerical_codes_df = prep_clerical_codes(
@@ -78,13 +75,6 @@ fix_lookup4plus = {
 }
 cc_4plus_df["sic_ind_occ"] = cc_4plus_df["sic_ind_occ"].replace(fix_lookup4plus)
 
-# check incorrrect codes "47710" => "47110"
-msk_cc = cc_df.unique_id.isin(cc_err_df.unique_id)
-msk_my = (cc_df["sic_ind1"] == "47110") & (cc_df["sic_ind_occ1"] == "47710")
-print(cc_df[msk_cc & ~msk_my & (cc_df["sic_ind_occ1"] == "47710")])
-
-# cc_df.loc[msk_cc, 'sic_ind_occ1'] = '47110'
-
 # check if any misssing 4+
 msk = (cc_df.sic_ind_occ1 == "4+") & ~cc_df.unique_id.isin(cc_4plus_df.unique_id)
 for cod_num in ["1", "2", "3"]:
@@ -105,7 +95,7 @@ stg3_df = pd.read_parquet(stg3_file)
 model_df = prep_model_codes(stg3_df, digits=5, out_col="sa_initial_codes")
 
 # %%
-knowledge_base_file = f"{api_data_bucket}api_config/data/sic_knowledge_base_utf8.csv"
+knowledge_base_file = f"{bucket_prefix}sic_knowledgebase/sic_knowledge_base_utf8.csv"
 kb_df = pd.read_csv(knowledge_base_file)
 kb_df["kb_initial_codes"] = kb_df["label"].apply(
     lambda x: get_clean_n_digit_codes(parse_numerical_code(x), n=5)[0]
@@ -147,10 +137,45 @@ combined_df.loc[~combined_df["kb_used"], "kb_initial_codes"] = combined_df.loc[
     ~combined_df["kb_used"], "sa_initial_codes"
 ]
 
-
 # %%
 combined_df.to_parquet(
     f"{work_folder}sa_cc_combined.parquet",
+    index=False,
+)
+# %%
+cims_df = pd.read_excel(
+    f"{cims_folder}TLFS_IT11_raw_data_stage_1_SIC07_multidig_lr_2_stage_20260402-2152_2026_04_13_13_57.xlsx"
+)
+
+
+# %%
+mock_cims_df = pd.DataFrame(
+    {
+        "unique_id": cims_df["tlfs_id"],
+        "sic_ind_occ1": cims_df["predicted_SIC07"].map(
+            lambda x: x + "x" * (5 - len(x)) if pd.notna(x) else x
+        ),
+    }
+)
+cims_codes = prep_clerical_codes(
+    mock_cims_df,
+    digits=5,
+    out_col="cims_initial_codes",
+)
+cims_codes["cims_code"] = cims_df["predicted_SIC07"]
+cims_codes["cims_confidence"] = cims_df["confidence_SIC07"]
+
+# %%
+cims_combined_df = combined_df.merge(
+    cims_codes[["unique_id", "cims_initial_codes", "cims_code", "cims_confidence"]],
+    on="unique_id",
+    how="inner",
+    indicator=True,
+)
+
+# %%
+cims_combined_df.to_parquet(
+    f"{work_folder}sa_cc_cims_combined.parquet",
     index=False,
 )
 # %%
