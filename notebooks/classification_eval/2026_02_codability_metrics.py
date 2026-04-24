@@ -16,6 +16,7 @@ import os
 import dotenv
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 
 from notebooks.classification_eval.helper_group_plotly import create_grouped_selector
 from notebooks.november_test.helper_load_data import combine_small_groups
@@ -147,14 +148,27 @@ plot_df.method.value_counts()
 
 # %%
 # melt for easier plotting
-def create_f1_plot(in_df, default_group="Total"):
-    """Create a line plot for codability, precision, recall, and F1 metrics."""
+def create_f1_plot(
+    in_df: pd.DataFrame,
+    default_group: str = "Total",
+    ylim: tuple[float, float] = (0, 1),
+) -> go.Figure:
+    """Create a line plot for codability, precision, recall, and F1 metrics.
+
+    Args:
+        in_df: DataFrame containing the metrics to plot. Expected to have columns for 'digits', 'method', 'sic_section', and the metrics to plot.
+        default_group: The default group to highlight in the plot.
+        ylim: Tuple specifying the y-axis limits.
+
+    Returns:
+        A Plotly Figure object.
+    """
     plot_df_f1 = in_df.melt(
         id_vars=["digits", "method", "sic_section", "confusion_matrix"],
         value_vars=["codability", "precision", "recall", "f1", "accuracy"],
         var_name="metrics",
         value_name="value",
-    ).sort_values(["method", "sic_section"], ascending=[False, True])
+    ).sort_values(["method", "sic_section"], ascending=[False, False])
 
     # add wald CI for codability
     # n = combined_df.shape[0]
@@ -195,10 +209,14 @@ def create_f1_plot(in_df, default_group="Total"):
     )
     # drop first part of facet annotation
     for i in fig.layout.annotations:
-        i.text = i.text.split("=")[-1].capitalize()
+        i.text = i.text.split("=", maxsplit=1)[-1].capitalize()
     # display y axes as percentages and remove axis title
     fig.update_yaxes(
-        tickformat=".0%", title_text="", showgrid=True, gridcolor="lightgrey"
+        tickformat=".0%",
+        title_text="",
+        showgrid=True,
+        gridcolor="lightgrey",
+        range=ylim,
     )
 
     # add text to footnote
@@ -237,7 +255,12 @@ def create_f1_plot(in_df, default_group="Total"):
     return fig
 
 
-fig1 = create_f1_plot(plot_df, default_group="Total")
+ylimits = (
+    plot_df[["codability", "f1", "precision", "recall", "accuracy"]].min().min(),
+    1,
+)
+
+fig1 = create_f1_plot(plot_df, default_group="Total", ylim=ylimits)
 fig1.update_layout(height=500, width=1200)
 fig1.show()
 
@@ -251,6 +274,7 @@ fig2 = create_grouped_selector(
     default_group="Total",
     figure_builder=create_f1_plot,
     include_default_group=True,
+    ylim=ylimits,
 )
 fig2.show()
 
@@ -263,8 +287,22 @@ if out_dir:
 
 # %%
 # melt for easier plotting
-def create_accu_plot(in_df, default_group="Total"):
-    """Create a line plot for accuracy metrics (OO, OM, MO, MM)."""
+def create_accu_plot(
+    in_df: pd.DataFrame,
+    default_group: str = "Total",
+    ylim: tuple[float, float] = (0, 1),
+) -> go.Figure:
+    """Create a line plot for accuracy metrics (OO, OM, MO, MM).
+
+    Args:
+        in_df: DataFrame containing the metrics to plot. Expected to have columns for 'digits', 'method', 'sic_section',
+            and the accuracy metrics as tuples of (accuracy, matches, total).
+        default_group: The default group to highlight in the plot.
+        ylim: Tuple specifying the y-axis limits.
+
+    Returns:
+        A Plotly Figure object.
+    """
     metric_order = ["OO Accuracy", "OM Accuracy", "MO Accuracy", "MM Accuracy"]
     plot_df_accu = (
         in_df[~in_df["method"].str.startswith("Clerical")]
@@ -274,7 +312,7 @@ def create_accu_plot(in_df, default_group="Total"):
             var_name="metrics",
             value_name="value_tuple",
         )
-        .sort_values(["method", "sic_section"], ascending=[False, True])
+        .sort_values(["method", "sic_section"], ascending=[False, False])
     )
     # unwrap tuple into three columns
     plot_df_accu[["accu_value", "matches", "total"]] = pd.DataFrame(
@@ -314,10 +352,14 @@ def create_accu_plot(in_df, default_group="Total"):
 
     # drop first part of facet annotation
     for i in fig.layout.annotations:
-        i.text = i.text.split("=")[1]
+        i.text = i.text.split("=", maxsplit=1)[1]
     # display y axes as percentages and remove axis title
     fig.update_yaxes(
-        tickformat=".0%", title_text="", showgrid=True, gridcolor="lightgrey"
+        tickformat=".0%",
+        title_text="",
+        showgrid=True,
+        gridcolor="lightgrey",
+        range=ylim,
     )
 
     # add text to footnote
@@ -358,7 +400,9 @@ def create_accu_plot(in_df, default_group="Total"):
     return fig
 
 
-fig1 = create_accu_plot(plot_df, default_group="Total")
+ylimits = (plot_df[["OO Accuracy", "OM Accuracy", "MO Accuracy", "MM Accuracy"]].apply(lambda x: x.apply(lambda x: x[0])).min().min(), 1)  # type: ignore
+
+fig1 = create_accu_plot(plot_df, default_group="Total", ylim=ylimits)
 fig1.update_layout(height=500, width=1000)
 fig1.show()
 
@@ -372,6 +416,7 @@ fig2 = create_grouped_selector(
     default_group="Total",
     figure_builder=create_accu_plot,
     include_default_group=True,
+    ylim=ylimits,
 )
 fig2.show()
 

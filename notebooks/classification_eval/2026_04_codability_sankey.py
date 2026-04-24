@@ -7,8 +7,8 @@ Expects environment variable EVALUATION_BUCKET to be set.
 Disabled check for too long lines (f strings) and variables names (uppercase for constants)
 """
 
-# ruff: noqa: PLR2004
-# pylint: disable=C0301,C0103,W0104,R0914,R0801
+# ruff: noqa: B006
+# pylint: disable=C0301,C0103,W0104,R0914,R0801,W0102
 
 # %%
 import os
@@ -59,19 +59,24 @@ combined_df_sic = combine_small_groups(
 
 def create_sankey_codability_gain_loss(
     input_df: pd.DataFrame,
-    left_col: str = "sa_codability_level",
-    middle_col: str = "cc_codability_level",
-    right_col: str = "cims_codability_level",
-    labels: list[str] | None = None,
+    column_names: list[str] = [
+        "sa_codability_level",
+        "cc_codability_level",
+        "cims_codability_level",
+    ],
+    column_labels: list[str] | None = None,
+    levels: list[str] | None = None,
 ) -> go.Figure:
     """Create a Sankey diagram to visualise codability gain/loss.
 
     Args:
         input_df: DataFrame containing the codability levels for the plotted stages.
-        left_col: Column representing the left-hand Sankey stage.
-        middle_col: Column representing the middle Sankey stage.
-        right_col: Column representing the right-hand Sankey stage.
-        labels: Optional display labels for the three stages and an optional title suffix.
+        column_names: List of column names in input_df representing the codability levels
+            for different methods. The order of columns determines the flow direction in the Sankey diagram.
+            Defaults to ["sa_codability_level", "cc_codability_level", "cims_codability_level"].
+        column_labels: Optional display labels for the three stages. If not provided, column names will be used.
+        levels: Optional list of codability levels to include in the diagram. If not provided,
+            all levels in the data will be included.
 
     Return:
         A Plotly Figure object representing the Sankey diagram.
@@ -79,51 +84,47 @@ def create_sankey_codability_gain_loss(
     Raises:
         ValueError: If any of the requested stage columns are missing.
     """
-    if not all(col in input_df.columns for col in [left_col, middle_col, right_col]):
-        raise ValueError(
-            f"Columns {left_col} or {right_col} not found in input DataFrame."
+    if not all(col in input_df.columns for col in column_names):
+        raise ValueError(f"Columns {column_names} not found in input DataFrame.")
+    input_df = input_df[column_names].copy()
+
+    if not levels:
+        levels = sorted(pd.unique(input_df[column_names].values.ravel("K")))
+        levels.sort(key=lambda x: (-int(re.sub(r"\D", "", "0" + x)), x))
+
+    for i, col_name in enumerate(column_names):
+        input_df[col_name + "_num"] = input_df[col_name].apply(levels.index) + i * len(
+            levels
         )
-    input_df = input_df[[left_col, middle_col, right_col]].copy()
 
-    label_list = list(
-        pd.unique(input_df[[left_col, middle_col, right_col]].values.ravel("K"))
+    input_df = input_df.sort_values(by=[x + "_num" for x in column_names]).reset_index(
+        drop=True
     )
-    label_list.sort(key=lambda x: (-int(re.sub(r"\D", "", "0" + x)), x))
-
-    input_df[left_col + "_num"] = input_df[left_col].apply(label_list.index)
-    input_df[middle_col + "_num"] = input_df[middle_col].apply(label_list.index) + len(
-        label_list
-    )
-
-    input_df[right_col + "_num"] = input_df[right_col].apply(
-        label_list.index
-    ) + 2 * len(label_list)
-
-    input_df = input_df.sort_values(
-        by=[left_col + "_num", middle_col + "_num", right_col + "_num"]
-    ).reset_index(drop=True)
 
     sankey_df = [
-        input_df.groupby([left_col, left_col + "_num", middle_col, middle_col + "_num"])
-        .size()
-        .reset_index(),
         input_df.groupby(
-            [middle_col, middle_col + "_num", right_col, right_col + "_num"]
+            [
+                column_names[i],
+                column_names[i] + "_num",
+                column_names[i + 1],
+                column_names[i + 1] + "_num",
+            ]
         )
         .size()
-        .reset_index(),
+        .reset_index()
+        for i in range(len(column_names) - 1)
     ]
-    sankey_df[0]["gain"] = sankey_df[0][left_col] == sankey_df[0][middle_col]
-    sankey_df[1]["gain"] = sankey_df[1][middle_col] == sankey_df[1][right_col]
+    for i, df in enumerate(sankey_df):
+        sankey_df[i]["gain"] = df[column_names[i]] == df[column_names[i + 1]]
 
     # add proportion to label list
-    label_list2 = []
-    for col_name in [left_col, middle_col, right_col]:
-        for lab in label_list:
+    levels2 = []
+    for col_name in column_names:
+        for lab in levels:
             count = sum(input_df[col_name] == lab)
             prop = 100 * count / len(input_df) if len(input_df) > 0 else 0
-            label_list2.append(f"{lab}: {prop:.1f}% ({count})")
-    label_colors = (["#1a9641"] + ["#a6d96a"] * (len(label_list) - 2) + ["#fdae61"]) * 3
+            levels2.append(f"{lab}: {prop:.1f}% ({count})")
+    label_colors = (["#1a9641"] + ["#a6d96a"] * (len(levels) - 2) + ["#fdae61"]) * 3
 
     # create flow/link data for sankey diagram
     link: dict[str, list] = {
@@ -134,8 +135,8 @@ def create_sankey_codability_gain_loss(
     }
     for ind, (col1, col2) in enumerate(
         [
-            (left_col + "_num", middle_col + "_num"),
-            (middle_col + "_num", right_col + "_num"),
+            (column_names[i] + "_num", column_names[i + 1] + "_num")
+            for i in range(len(column_names) - 1)
         ]
     ):
         link["source"].extend(sankey_df[ind][col1])
@@ -170,7 +171,7 @@ def create_sankey_codability_gain_loss(
                     "thickness": 20,
                     "line": {"color": "black", "width": 0.5},
                     "color": label_colors,
-                    "label": label_list2,
+                    "label": levels2,
                     "hovertemplate": "Count %{value}<extra></extra>",
                 },
                 link=link,
@@ -178,20 +179,22 @@ def create_sankey_codability_gain_loss(
         ]
     )
     # label the left and right sides
-    if not labels:
-        labels = [left_col, middle_col, right_col]
-    sankey_fig.add_annotation(
-        x=-0.02, y=1.05, text=labels[0], showarrow=False, font={"size": 12}
-    )
-    sankey_fig.add_annotation(
-        x=1.01, y=1.05, text=labels[2], showarrow=False, font={"size": 12}
-    )
-    sankey_fig.add_annotation(
-        x=0.5, y=1.05, text=labels[1], showarrow=False, font={"size": 12}
-    )
+    if not column_labels:
+        column_labels = [
+            column_name.split("_", maxsplit=1)[0].upper()
+            for column_name in column_names
+        ]
+    for i, col_label in enumerate(column_labels):
+        sankey_fig.add_annotation(
+            x=-0.02 + i * (1.03 / (len(column_names) - 1)),
+            y=1.05,
+            text=col_label,
+            showarrow=False,
+            font={"size": 12},
+        )
 
     sankey_fig.update_layout(
-        title_text=f"Comparison of Codability Levels {labels[3] if len(labels) > 3 else ''}",
+        title_text="Comparison of Codability Levels Across Methods",
         font_size=10,
         height=600,
         width=1000,
@@ -200,12 +203,23 @@ def create_sankey_codability_gain_loss(
 
 
 # %%
+level_names = sorted(
+    combined_df_sic["sa_codability_level"].unique().tolist(),
+    key=lambda x: (-int(re.sub(r"\D", "", "0" + x)), x),
+)
+
 fig = create_grouped_selector(
     combined_df_sic,
     group_col="sic_section",
     default_group="Total",
     figure_builder=create_sankey_codability_gain_loss,
-    labels=["SurveyAssist", "Clerical Codability", "CIMS"],
+    column_names=[
+        "sa_codability_level",
+        "cc_codability_level",
+        "cims_codability_level",
+    ],
+    column_labels=["SurveyAssist", "Clerical Codability", "CIMS"],
+    levels=level_names,
 )
 fig.show()
 
