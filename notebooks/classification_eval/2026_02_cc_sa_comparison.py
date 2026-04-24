@@ -51,8 +51,10 @@ combined_df["cc_initial_codes"] = combined_df["cc_initial_codes_add_section"]
 stage_cols = {
     "SA only": ("cc_initial_codes", "sa_initial_codes"),
     "SA+lookup": ("cc_initial_codes", "kb_initial_codes"),
-    "CIMS": ("cc_initial_codes", "cims_initial_codes"),
 }
+if "cims_initial_codes" in combined_df.columns:
+    stage_cols["CIMS"] = ("cc_initial_codes", "cims_initial_codes")
+
 for col in set().union(*stage_cols.values()):
     for DIGITS in [0, 2, 3, 4, 5]:
         combined_df[f"{col}_to_{DIGITS}digits"] = combined_df[col].apply(
