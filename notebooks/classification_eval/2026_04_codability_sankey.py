@@ -200,13 +200,111 @@ def create_sankey_codability_gain_loss(
     return sankey_fig
 
 
+def create_grouped_sankey_selector(
+    input_df: pd.DataFrame,
+    group_col: str,
+    default_group: str,
+    labels: list[str],
+) -> tuple[go.Figure, str]:
+    """Create a Sankey figure with an always-visible selector for grouping values."""
+    group_labels = input_df[group_col].dropna().drop_duplicates().tolist()
+    if not group_labels:
+        msg = f"No groups found in column {group_col}."
+        raise ValueError(msg)
+
+    if default_group not in group_labels:
+        default_group = group_labels[0]
+
+    ordered_groups = [
+        default_group,
+        *sorted(
+            [
+                group_label
+                for group_label in group_labels
+                if group_label != default_group
+            ]
+        ),
+    ]
+
+    grouped_figures = []
+    for group_label in ordered_groups:
+        group_fig = create_sankey_codability_gain_loss(
+            input_df[input_df[group_col] == group_label],
+            labels=labels,
+        )
+        grouped_figures.append(group_fig)
+
+    selector_fig = go.Figure()
+    for index, grouped_fig in enumerate(grouped_figures):
+        trace = grouped_fig.data[0]
+        trace.visible = index == 0
+        selector_fig.add_trace(trace)
+
+    selector_fig.update_layout(
+        title_text=grouped_figures[0].layout.title.text,
+        font_size=10,
+        height=600,
+        width=1200,
+        margin={"r": 180},
+        annotations=[
+            *grouped_figures[0].layout.annotations,
+            {
+                "x": 1.02,
+                "y": 1.10,
+                "xref": "paper",
+                "yref": "paper",
+                "text": "Section selection",
+                "showarrow": False,
+                "xanchor": "left",
+                "yanchor": "bottom",
+                "font": {"size": 12},
+            },
+        ],
+        updatemenus=[
+            {
+                "type": "buttons",
+                "buttons": [
+                    {
+                        "label": group_label,
+                        "method": "update",
+                        "args": [
+                            {
+                                "visible": [
+                                    current_index == button_index
+                                    for current_index in range(len(ordered_groups))
+                                ]
+                            },
+                            {
+                                "title_text": grouped_figures[
+                                    button_index
+                                ].layout.title.text,
+                            },
+                        ],
+                    }
+                    for button_index, group_label in enumerate(ordered_groups)
+                ],
+                "direction": "down",
+                "showactive": True,
+                "active": 0,
+                "x": 1.02,
+                "xanchor": "left",
+                "y": 1.08,
+                "yanchor": "top",
+            }
+        ],
+    )
+    return selector_fig, default_group
+
+
 # %%
-fig = create_sankey_codability_gain_loss(
-    combined_df, labels=["SurveyAssist", "Clerical", "CIMS", "- All data IT11"]
+fig, group_lab = create_grouped_sankey_selector(
+    combined_df_sic,
+    group_col="sic_section",
+    default_group="Total",
+    labels=["SurveyAssist", "Clerical", "CIMS"],
 )
 fig.show()
 
 if out_dir:
-    fig.write_image(f"{out_dir}sankey_codability_gain_loss_all_data.png", scale=2)
-    fig.write_html(f"{out_dir}sankey_codability_gain_loss_all_data.html")
+    fig.write_html(f"{out_dir}sankey_codability_comparison.html")
 # %%
