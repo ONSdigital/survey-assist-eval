@@ -1,5 +1,8 @@
 """Helper function to create a grouped selector for Plotly figures."""
 
+# pylint: disable=too-many-locals
+
+from copy import deepcopy
 from typing import Callable
 
 import pandas as pd
@@ -11,8 +14,9 @@ def create_grouped_selector(
     group_col: str,
     default_group: str,
     figure_builder: Callable,
+    include_default_group: bool = False,
     **kwargs,
-) -> tuple[go.Figure, str]:
+) -> go.Figure:
     """Create a figure with an always-visible selector for grouping values."""
     group_labels = input_df[group_col].dropna().drop_duplicates().tolist()
     if not group_labels:
@@ -36,15 +40,34 @@ def create_grouped_selector(
     grouped_figures = []
     for group_label in ordered_groups:
         group_fig = figure_builder(
-            input_df[input_df[group_col] == group_label], **kwargs
+            input_df[
+                input_df[group_col].isin(
+                    [group_label, default_group if include_default_group else None]
+                )
+            ],
+            **kwargs,
         )
         grouped_figures.append(group_fig)
 
-    selector_fig = go.Figure()
-    for index, grouped_fig in enumerate(grouped_figures):
-        trace = grouped_fig.data[0]
-        trace.visible = index == 0
-        selector_fig.add_trace(trace)
+    selector_fig = go.Figure(grouped_figures[0])
+    trace_counts = [len(grouped_fig.data) for grouped_fig in grouped_figures]
+    selector_fig.update_traces(visible=True)
+
+    for grouped_fig in grouped_figures[1:]:
+        for trace in grouped_fig.data:
+            trace_copy = deepcopy(trace)
+            trace_copy.update(visible=False)
+            selector_fig.add_trace(trace_copy)
+
+    visibility_masks = []
+    start_index = 0
+    total_traces = sum(trace_counts)
+    for trace_count in trace_counts:
+        mask = [False] * total_traces
+        for trace_index in range(start_index, start_index + trace_count):
+            mask[trace_index] = True
+        visibility_masks.append(mask)
+        start_index += trace_count
 
     selector_fig.update_layout(
         title_text=grouped_figures[0].layout.title.text,
@@ -74,12 +97,7 @@ def create_grouped_selector(
                         "label": group_label,
                         "method": "update",
                         "args": [
-                            {
-                                "visible": [
-                                    current_index == button_index
-                                    for current_index in range(len(ordered_groups))
-                                ]
-                            },
+                            {"visible": visibility_masks[button_index]},
                             {
                                 "title_text": grouped_figures[
                                     button_index
@@ -99,4 +117,4 @@ def create_grouped_selector(
             }
         ],
     )
-    return selector_fig, default_group
+    return selector_fig

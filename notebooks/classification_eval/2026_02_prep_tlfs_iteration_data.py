@@ -2,8 +2,8 @@
 
 It loads specific clerical coding data and model outputs from bucket.
 The bucket name and folder (on line 32) can be manually entered or it is read from
-the .env file, where it should be stored as BUCKET_PREFIX variable, i.e.:
-BUCKET_PREFIX = "gs://<bucket-name>/<folder>/"
+the .env file, where it should be stored as EVALUATION_BUCKET variable, i.e.:
+EVALUATION_BUCKET = "gs://<bucket-name>/"
 
 Disabled check for too long lines (f strings) and variables names (uppercase for constants)
 """
@@ -92,16 +92,16 @@ stg3_file = f"{work_folder}STG3.parquet"
 stg3_df = pd.read_parquet(stg3_file)
 
 # %%
-model_df = prep_model_codes(stg3_df, digits=5, out_col="sa_initial_codes")
+model_df = prep_model_codes(stg3_df, digits=5, out_col="sa_without_kb_initial_codes")
 
 # %%
 knowledge_base_file = f"{bucket_prefix}sic_knowledgebase/sic_knowledge_base_utf8.csv"
 kb_df = pd.read_csv(knowledge_base_file)
-kb_df["kb_initial_codes"] = kb_df["label"].apply(
+kb_df["sa_initial_codes"] = kb_df["label"].apply(
     lambda x: get_clean_n_digit_codes(parse_numerical_code(x), n=5)[0]
 )
-print(kb_df["kb_initial_codes"].apply(len).value_counts())
-kb_df = kb_df[kb_df["kb_initial_codes"].apply(len) == 1].reset_index(drop=True).copy()
+print(kb_df["sa_initial_codes"].apply(len).value_counts())
+kb_df = kb_df[kb_df["sa_initial_codes"].apply(len) == 1].reset_index(drop=True).copy()
 
 # %%
 stg3_df["description"] = stg3_df["sic2007_employee"]
@@ -129,12 +129,12 @@ combined_df = (
         on="unique_id",
         how="left",
     )
-    .merge(kb_df[["kb_initial_codes", "clean_descr"]], how="left", on="clean_descr")
+    .merge(kb_df[["sa_initial_codes", "clean_descr"]], how="left", on="clean_descr")
 )
 
-combined_df["kb_used"] = combined_df["kb_initial_codes"].notna()
-combined_df.loc[~combined_df["kb_used"], "kb_initial_codes"] = combined_df.loc[
-    ~combined_df["kb_used"], "sa_initial_codes"
+combined_df["kb_used"] = combined_df["sa_initial_codes"].notna()
+combined_df.loc[~combined_df["kb_used"], "sa_initial_codes"] = combined_df.loc[
+    ~combined_df["kb_used"], "sa_without_kb_initial_codes"
 ]
 
 # %%

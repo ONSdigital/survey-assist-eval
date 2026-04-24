@@ -40,7 +40,7 @@ for col in [col for col in combined_df.columns if "codes" in col.lower()]:
     combined_df[col] = combined_df[col].apply(set)
 
 # %%
-for prefix in ["cc", "sa", "kb", "cims"]:
+for prefix in ["cc", "sa", "cims"]:
     combined_df[f"{prefix}_codability_level"] = combined_df.apply(
         lambda row, pre=prefix: get_codability_level(row[f"{pre}_initial_codes"]),
         axis=1,
@@ -63,7 +63,7 @@ combined_df_sic = combine_small_groups(
 
 def create_sankey_codability_gain_loss(
     input_df: pd.DataFrame,
-    left_col: str = "kb_codability_level",
+    left_col: str = "sa_codability_level",
     middle_col: str = "cc_codability_level",
     right_col: str = "cims_codability_level",
     labels: list[str] | None = None,
@@ -202,7 +202,7 @@ def create_sankey_codability_gain_loss(
 
 
 # %%
-fig, group_lab = create_grouped_selector(
+fig = create_grouped_selector(
     combined_df_sic,
     group_col="sic_section",
     default_group="Total",
