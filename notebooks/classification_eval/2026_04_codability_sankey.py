@@ -1,8 +1,8 @@
 """Notebook to visualise the codability gain/loss using a Sankey diagram.
 
-Loads preprocessed data with both clerical and SA codings,
-calculates various metrics and visualises them.
-Expects environment variable BUCKET_PREFIX to be set.
+Loads preprocessed data with clerical, SurveyAssist, and CIMS codings,
+derives codability levels, and visualises the transitions between methods.
+Expects environment variable EVALUATION_BUCKET to be set.
 
 Disabled check for too long lines (f strings) and variables names (uppercase for constants)
 """
@@ -53,12 +53,8 @@ combined_df_sic = combine_small_groups(
 )
 
 # %%
-# create sankey diagram showing the flow of codability levels from clerical to SA coding
-# and from SA to KB and CIMS coding, with counts of records in each flow
-# we will create a sankey diagram with 4 stages: Clerical, SA, KB, CIMS
-# and flows between them based on codability levels
-# we will also create a separate sankey diagram for each SIC section
-# and a combined one for all data
+# Create a three-stage Sankey diagram comparing codability levels across
+# SurveyAssist, clerical coding, and CIMS for the full dataset and each SIC group.
 
 
 def create_sankey_codability_gain_loss(
@@ -71,15 +67,17 @@ def create_sankey_codability_gain_loss(
     """Create a Sankey diagram to visualise codability gain/loss.
 
     Args:
-        input_df: DataFrame containing initial and final codability levels.
-        left_col: Name of the column representing initial codability levels.
-        middle_col: Name of the column representing middle codability levels.
-        right_col: Name of the column representing final codability levels.
-        title_suffix: Suffix to add to the title of the figure, e.g. section name.
-        labels: Optional list of labels for the left, middle, and right columns. If None, column names will be used.
+        input_df: DataFrame containing the codability levels for the plotted stages.
+        left_col: Column representing the left-hand Sankey stage.
+        middle_col: Column representing the middle Sankey stage.
+        right_col: Column representing the right-hand Sankey stage.
+        labels: Optional display labels for the three stages and an optional title suffix.
 
     Return:
-        A Plotly Figure object representing the Sankey diagram, or None if columns not found.
+        A Plotly Figure object representing the Sankey diagram.
+
+    Raises:
+        ValueError: If any of the requested stage columns are missing.
     """
     if not all(col in input_df.columns for col in [left_col, middle_col, right_col]):
         raise ValueError(

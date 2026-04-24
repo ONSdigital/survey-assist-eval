@@ -1,7 +1,8 @@
 """Notebook to compare clerical coding vs SurveyAssist model coding performance.
 
-Loads preprocessed data with both clerical and SA codings,
-calculates various metrics and visualises them.
+Loads preprocessed clerical and SurveyAssist codings,
+builds confusion matrices at multiple code depths, and extracts representative
+disagreement examples.
 Expects environment variable EVALUATION_BUCKET to be set.
 
 Disabled check for too long lines (f strings) and variables names (uppercase for constants)
@@ -47,7 +48,7 @@ for prefix in ["cc", "sa", "sa_without_kb", "cims"]:
 
 
 # %%
-# create confusion matrix for section (0-digit) and subset of 5-digit
+# Create confusion matrices for 5-digit, 2-digit, and section-level codings.
 df = combined_df.copy()  # [combined_df.batch_num.notna()].copy()
 for DIGITS in [5, 2, 0]:
     col1 = f"cc_initial_codes_to_{DIGITS}digits"
@@ -159,7 +160,7 @@ for DIGITS in [5, 2, 0]:
 
 
 # %%
-# get examples
+# Inspect common non-overlapping clerical vs SurveyAssist disagreements in section C.
 digits = 5
 tmp_df = combined_df[combined_df.sic_section == "C"].copy()
 min_mistakes = 5

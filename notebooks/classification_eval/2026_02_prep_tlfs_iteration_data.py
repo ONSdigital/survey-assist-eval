@@ -1,8 +1,9 @@
 """Notebook to prepare data for TLFS iteration evaluation.
 
-It loads specific clerical coding data and model outputs from bucket.
-The bucket name and folder (on line 32) can be manually entered or it is read from
-the .env file, where it should be stored as EVALUATION_BUCKET variable, i.e.:
+It loads clerical coding data, SurveyAssist outputs, and CIMS outputs from the
+configured evaluation bucket.
+The bucket prefix is read from the .env file, where it should be stored as
+EVALUATION_BUCKET, i.e.:
 EVALUATION_BUCKET = "gs://<bucket-name>/"
 
 Disabled check for too long lines (f strings) and variables names (uppercase for constants)
@@ -40,7 +41,7 @@ cc_data_folder = (
 cims_folder = f"{bucket_prefix}evaluation-pipeline/CIMS/"
 
 # %%
-# load clerical data
+# Load clerical source files used to build the comparison dataset.
 clerical_file = f"{cc_data_folder}TLFS_evaluation_data_IT11.csv"
 clerical_4plus_file = f"{cc_data_folder}Codes_for_4_plus_IT11_v3.csv"
 # clerical_errors_file = f"{cc_data_folder}tlfs_it9_invalid_code_correction_to_47110.csv"
@@ -55,7 +56,7 @@ clerical_codes_df = prep_clerical_codes(
 print(clerical_codes_df[clerical_codes_df["cc_initial_codes_invalid"].apply(len) > 0])
 
 # %%
-# fix typos (based on Clere's review, not all needed from IT11 onwards)
+# Correct known clerical typos before rebuilding the cleaned code columns.
 fix_lookup = {
     "43391": "43991",
     "74000": "74100",
@@ -75,13 +76,13 @@ fix_lookup4plus = {
 }
 cc_4plus_df["sic_ind_occ"] = cc_4plus_df["sic_ind_occ"].replace(fix_lookup4plus)
 
-# check if any misssing 4+
+# Backfill unresolved 4+ cases from the base clerical columns when no 4+ file row exists.
 msk = (cc_df.sic_ind_occ1 == "4+") & ~cc_df.unique_id.isin(cc_4plus_df.unique_id)
 for cod_num in ["1", "2", "3"]:
     cc_df.loc[msk, f"sic_ind_occ{cod_num}"] = cc_df.loc[msk, f"sic_ind{cod_num}"]
 
 # %%
-# run the corrected clerical codes through (should not see eny more errors)
+# Rebuild the cleaned clerical codes after applying the manual corrections above.
 clerical_codes_df["cc_initial_codes"] = prep_clerical_codes(
     cc_df, cc_4plus_df, digits=5, out_col="cc_initial_codes"
 )["cc_initial_codes"]
@@ -108,9 +109,8 @@ stg3_df["description"] = stg3_df["sic2007_employee"]
 
 for df in [stg3_df, kb_df]:
     df["clean_descr"] = df["description"].str.lower()
-    # remove weird characters
+    # Normalise descriptions so exact text matches can be used for the KB merge.
     df["clean_descr"] = df["clean_descr"].str.replace(r"[^a-z0-9 ]", "", regex=True)
-    # remove multiple spaces
     df["clean_descr"] = (
         df["clean_descr"].str.replace(r"\s+", " ", regex=True).str.strip()
     )
