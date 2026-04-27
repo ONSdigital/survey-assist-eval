@@ -185,7 +185,7 @@ fig.update_layout(height=500, width=1400)
 fig.show()
 
 if out_dir:
-    fig.write_image(f"{out_dir}/cc_sa_sic_section_distribution.png")
-    fig.write_html(f"{out_dir}/cc_sa_sic_section_distribution.html")
+    # fig.write_image(f"{out_dir}/cc_sa_sic_section_distribution.png")
+    fig.write_html(f"{out_dir}/it11_cc_sa_cims_sic_section_distribution.html")
 
 # %%

@@ -224,5 +224,5 @@ fig = create_grouped_selector(
 fig.show()
 
 if out_dir:
-    fig.write_html(f"{out_dir}sankey_codability_comparison.html")
+    fig.write_html(f"{out_dir}it11_cc_sa_cims_sankey_codability.html")
 # %%

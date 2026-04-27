@@ -151,7 +151,7 @@ plot_df.method.value_counts()
 def create_f1_plot(
     in_df: pd.DataFrame,
     default_group: str = "Total",
-    ylim: tuple[float, float] = (0, 1),
+    ylim: tuple[float, float] = (-0.01, 1.01),
 ) -> go.Figure:
     """Create a line plot for codability, precision, recall, and F1 metrics.
 
@@ -256,17 +256,13 @@ def create_f1_plot(
 
 
 ylimits = (
-    plot_df[["codability", "f1", "precision", "recall", "accuracy"]].min().min(),
-    1,
+    plot_df[["codability", "f1", "precision", "recall", "accuracy"]].min().min() - 0.01,
+    1.01,
 )
 
 fig1 = create_f1_plot(plot_df, default_group="Total", ylim=ylimits)
 fig1.update_layout(height=500, width=1200)
 fig1.show()
-
-if out_dir:
-    # fig1.write_image(f"{out_dir}/cc_sa_cims_initial_codes_ambiguity_decision.png")
-    fig1.write_html(f"{out_dir}/cc_sa_cims_initial_codes_ambiguity_decision.html")
 
 fig2 = create_grouped_selector(
     input_df=plot_df,
@@ -279,10 +275,8 @@ fig2 = create_grouped_selector(
 fig2.show()
 
 if out_dir:
-    # fig2.write_image(f"{out_dir}/cc_sa_cims_initial_codes_ambiguity_decision_by_section.png")
-    fig2.write_html(
-        f"{out_dir}/cc_sa_cims_initial_codes_ambiguity_decision_by_section.html"
-    )
+    #     fig1.write_html(f"{out_dir}/cc_sa_cims_initial_codes_ambiguity_decision.html")
+    fig2.write_html(f"{out_dir}/it11_cc_sa_cims_ambiguity_decision.html")
 
 
 # %%
@@ -290,7 +284,7 @@ if out_dir:
 def create_accu_plot(
     in_df: pd.DataFrame,
     default_group: str = "Total",
-    ylim: tuple[float, float] = (0, 1),
+    ylim: tuple[float, float] = (-0.01, 1.01),
 ) -> go.Figure:
     """Create a line plot for accuracy metrics (OO, OM, MO, MM).
 
@@ -400,15 +394,11 @@ def create_accu_plot(
     return fig
 
 
-ylimits = (plot_df[["OO Accuracy", "OM Accuracy", "MO Accuracy", "MM Accuracy"]].apply(lambda x: x.apply(lambda x: x[0])).min().min(), 1)  # type: ignore
+ylimits = (plot_df[["OO Accuracy", "OM Accuracy", "MO Accuracy", "MM Accuracy"]].apply(lambda x: x.apply(lambda x: x[0])).min().min() - 0.01, 1.01)  # type: ignore
 
 fig1 = create_accu_plot(plot_df, default_group="Total", ylim=ylimits)
 fig1.update_layout(height=500, width=1000)
 fig1.show()
-
-if out_dir:
-    # fig1.write_image(f"{out_dir}/cc_sa_cims_initial_codes_accuracy_metrics.png")
-    fig1.write_html(f"{out_dir}/cc_sa_cims_initial_codes_accuracy_metrics.html")
 
 fig2 = create_grouped_selector(
     input_df=plot_df,
@@ -421,8 +411,7 @@ fig2 = create_grouped_selector(
 fig2.show()
 
 if out_dir:
-    fig2.write_html(
-        f"{out_dir}/cc_sa_cims_initial_codes_accuracy_metrics_by_section.html"
-    )
+    # fig1.write_html(f"{out_dir}/cc_sa_cims_initial_codes_accuracy_metrics.html")
+    fig2.write_html(f"{out_dir}/it11_cc_sa_cims_accuracy_metrics.html")
 
 # %%
