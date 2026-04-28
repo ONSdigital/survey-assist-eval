@@ -20,7 +20,7 @@ project_id = get_key(".env", "PROJECT_ID")
 if not project_id:
     raise ValueError("PROJECT_ID not found in .env file. Please set it.")
 
-data_bucket = get_key(".env", "EVALUATION_BUCKET") or "./"
+bucket_name = get_key(".env", "EVALUATION_BUCKET_NAME") or "./"
 
 # out_dir = f"{data_bucket}SAYT_semantic_search_test_results/"
 out_dir = "data/SAYT_semantic_search_results/"
@@ -29,14 +29,15 @@ if not out_dir.startswith("gs://"):
     os.makedirs(out_dir, exist_ok=True)
 
 # %%
-sayt_df = pd.read_csv(
-    f"{data_bucket}evaluation-pipeline/SAYT/Lookup_IT3_Final.csv", dtype=str
-).rename(columns={"SIC07": "id", "SIC_lookup": "text"})
+lookup_file_name = f"gs://{bucket_name}/evaluation-pipeline/SAYT/Lookup_IT3_Final.csv"
+sayt_df = pd.read_csv(lookup_file_name, dtype=str).rename(
+    columns={"SIC07": "id", "SIC_lookup": "text"}
+)
 sayt_df["id"] = sayt_df["id"].apply(lambda x: x if len(x) == 5 else f"0{x}")
 
 # %%
 matching_df = pd.read_csv(
-    f"{data_bucket}evaluation-pipeline/SAYT/SAYT_matching.csv",
+    f"gs://{bucket_name}/evaluation-pipeline/SAYT/SAYT_matching.csv",
     usecols=[
         "Correct SIC code",
         "Full entry looking for",
@@ -97,7 +98,7 @@ class MockSAYTVectoriser(VectoriserBase):
 
 # %%
 hf_vs = VectorStore(
-    file_name=f"{data_bucket}Lookup_IT3_Final.csv",
+    file_name=lookup_file_name,
     data_type="csv",
     vectoriser=hfv,
     batch_size=8,
@@ -109,7 +110,7 @@ hf_vs = VectorStore(
 #       remove all GCP related things in this file, and just look at the
 #       huggingface vectoriser results instead (it's almost as good).
 gcp_vs = VectorStore(
-    file_name=f"{data_bucket}Lookup_IT3_Final.csv",
+    file_name=lookup_file_name,
     data_type="csv",
     vectoriser=gcpv,
     batch_size=128,
@@ -121,7 +122,7 @@ gcp_vs = VectorStore(
 
 sayt_v = MockSAYTVectoriser(sayt_df["text"])
 sayt_vs = VectorStore(
-    file_name=f"{data_bucket}Lookup_IT3_Final.csv",
+    file_name=lookup_file_name,
     data_type="csv",
     vectoriser=sayt_v,
     batch_size=8,

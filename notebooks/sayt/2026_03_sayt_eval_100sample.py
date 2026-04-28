@@ -7,16 +7,16 @@
 import dotenv
 import pandas as pd
 import plotly.express as px
-from industrial_classification_utils.sayt.sayt import SAYTSuggester
+from industrial_classification_utils.sayt import SAYTSuggester
 
 from survey_assist_eval.data_cleaning.sic_codes import get_clean_n_digit_codes
 
 # %%
-data_bucket = dotenv.get_key(".env", "EVALUATION_BUCKET") or "data/"
+bucket_name = dotenv.get_key(".env", "EVALUATION_BUCKET_NAME") or "data/"
 
 # %%
 test_df = pd.read_excel(
-    f"{data_bucket}evaluation-pipeline/SAYT/SAYT matching.xlsx",
+    f"gs://{bucket_name}/evaluation-pipeline/SAYT/SAYT matching.xlsx",
     dtype=str,
     nrows=100,  # Excel formatting causes 10s of thousands of blank input rows after the real 100
 )
@@ -40,15 +40,20 @@ if msk.any():
     print(test_df[msk])
 
 # %%
-sayt_df = pd.read_csv(
-    f"{data_bucket}evaluation-pipeline/SAYT/Lookup_IT3_Final.csv", dtype=str
-)
+lookup_file_name = f"gs://{bucket_name}/evaluation-pipeline/SAYT/Lookup_IT3_Final.csv"
+sayt_df = pd.read_csv(lookup_file_name, dtype=str)
 sayt_df["code"] = sayt_df["SIC07"].apply(lambda x: x if len(x) == 5 else f"0{x}")
 sayt_df["display_text"] = sayt_df["SIC_lookup"] + ": " + sayt_df["code"]
 
 sayt_corpus = list(zip(sayt_df["SIC_lookup"], sayt_df["display_text"]))
 sayt_suggester_without_sem = SAYTSuggester(sayt_corpus, semantic_enable=False)
-sayt_suggester_with_sem = SAYTSuggester(sayt_corpus, semantic_enable=True)
+sayt_suggester_with_sem10 = SAYTSuggester(sayt_corpus, semantic_enable=True)
+sayt_suggester_with_sem05 = SAYTSuggester(
+    sayt_corpus, semantic_enable=True, semantic_weight=0.5
+)
+sayt_suggester_with_sem15 = SAYTSuggester(
+    sayt_corpus, semantic_enable=True, semantic_weight=1.5
+)
 
 
 # %%
@@ -77,7 +82,9 @@ MAX_SUGGESTIONS = 20
 for num_chars in [4, 5, 7, 9, 150]:
     for suggester_label, suggester in [
         ("without_sem", sayt_suggester_without_sem),
-        ("with_sem", sayt_suggester_with_sem),
+        ("with_sem05", sayt_suggester_with_sem05),
+        ("with_sem10", sayt_suggester_with_sem10),
+        ("with_sem15", sayt_suggester_with_sem15),
     ]:
 
         test_df[f"suggestions_{num_chars}chars_{suggester_label}"] = test_df.apply(
@@ -107,8 +114,9 @@ results_df["num_chars"] = results_df["suggester_numchars"].apply(
     lambda x: int(x.split("_")[1].replace("chars", ""))
 )
 results_df["suggester"] = results_df["suggester_numchars"].apply(
-    lambda x: x.split("_")[-2]
+    lambda x: " ".join(x.split("_")[-2:])
 )
+results_df.loc[results_df["rank"] > MAX_SUGGESTIONS, "rank"] = None
 results_df["rank"] = results_df["rank"].fillna(
     MAX_SUGGESTIONS + 2
 )  # Treat not found as worst rank
@@ -122,6 +130,7 @@ fig = px.histogram(
     facet_col="num_chars",
     category_orders={"rank": list(range(0, MAX_SUGGESTIONS + 2))},
     barmode="group",  # next to each other
+    # use frequencies
     title="Distribution of Ranks of Correct Code in Suggestions by Number of Characters",
 )
 # labels on x axis are too crowded, so just show every 5th but use 'NA' for 21
@@ -131,7 +140,7 @@ fig.update_xaxes(
     ticktext=[str(i) for i in range(0, MAX_SUGGESTIONS, 5)] + ["NA"],
 )
 
-fig.update_layout(bargap=0.1)
+fig.update_layout(bargap=0.1, width=1600)
 fig.show()
 
 # %%
