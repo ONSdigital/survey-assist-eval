@@ -2,7 +2,7 @@
 
 Loads preprocessed data with clerical, SurveyAssist, and CIMS codings,
 derives codability levels, and visualises the transitions between methods.
-Expects environment variable EVALUATION_BUCKET to be set.
+Expects environment variable EVALUATION_BUCKET_NAME to be set.
 
 Disabled check for too long lines (f strings) and variables names (uppercase for constants)
 """
@@ -25,12 +25,12 @@ from survey_assist_eval.data_cleaning.sic_codes import (
 )
 
 # %%
-bucket_prefix = dotenv.get_key(".env", "EVALUATION_BUCKET")
+bucket_name = dotenv.get_key(".env", "EVALUATION_BUCKET_NAME")
 out_dir = "data/figures/tlfs_it11/"  # needs local folder unfortunately, set to None to skip saving
 if out_dir:
     os.makedirs(out_dir, exist_ok=True)
 
-work_folder = f"{bucket_prefix}evaluation-pipeline/two_prompt_pipeline/2026_03_tlfs_it11_gemini25_europe_west9/"
+work_folder = f"gs://{bucket_name}/evaluation-pipeline/two_prompt_pipeline/2026_03_tlfs_it11_gemini25_europe_west9/"
 
 # %% read data prepared in 2026_02_prep_tlfs_iteration_data.py script
 combined_df = pd.read_parquet(f"{work_folder}sa_cc_cims_combined.parquet")

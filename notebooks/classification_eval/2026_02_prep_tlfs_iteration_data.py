@@ -3,8 +3,7 @@
 It loads clerical coding data, SurveyAssist outputs, and CIMS outputs from the
 configured evaluation bucket.
 The bucket prefix is read from the .env file, where it should be stored as
-EVALUATION_BUCKET, i.e.:
-EVALUATION_BUCKET = "gs://<bucket-name>/"
+EVALUATION_BUCKET_NAME (without gs:// and trailing /).
 
 Disabled check for too long lines (f strings) and variables names (uppercase for constants)
 """
@@ -28,17 +27,17 @@ from survey_assist_eval.data_cleaning.sic_codes import (
 # %%
 logger = get_logger(__name__)
 
-bucket_prefix = dotenv.get_key(".env", "EVALUATION_BUCKET")
-if not bucket_prefix:
-    raise ValueError("EVALUTION_BUCKET not found in .env file. Please set it.")
+bucket_name = dotenv.get_key(".env", "EVALUATION_BUCKET_NAME")
+if not bucket_name:
+    raise ValueError("EVALUATION_BUCKET_NAME not found in .env file. Please set it.")
 
-work_folder = f"{bucket_prefix}evaluation-pipeline/two_prompt_pipeline/2026_03_tlfs_it11_gemini25_europe_west9/"
+work_folder = f"gs://{bucket_name}/evaluation-pipeline/two_prompt_pipeline/2026_03_tlfs_it11_gemini25_europe_west9/"
 
 cc_data_folder = (
-    f"{bucket_prefix}evaluation-pipeline/original_datasets/TLFS_evaluation_data/"
+    f"gs://{bucket_name}/evaluation-pipeline/original_datasets/TLFS_evaluation_data/"
 )
 
-cims_folder = f"{bucket_prefix}evaluation-pipeline/CIMS/"
+cims_folder = f"gs://{bucket_name}/evaluation-pipeline/CIMS/"
 
 # %%
 # Load clerical source files used to build the comparison dataset.
@@ -96,7 +95,9 @@ stg3_df = pd.read_parquet(stg3_file)
 model_df = prep_model_codes(stg3_df, digits=5, out_col="sa_without_kb_initial_codes")
 
 # %%
-knowledge_base_file = f"{bucket_prefix}sic_knowledgebase/sic_knowledge_base_utf8.csv"
+knowledge_base_file = (
+    f"gs://{bucket_name}/sic_knowledgebase/sic_knowledge_base_utf8.csv"
+)
 kb_df = pd.read_csv(knowledge_base_file)
 kb_df["sa_initial_codes"] = kb_df["label"].apply(
     lambda x: get_clean_n_digit_codes(parse_numerical_code(x), n=5)[0]
