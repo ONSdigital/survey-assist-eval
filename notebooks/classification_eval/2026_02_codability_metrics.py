@@ -213,7 +213,7 @@ def create_f1_plot(
         # error_y="ci",
     )
     # drop first part of facet annotation
-    for i in fig.layout.annotations:
+    for i in fig.layout.annotations:  # type: ignore
         i.text = i.text.split("=", maxsplit=1)[-1].capitalize()
     # display y axes as percentages and remove axis title
     fig.update_yaxes(
@@ -350,7 +350,7 @@ def create_accu_plot(
     )
 
     # drop first part of facet annotation
-    for i in fig.layout.annotations:
+    for i in fig.layout.annotations:  # type: ignore
         i.text = i.text.split("=", maxsplit=1)[1]
     # display y axes as percentages and remove axis title
     fig.update_yaxes(

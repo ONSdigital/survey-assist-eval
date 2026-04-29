@@ -54,7 +54,7 @@ combined_df_sic = combine_small_groups(
 
 
 # %%
-def _flow_color_from_levels(level1, level2) -> str:
+def _flow_color_from_levels(level1: str, level2: str) -> str:
     """Determine flow color based on codability level changes."""
     if level1 == level2:
         return "rgba(166,217,106,0.3)"  # green for no change (gain)
@@ -69,6 +69,46 @@ def _flow_color_from_levels(level1, level2) -> str:
     return "rgba(180,180,180,0.3)"  # gray for small disagreement
 
 
+def _flows_from_records(
+    in_df: pd.DataFrame,
+    cols: tuple[str, str],
+    ind: int,
+    *,
+    levels: list[str],
+    example_col: str | None = None,
+) -> pd.DataFrame:
+    in_df["source"] = in_df[cols[0]].apply(levels.index) + ind * len(levels)
+    in_df["target"] = in_df[cols[1]].apply(levels.index) + (ind + 1) * len(levels)
+    grouped = in_df.groupby([cols[0], "source", cols[1], "target"])
+    # add size and most common examples
+    df = (
+        grouped.size().reset_index(name="value")  #  type: ignore
+        if not example_col
+        else grouped.aggregate(
+            value=(example_col, "size"),
+            examples=(
+                example_col,
+                lambda x: "<br>Examples: "
+                + ", ".join(x.dropna().astype(str).value_counts().index[:3]),
+            ),
+        ).reset_index()
+    )
+    if not example_col:
+        df["examples"] = ""
+    df["color"] = df.apply(
+        lambda row: _flow_color_from_levels(row[cols[0]], row[cols[1]]), axis=1
+    )
+    df["customdata"] = df.apply(
+        lambda row: (
+            f"Count: {100 * row['value'] / len(in_df):.1f}% ({row['value']}) {row['examples']}"
+            if len(in_df) > 0
+            else "0.0% (0)"
+        ),
+        axis=1,
+    )
+    return df[["source", "target", "value", "color", "customdata"]]
+
+
 # %%
 # Create a three-stage Sankey diagram comparing codability levels across
 # SurveyAssist, clerical coding, and CIMS for the full dataset and each SIC group.
@@ -76,12 +116,14 @@ def _flow_color_from_levels(level1, level2) -> str:
 
 def create_sankey_codability_gain_loss(
     input_df: pd.DataFrame,
+    *,
     column_names: list[str] = [
         "sa_codability_level",
         "cc_codability_level",
         "cims_codability_level",
     ],
     column_labels: list[str] | None = None,
+    example_col: str | None = None,
     levels: list[str] | None = None,
 ) -> go.Figure:
     """Create a Sankey diagram to visualise codability gain/loss.
@@ -92,6 +134,8 @@ def create_sankey_codability_gain_loss(
             for different methods. The order of columns determines the flow direction in the Sankey diagram.
             Defaults to ["sa_codability_level", "cc_codability_level", "cims_codability_level"].
         column_labels: Optional display labels for the three stages. If not provided, column names will be used.
+        example_col: Optional column name in input_df containing example descriptions to show on hover.
+            If not provided, no examples will be shown.
         levels: Optional list of codability levels to include in the diagram. If not provided,
             all levels in the data will be included.
 
@@ -101,43 +145,16 @@ def create_sankey_codability_gain_loss(
     Raises:
         ValueError: If any of the requested stage columns are missing.
     """
-    if not all(col in input_df.columns for col in column_names):
-        raise ValueError(f"Columns {column_names} not found in input DataFrame.")
-    input_df = input_df[column_names].copy()
+    selected_columns = column_names + (
+        [example_col] if example_col in input_df.columns else []
+    )
+    if not all(col in input_df.columns for col in selected_columns):
+        raise ValueError(f"Column(s) {selected_columns} not found in input DataFrame.")
+    input_df = input_df[selected_columns].copy()
 
     if not levels:
         levels = sorted(pd.unique(input_df[column_names].values.ravel("K")))
         levels.sort(key=lambda x: (-int(re.sub(r"\D", "", "0" + x)), x))
-
-    for i, col_name in enumerate(column_names):
-        input_df[col_name + "_num"] = input_df[col_name].apply(levels.index) + i * len(
-            levels
-        )
-
-    input_df = input_df.sort_values(by=[x + "_num" for x in column_names]).reset_index(
-        drop=True
-    )
-
-    sankey_df = [
-        input_df.groupby(
-            [
-                column_names[i],
-                column_names[i] + "_num",
-                column_names[i + 1],
-                column_names[i + 1] + "_num",
-            ]
-        )
-        .size()
-        .reset_index()
-        for i in range(len(column_names) - 1)
-    ]
-    for i, df in enumerate(sankey_df):
-        sankey_df[i]["change_color"] = df.apply(
-            lambda row, ind=i: _flow_color_from_levels(
-                row[column_names[ind]], row[column_names[ind + 1]]
-            ),
-            axis=1,
-        )
 
     # add proportion to label list
     levels2 = []
@@ -147,49 +164,32 @@ def create_sankey_codability_gain_loss(
             prop = 100 * count / len(input_df) if len(input_df) > 0 else 0
             levels2.append(f"{lab}: {prop:.1f}% ({count})")
     label_colors = (["#1a9641"] + ["#a6d96a"] * (len(levels) - 2) + ["#fdae61"]) * 3
+    node = {"color": label_colors, "label": levels2}
 
     # create flow/link data for sankey diagram
-    link: dict[str, list] = {
-        "source": [],
-        "target": [],
-        "value": [],
-        "color": [],
-    }
-    for ind, (col1, col2) in enumerate(
+    link_df = pd.concat(
         [
-            (column_names[i] + "_num", column_names[i + 1] + "_num")
+            _flows_from_records(
+                input_df,
+                ind=i,
+                cols=(column_names[i], column_names[i + 1]),
+                levels=levels,
+                example_col=example_col,
+            )
             for i in range(len(column_names) - 1)
-        ]
-    ):
-        link["source"].extend(sankey_df[ind][col1])
-        link["target"].extend(sankey_df[ind][col2])
-        link["value"].extend(sankey_df[ind][0].tolist())
-        link["color"].extend(sankey_df[ind]["change_color"].tolist())
-    link["customdata"] = [
-        (
-            f"{100 * count / len(input_df):.1f}% ({count})"
-            if len(input_df) > 0
-            else "0.0% (0)"
-        )
-        for count in link["value"]
-    ]
+        ],
+        ignore_index=True,
+    )
+    link = {
+        "source": link_df["source"].tolist(),
+        "target": link_df["target"].tolist(),
+        "value": link_df["value"].tolist(),
+        "color": link_df["color"].tolist(),
+        "customdata": link_df["customdata"].tolist(),
+    }
     link["hovertemplate"] = "%{customdata}<extra></extra>"  # type: ignore
 
-    sankey_fig = go.Figure(
-        data=[
-            go.Sankey(
-                node={
-                    "pad": 15,
-                    "thickness": 20,
-                    "line": {"color": "black", "width": 0.5},
-                    "color": label_colors,
-                    "label": levels2,
-                    "hovertemplate": "Count %{value}<extra></extra>",
-                },
-                link=link,
-            )
-        ]
-    )
+    sankey_fig = go.Figure(data=[go.Sankey(node=node, link=link)])
     # label the left and right sides
     if not column_labels:
         column_labels = [
@@ -231,6 +231,7 @@ fig = create_grouped_selector(
         "cims_codability_level",
     ],
     column_labels=["SurveyAssist", "Clerical Codability", "CIMS"],
+    example_col="merged_industry_desc",
     levels=level_names,
 )
 fig.show()
