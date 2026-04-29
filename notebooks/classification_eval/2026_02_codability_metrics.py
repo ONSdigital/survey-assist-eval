@@ -137,11 +137,16 @@ plot_df = pd.DataFrame(
 plot_df = plot_df[
     ~plot_df.method.str.startswith("CC") | plot_df.method.str.endswith("Assist")
 ].copy()
+# fix order categories
+method_dtype = pd.CategoricalDtype(
+    categories=["SurveyAssist", "CIMS", "Clerical Coding"], ordered=True
+)
 plot_df["method"] = (
     plot_df["method"]
-    .str.replace("CC SurveyAssist", "Clerical Coding")
-    .str.replace("SA SurveyAssist", "SurveyAssist")
-    .str.replace("SA CIMS", "CIMS")
+    .str.replace("SA SurveyAssist", "SurveyAssist", regex=False)
+    .str.replace("SA CIMS", "CIMS", regex=False)
+    .str.replace("CC SurveyAssist", "Clerical Coding", regex=False)
+    .astype(method_dtype)
 )
 plot_df.method.value_counts()
 
@@ -168,7 +173,7 @@ def create_f1_plot(
         value_vars=["codability", "precision", "recall", "f1", "accuracy"],
         var_name="metrics",
         value_name="value",
-    ).sort_values(["method", "sic_section"], ascending=[False, False])
+    ).sort_values(["method", "sic_section"], ascending=[True, False])
 
     # add wald CI for codability
     # n = combined_df.shape[0]
@@ -306,7 +311,7 @@ def create_accu_plot(
             var_name="metrics",
             value_name="value_tuple",
         )
-        .sort_values(["method", "sic_section"], ascending=[False, False])
+        .sort_values(["method", "sic_section"], ascending=[True, False])
     )
     # unwrap tuple into three columns
     plot_df_accu[["accu_value", "matches", "total"]] = pd.DataFrame(

@@ -52,6 +52,23 @@ combined_df_sic = combine_small_groups(
     combined_df, "sic_section", group_size_threshold=thr
 )
 
+
+# %%
+def _flow_color_from_levels(level1, level2) -> str:
+    """Determine flow color based on codability level changes."""
+    if level1 == level2:
+        return "rgba(166,217,106,0.3)"  # green for no change (gain)
+    big_change = {
+        ("Uncodable", "Sub-class (5-digits)"),
+        ("Uncodable", "Class (4-digits)"),
+        ("Section (letter)", "Sub-class (5-digits)"),
+    }
+    if (level1, level2) in big_change or (level2, level1) in big_change:
+        return "rgba(253,174,97,0.3)"  # orange for big disagreement
+
+    return "rgba(180,180,180,0.3)"  # gray for small disagreement
+
+
 # %%
 # Create a three-stage Sankey diagram comparing codability levels across
 # SurveyAssist, clerical coding, and CIMS for the full dataset and each SIC group.
@@ -115,7 +132,12 @@ def create_sankey_codability_gain_loss(
         for i in range(len(column_names) - 1)
     ]
     for i, df in enumerate(sankey_df):
-        sankey_df[i]["gain"] = df[column_names[i]] == df[column_names[i + 1]]
+        sankey_df[i]["change_color"] = df.apply(
+            lambda row, ind=i: _flow_color_from_levels(
+                row[column_names[ind]], row[column_names[ind + 1]]
+            ),
+            axis=1,
+        )
 
     # add proportion to label list
     levels2 = []
@@ -142,17 +164,7 @@ def create_sankey_codability_gain_loss(
         link["source"].extend(sankey_df[ind][col1])
         link["target"].extend(sankey_df[ind][col2])
         link["value"].extend(sankey_df[ind][0].tolist())
-        link["color"].extend(
-            sankey_df[ind]["gain"]
-            .apply(
-                lambda x: (
-                    "rgba(166,217,106,0.3)"
-                    if x > 0
-                    else ("rgba(180,180,180,0.3)" if x == 0 else "rgba(253,174,97,0.3)")
-                )
-            )
-            .tolist()
-        )
+        link["color"].extend(sankey_df[ind]["change_color"].tolist())
     link["customdata"] = [
         (
             f"{100 * count / len(input_df):.1f}% ({count})"
@@ -225,4 +237,5 @@ fig.show()
 
 if out_dir:
     fig.write_html(f"{out_dir}it11_cc_sa_cims_sankey_codability.html")
+
 # %%
