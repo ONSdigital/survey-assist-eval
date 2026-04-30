@@ -13,13 +13,13 @@ import dotenv
 import pandas as pd
 
 # %%
-preprod_bucket = dotenv.get_key(".env", "PREPROD_DATA_BUCKET")
-if not preprod_bucket:
-    raise ValueError("PREPROD_DATA_BUCKET not found in .env file. Please set it.")
+bucket_name = dotenv.get_key(".env", "PREPROD_DATA_BUCKET_NAME") or ""
+if not bucket_name:
+    raise ValueError("PREPROD_DATA_BUCKET_NAME not found in .env file. Please set it.")
 
 # %%
 data = pd.read_parquet(
-    f"{preprod_bucket}analysis-interim-results/SAYT/sayt_sa_comparison_all_columns.parquet"
+    f"gs://{bucket_name}/analysis-interim-results/SAYT/sayt_sa_comparison_all_columns.parquet"
 )
 
 # %%
