@@ -5,10 +5,10 @@ Saves to the storage in a location specified in .env file (cell with that functi
 is currently commented out, at the very bottom of this notebook).
 
 Before running the notebook, create .env file with bucket variables, such as
-PREPROD_DATA_BUCKET_NAME = "<bucket-name>", and EVALUATION_BUCKET similarly.
+PREPROD_DATA_BUCKET_NAME = "<bucket-name>", and EVALUATION_BUCKET_NAME similarly.
 
 PREPROD_DATA_BUCKET_NAME - name of the input bucket.
-EVALUATION_BUCKET - location where the reference / knowledge base files are stored.
+EVALUATION_BUCKET_NAME - location where the reference / knowledge base files are stored.
 """
 
 # %%
@@ -22,10 +22,10 @@ import dotenv
 import pandas as pd
 
 # %%
-evaluation_bucket = dotenv.get_key(".env", "EVALUATION_BUCKET")
+evaluation_bucket = dotenv.get_key(".env", "EVALUATION_BUCKET_NAME") or ""
 bucket_name = dotenv.get_key(".env", "PREPROD_DATA_BUCKET_NAME") or ""
 if not evaluation_bucket:
-    raise ValueError("EVALUATION_BUCKET not found in .env file. Please set it.")
+    raise ValueError("EVALUATION_BUCKET_NAME not found in .env file. Please set it.")
 if not bucket_name:
     raise ValueError("PREPROD_DATA_BUCKET_NAME not found in .env file. Please set it.")
 

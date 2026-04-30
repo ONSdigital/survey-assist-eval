@@ -3,8 +3,8 @@
 
 Initial analysis of survey responses, focusing on Closed Follow up questions.
 
-Create .env file with bucket variables, such as EVALUATION_BUCKET = "gs://<bucket-name>/<folder>/",
-and PREPROD_DATA_BUCKET_NAME = "<bucket-name>".
+Requires an enviroment variable PREPROD_DATA_BUCKET_NAME with the name of the
+bucket where the data is stored.
 """
 
 # %%
