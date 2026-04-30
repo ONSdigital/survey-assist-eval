@@ -44,7 +44,7 @@ sayt_df = pd.read_csv(lookup_file_name, dtype=str)
 sayt_df["code"] = sayt_df["SIC07"].apply(lambda x: x if len(x) == 5 else f"0{x}")
 sayt_df["display_text"] = sayt_df["SIC_lookup"] + ": " + sayt_df["code"]
 
-sayt_corpus = list(zip(sayt_df["SIC_lookup"], sayt_df["display_text"]))
+sayt_corpus = list(zip(sayt_df["SIC_lookup"], sayt_df["display_text"], strict=False))
 sayt_suggester = SAYTSuggester(sayt_corpus, min_chars=3)
 
 # %%
@@ -84,7 +84,9 @@ merged_df = sic_index_df.merge(
     rephrased_df[["code", "display_text"]], on="code", how="outer", indicator=True
 )
 
-activities_corpus = list(zip(merged_df["Activity"], merged_df["display_text"]))
+activities_corpus = list(
+    zip(merged_df["Activity"], merged_df["display_text"], strict=False)
+)
 activities_suggester = SAYTSuggester(activities_corpus, min_chars=3)
 # note the startup embedding here takes much longer
 

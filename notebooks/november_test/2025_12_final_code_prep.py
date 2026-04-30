@@ -4,7 +4,7 @@ It only needs to be run once, before other analysis notebooks.
 Saves the cleaned data to a parquet file for further analysis.
 
 Usage:
-    1. Set the PREPROD_DATA_BUCKET in .env file to point to the correct data bucket.
+    1. Set the PREPROD_DATA_BUCKET_NAME in .env file to point to the correct data bucket.
     2. Run this notebook to output data for final code assignement (around line 100).
     3. Run the SIC classification pipeline in `sic-classification-utils` to get final codes.
     4. After getting the final codes, run this notebook again to merge final codes and
@@ -26,10 +26,10 @@ from survey_assist_eval.data_cleaning.sic_codes import (
     get_codability_level,
 )
 
-data_bucket = dotenv.get_key(".env", "PREPROD_DATA_BUCKET") or ""
+bucket_name = dotenv.get_key(".env", "PREPROD_DATA_BUCKET_NAME") or ""
 
 # %%
-work_dir = data_bucket + "analysis-interim-results"
+work_dir = f"gs://{bucket_name}/analysis-interim-results"
 out_dir = work_dir  # set to None to skip saving
 
 # %%

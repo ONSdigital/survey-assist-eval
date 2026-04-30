@@ -29,19 +29,17 @@ from survey_assist_eval.data_cleaning.sic_codes import (
 # Load environmental variables & set data input/output locations:
 ## %matplotlib inline
 
-data_bucket = dotenv.get_key(".env", "PREPROD_DATA_BUCKET") or ""
+bucket_name = dotenv.get_key(".env", "PREPROD_DATA_BUCKET_NAME") or ""
 
 small_nonzero_number = 1e-256
 SIGNIFICANCE_THRESHOLD = 0.05
 
-folder = data_bucket + "analysis-interim-results"
+folder = f"gs://{bucket_name}/analysis-interim-results"
 
-out_folder = (
-    data_bucket + "analysis-interim-results/feedback-analysis"
-)  # set to None to skip saving
+out_folder = f"gs://{bucket_name}/analysis-interim-results/feedback-analysis"  # set to None to skip saving
 out_folder = None  # type: ignore[assignment]
 
-figures_output_folder = "data/figures/quantitative_feedback_analysis/"
+figures_output_folder = "data/figures/quantitative_feedback_analysis"
 makedirs(figures_output_folder, exist_ok=True)
 
 # %%
@@ -550,7 +548,7 @@ effect_strength_ease = [
         len(feedback_given_df_SIC_dummies[feedback_given_df_SIC_dummies[sec] == 1])
         * len(feedback_given_df_SIC_dummies[feedback_given_df_SIC_dummies[sec] == 0])
     )
-    for res, sec in zip(results_ease, ordered_SIC_sections)
+    for res, sec in zip(results_ease, ordered_SIC_sections, strict=False)
 ]
 
 effect_strength_relevance: Any = [
@@ -559,7 +557,7 @@ effect_strength_relevance: Any = [
         len(feedback_given_df_SIC_dummies[feedback_given_df_SIC_dummies[sec] == 1])
         * len(feedback_given_df_SIC_dummies[feedback_given_df_SIC_dummies[sec] == 0])
     )
-    for res, sec in zip(results_relevance, ordered_SIC_sections)
+    for res, sec in zip(results_relevance, ordered_SIC_sections, strict=False)
 ]
 
 effect_strength_comfort: Any = [
@@ -568,7 +566,7 @@ effect_strength_comfort: Any = [
         len(feedback_given_df_SIC_dummies[feedback_given_df_SIC_dummies[sec] == 1])
         * len(feedback_given_df_SIC_dummies[feedback_given_df_SIC_dummies[sec] == 0])
     )
-    for res, sec in zip(results_comfort, ordered_SIC_sections)
+    for res, sec in zip(results_comfort, ordered_SIC_sections, strict=False)
 ]
 
 effect_strengths_SIC = np.array(

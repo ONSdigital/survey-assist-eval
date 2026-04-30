@@ -45,7 +45,7 @@ sayt_df = pd.read_csv(lookup_file_name, dtype=str)
 sayt_df["code"] = sayt_df["SIC07"].apply(lambda x: x if len(x) == 5 else f"0{x}")
 sayt_df["display_text"] = sayt_df["SIC_lookup"] + ": " + sayt_df["code"]
 
-sayt_corpus = list(zip(sayt_df["SIC_lookup"], sayt_df["display_text"]))
+sayt_corpus = list(zip(sayt_df["SIC_lookup"], sayt_df["display_text"], strict=False))
 sayt_suggester_without_sem = SAYTSuggester(sayt_corpus, semantic_enable=False)
 sayt_suggester_with_sem10 = SAYTSuggester(sayt_corpus, semantic_enable=True)
 sayt_suggester_with_sem05 = SAYTSuggester(

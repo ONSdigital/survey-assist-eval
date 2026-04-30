@@ -1,12 +1,12 @@
 ---
     name: CI
-    
+
     on: # yamllint disable-line rule:truthy
       push:
         branches: [main]
       pull_request:
         branches: [main]
-    
+
     concurrency:
       group: "${{ github.head_ref || github.ref }}-${{ github.workflow }}"
       cancel-in-progress: true
@@ -22,7 +22,7 @@
             steps:
                 - uses: actions/checkout@v4
                 - name: Install Poetry
-                  run: pipx install poetry==1.7.1
+                  run: pipx install poetry==2.3.4
 
                 - name: Set up Python
                   uses: actions/setup-python@v5
@@ -44,5 +44,3 @@
 
                 - name: Cleanup residue file
                   run: make clean
-    
-    
