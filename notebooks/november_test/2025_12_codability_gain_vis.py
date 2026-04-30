@@ -2,7 +2,7 @@
 
 Loads preprocessed data with both clerical and SA codings,
 calculates various metrics and visualises them.
-Expects environment variable PREPROD_DATA_BUCKET to be set.
+Expects environment variable PREPROD_DATA_BUCKET_NAME to be set.
 
 Disabled check for too long lines (f strings) and variables names (uppercase for constants)
 """
@@ -19,11 +19,9 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 # %%
-data_bucket = dotenv.get_key(".env", "PREPROD_DATA_BUCKET") or ""
-work_dir = data_bucket + "analysis-interim-results"
-out_dir = (
-    "data/figures/"  # needs local folder unfortunately, set to None to skip saving
-)
+bucket_name = dotenv.get_key(".env", "PREPROD_DATA_BUCKET_NAME") or ""
+work_dir = f"gs://{bucket_name}/analysis-interim-results"
+out_dir = "data/figures/november_test"  # needs local folder unfortunately, set to None to skip saving
 if out_dir:
     os.makedirs(out_dir, exist_ok=True)
 

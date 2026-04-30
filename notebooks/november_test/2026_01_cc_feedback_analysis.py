@@ -21,12 +21,12 @@ project_id = dotenv.get_key(".env", "PROJECT_ID")
 if not project_id:
     raise ValueError("PROJECT_ID not found in .env file. Please set it.")
 
-data_bucket = dotenv.get_key(".env", "PREPROD_DATA_BUCKET") or ""
-work_dir = data_bucket + "analysis-interim-results"
+bucket_name = dotenv.get_key(".env", "PREPROD_DATA_BUCKET_NAME") or ""
+work_dir = f"gs://{bucket_name}/analysis-interim-results"
 # out_dir = work_dir + "/CC_SocSurveys_feedback"
 out_dir = None
 
-figures_output_folder = "data/figures/cc_feedback_analysis/"
+figures_output_folder = "data/figures/cc_feedback_analysis"
 makedirs(figures_output_folder, exist_ok=True)
 
 # %%
@@ -199,7 +199,7 @@ bar_no = ax.bar(x, no_counts, bottom=yes_counts, label="No", color="#F46A25")
 bar_missing = ax.bar(
     x,
     missing_counts,
-    bottom=[i + j for i, j in zip(yes_counts, no_counts)],
+    bottom=[i + j for i, j in zip(yes_counts, no_counts, strict=False)],
     label="Missing",
     color="#A285D1",
 )

@@ -4,7 +4,7 @@
 Initial analysis of survey responses, focusing on Closed Follow up questions.
 
 Create .env file with bucket variables, such as EVALUATION_BUCKET = "gs://<bucket-name>/<folder>/",
-and ANALYSIS_BUCKET similarly.
+and PREPROD_DATA_BUCKET_NAME = "<bucket-name>".
 """
 
 # %%
@@ -25,15 +25,14 @@ from scipy.stats import chi2_contingency
 significance_threshold = 0.05
 
 # %%
-data_bucket = dotenv.get_key(".env", "PREPROD_DATA_BUCKET") or ""
-work_dir = data_bucket + "analysis-interim-results"
+bucket_name = dotenv.get_key(".env", "PREPROD_DATA_BUCKET_NAME") or ""
+work_dir = f"gs://{bucket_name}/analysis-interim-results"
 
 full_data = load_data(work_dir)
 
 # %%
-analysis_bucket = dotenv.get_key(".env", "PREPROD_DATA_BUCKET")
-if not analysis_bucket:
-    raise ValueError("PREPROD_DATA_BUCKET not found in .env file. Please set it.")
+if not bucket_name:
+    raise ValueError("PREPROD_DATA_BUCKET_NAME not found in .env file. Please set it.")
 
 # %%
 closed_question_data = full_data[

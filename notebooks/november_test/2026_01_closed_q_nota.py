@@ -5,7 +5,7 @@ Initial analysis of survey responses, focusing on resons for selecting
 "None of the above" as response to Closed Follow up questions.
 
 Create .env file with bucket variables, such as
-PREPROD_DATA_BUCKET = "gs://<bucket-name>/<folder>/".
+PREPROD_DATA_BUCKET_NAME = "<bucket-name>".
 """
 
 # %%
@@ -28,9 +28,9 @@ from scipy.stats import (
 from survey_assist_eval.data_cleaning.sic_codes import get_clean_n_digit_codes
 
 # %%
-preprod_bucket = dotenv.get_key(".env", "PREPROD_DATA_BUCKET")
-if not preprod_bucket:
-    raise ValueError("PREPROD_DATA_BUCKET not found in .env file. Please set it.")
+bucket_name = dotenv.get_key(".env", "PREPROD_DATA_BUCKET_NAME") or ""
+if not bucket_name:
+    raise ValueError("PREPROD_DATA_BUCKET_NAME not found in .env file. Please set it.")
 
 # %% [markdown]
 # ## None of the above (NOTA)
@@ -39,7 +39,7 @@ if not preprod_bucket:
 
 # %%
 data = pd.read_parquet(
-    f"{preprod_bucket}analysis-interim-results/evaluation_df_with_sa_clean_codes.parquet"
+    f"gs://{bucket_name}/analysis-interim-results/evaluation_df_with_sa_clean_codes.parquet"
 )
 
 # %%

@@ -22,7 +22,6 @@ import json
 import os
 import shutil
 from argparse import ArgumentParser, Namespace
-from typing import Optional
 
 import gcsfs
 import pandas as pd
@@ -147,8 +146,8 @@ def persist_results(  # noqa:PLR0913, pylint: disable=too-many-arguments
     metadata: dict,
     output_folder: str,
     output_shortname: str,
-    is_final: Optional[bool] = False,
-    completed_batches: Optional[int] = 0,
+    is_final: bool | None = False,
+    completed_batches: int | None = 0,
 ):
     """Persists the results DataFrame to CSV, parquet, and saves metadata to JSON.
 

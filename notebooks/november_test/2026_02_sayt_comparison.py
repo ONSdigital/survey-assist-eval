@@ -3,7 +3,7 @@
 
 Loads preprocessed data with both clerical and SA codings,
 calculates various metrics and visualises them.
-Expects environment variable PREPROD_DATA_BUCKET to be set.
+Expects environment variable PREPROD_DATA_BUCKET_NAME to be set.
 
 Disabled check for too long lines (f strings) and variables names (uppercase for constants)
 """
@@ -30,13 +30,11 @@ from survey_assist_eval.data_cleaning.sic_codes import (
 )
 
 # %%
-data_bucket = dotenv.get_key(".env", "PREPROD_DATA_BUCKET") or ""
+bucket_name = dotenv.get_key(".env", "PREPROD_DATA_BUCKET_NAME") or ""
 project_id = dotenv.get_key(".env", "PROJECT_ID") or ""
 
-work_dir = data_bucket + "analysis-interim-results"
-out_dir = (
-    "data/figures/"  # needs local folder unfortunately, set to None to skip saving
-)
+work_dir = f"gs://{bucket_name}/analysis-interim-results"
+out_dir = "data/figures/november_test"  # needs local folder unfortunately, set to None to skip saving
 if out_dir:
     os.makedirs(out_dir, exist_ok=True)
 

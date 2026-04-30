@@ -5,10 +5,10 @@ Saves to the storage in a location specified in .env file (cell with that functi
 is currently commented out, at the very bottom of this notebook).
 
 Before running the notebook, create .env file with bucket variables, such as
-PREPROD_DATA_BUCKET = "gs://<bucket-name>/<folder>/", and EVALUATION_BUCKET similarly.
+PREPROD_DATA_BUCKET_NAME = "<bucket-name>", and EVALUATION_BUCKET similarly.
 
-PREPROD_DATA_BUCKET - location of the input files.
-EVALUATION_BUCKET - location where the file is to be saved.
+PREPROD_DATA_BUCKET_NAME - name of the input bucket.
+EVALUATION_BUCKET - location where the reference / knowledge base files are stored.
 """
 
 # %%
@@ -23,20 +23,21 @@ import pandas as pd
 
 # %%
 evaluation_bucket = dotenv.get_key(".env", "EVALUATION_BUCKET")
-preprod_bucket = dotenv.get_key(".env", "PREPROD_DATA_BUCKET")
+bucket_name = dotenv.get_key(".env", "PREPROD_DATA_BUCKET_NAME") or ""
 if not evaluation_bucket:
     raise ValueError("EVALUATION_BUCKET not found in .env file. Please set it.")
-if not preprod_bucket:
-    raise ValueError("PREPROD_DATA_BUCKET not found in .env file. Please set it.")
+if not bucket_name:
+    raise ValueError("PREPROD_DATA_BUCKET_NAME not found in .env file. Please set it.")
 
 # %%
 data = pd.read_parquet(
-    f"{preprod_bucket}analysis-interim-results/evaluation_df_with_sa_clean_codes.parquet"
+    f"gs://{bucket_name}/analysis-interim-results/evaluation_df_with_sa_clean_codes.parquet"
 )
 
 # %%
 sic_rephrased = pd.read_csv(
-    f"{evaluation_bucket}sic_rephrased_descriptions_2025_02_03.csv", dtype=str
+    f"gs://{evaluation_bucket}/sic_knowledgebase/sic_rephrased_2025_02_03_v2.csv",
+    dtype=str,
 )
 
 # %%
@@ -199,5 +200,5 @@ closed_q_data["survey_assist_closed_question_response_code"] = response_codes
 
 # %%
 # closed_q_data.to_parquet(
-#     f"{preprod_bucket}closed_questions/closed_questions_codes.parquet", index=False
+#     f"gs://{bucket_name}/analysis-interim-results/closed_questions/closed_questions_codes.parquet", index=False
 # )
