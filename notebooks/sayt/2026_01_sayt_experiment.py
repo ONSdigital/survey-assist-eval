@@ -35,31 +35,31 @@ print(f"Using project ID for GCP vectoriser: {project_id}")
 
 out_dir = "data/SAYT_semantic_search_results"
 
-if not out_dir.startswith("gs://"):
-    os.makedirs(out_dir, exist_ok=True)
+if out_dir.startswith("gs://"):
+    raise ValueError(
+        "Output directory at this moment needs to be local to enable direct classifai loading."
+    )
+
+os.makedirs(out_dir, exist_ok=True)
 
 # %%
 lookup_file_name = f"gs://{bucket_name}/evaluation-pipeline/SAYT/Lookup_IT3_Final.csv"
 sayt_df = pd.read_csv(lookup_file_name, dtype=str).rename(
-    columns={"SIC07": "id", "SIC_lookup": "text"}
+    columns={"SIC07": "label", "SIC_lookup": "text"}
 )
-sayt_df["id"] = sayt_df["id"].apply(lambda x: x if len(x) == 5 else f"0{x}")
+sayt_df["label"] = sayt_df["label"].apply(lambda x: x if len(x) == 5 else f"0{x}")
+# Save the corpus in the format expected by classifai VectorStore (csv with 'label' and 'text' columns) in a local directory
+tmp_corpus_file = out_dir + "/sayt_corpus.txt"
+sayt_df.to_csv(tmp_corpus_file, index=False)
+tmp_db_dir = out_dir + "/sayt_vector_store"
 
 # %%
-matching_df = pd.read_csv(
-    f"gs://{bucket_name}/evaluation-pipeline/SAYT/SAYT_matching.csv",
-    usecols=[
-        "Correct SIC code",
-        "Full entry looking for",
-        "Search term used first 5 characters",
-    ],
-    dtype={
-        "Correct SIC code": pd.StringDtype,
-        "Full entry looking for": pd.StringDtype,
-        "Search term used first 5 characters": pd.StringDtype,
-    },
+matching_df = pd.read_excel(
+    f"gs://{bucket_name}/evaluation-pipeline/SAYT/SAYT matching.xlsx",
+    dtype=str,
     nrows=100,  # Excel formatting causes 10s of thousands of blank input rows after the real 100
 )
+
 matching_df["Correct SIC code"] = matching_df["Correct SIC code"].apply(
     lambda x: x if len(x) == 5 else f"0{x}"
 )
@@ -108,11 +108,11 @@ class MockSAYTVectoriser(VectoriserBase):
 
 # %%
 hf_vs = VectorStore(
-    file_name=lookup_file_name,
+    file_name=tmp_corpus_file,
     data_type="csv",
     vectoriser=hfv,
     batch_size=8,
-    output_dir="hf_vs",
+    output_dir=f"{tmp_db_dir}/hf_vs",
     overwrite=True,
 )
 
@@ -120,25 +120,25 @@ hf_vs = VectorStore(
 #       remove all GCP related things in this file, and just look at the
 #       huggingface vectoriser results instead (it's almost as good).
 gcp_vs = VectorStore(
-    file_name=lookup_file_name,
+    file_name=tmp_corpus_file,
     data_type="csv",
     vectoriser=gcpv,
     batch_size=128,
-    output_dir="gcp_vs",
+    output_dir=f"{tmp_db_dir}/gcp_vs",
     overwrite=True,
 )
 
 # %%
-
 sayt_v = MockSAYTVectoriser(sayt_df["text"])
 sayt_vs = VectorStore(
-    file_name=lookup_file_name,
+    file_name=tmp_corpus_file,
     data_type="csv",
     vectoriser=sayt_v,
     batch_size=8,
-    output_dir="sayt_vs",
+    output_dir=f"{tmp_db_dir}/sayt_vs",
     overwrite=True,
 )
+
 # %%
 matching_search_data_full = VectorStoreSearchInput(
     {
@@ -157,13 +157,13 @@ matching_search_data_partial = VectorStoreSearchInput(
 
 def collate_matches(vector_store, search_input, out_col_name):
     search_results = vector_store.search(search_input, n_results=10)
-    search_results["doc_id"] = search_results["doc_id"].apply(
+    search_results["doc_label"] = search_results["doc_label"].apply(
         lambda x: x if len(x) == 5 else f"0{x}"
     )
     search_results_gpby = search_results.groupby("query_id", as_index=False)
-    return search_results_gpby.agg(list)[["query_id", "doc_id", "doc_text"]].rename(
+    return search_results_gpby.agg(list)[["query_id", "doc_label", "doc_text"]].rename(
         columns={
-            "doc_id": out_col_name + "_codes",
+            "doc_label": out_col_name + "_codes",
             "doc_text": out_col_name + "_descriptions",
         }
     )
@@ -253,11 +253,11 @@ useful_cols = [
 # %%
 print("Saving output file in .csv and .parquet formats")
 matching_df[useful_cols].to_csv(
-    f"{out_dir}SAYT_semantic_search_results.csv", index=False
+    f"{out_dir}/SAYT_semantic_search_results.csv", index=False
 )
 try:
     matching_df[useful_cols].to_parquet(
-        f"{out_dir}SAYT_semantic_search_results.parquet", index=False
+        f"{out_dir}/SAYT_semantic_search_results.parquet", index=False
     )
 except ImportError:
     print("failed to save parquet file of results, skipping...")
@@ -283,7 +283,7 @@ for solution in ["hf", "gcp", "sayt"]:
         ]:
             print(
                 f"""{col} accuracy: {
-                    (matching_df.apply(lambda x, col=col, top_k=top_k: get_accuracy(x, col, top_k), axis=1)).sum():.3f
+                    (matching_df.apply(lambda x, col=col, top_k=top_k: get_accuracy(x, col, top_k), axis=1)).sum()
                     }%"""
             )
 # %%

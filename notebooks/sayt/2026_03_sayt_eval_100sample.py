@@ -46,7 +46,9 @@ test_df = test_df[["correct_sic_code", "full_entry"]]
 clean_codes = test_df["correct_sic_code"].apply(
     lambda x: x if pd.isna(x) else get_clean_n_digit_codes(x, n=5)[0]
 )
-msk = test_df.correct_sic_code != clean_codes.map(lambda x: next(iter(x)))
+msk = test_df["correct_sic_code"] != clean_codes.map(
+    lambda x: x if pd.isna(x) else next(iter(x))
+)
 if msk.any():
     print("Found malformed codes:")
     print(test_df[msk])
