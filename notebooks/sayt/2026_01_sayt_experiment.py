@@ -4,7 +4,7 @@ This is initial experiment not using the SAYTSuggester class.
 """
 
 # ruff: noqa: PLR2004
-# pylint: disable=C0301,C0103,C0115,C0116,W0621,W0105,R0903
+# pylint: disable=C0301,C0103,C0115,C0116,W0621,W0105,R0903,R0801
 # %%
 import os
 
@@ -12,18 +12,28 @@ import pandas as pd
 from classifai.indexers import VectorStore
 from classifai.indexers.dataclasses import VectorStoreSearchInput
 from classifai.vectorisers import GcpVectoriser, HuggingFaceVectoriser, VectoriserBase
-from dotenv import get_key, load_dotenv
+from dotenv import find_dotenv, get_key
 from sklearn.feature_extraction.text import CountVectorizer
 
-load_dotenv("./.env")
-project_id = get_key(".env", "PROJECT_ID")
+env_file = find_dotenv(".env")
+if not env_file:
+    raise FileNotFoundError("No .env file found in the directory tree.")
+
+print(f"Environment variables will be read from {env_file}")
+
+bucket_name = get_key(env_file, "EVALUATION_BUCKET_NAME")
+if not bucket_name:
+    raise ValueError("EVALUATION_BUCKET_NAME environment variable not set")
+
+print(f"Using bucket for data loading: {bucket_name}")
+
+project_id = get_key(env_file, "PROJECT_ID")
 if not project_id:
     raise ValueError("PROJECT_ID not found in .env file. Please set it.")
 
-bucket_name = get_key(".env", "EVALUATION_BUCKET_NAME") or "./"
+print(f"Using project ID for GCP vectoriser: {project_id}")
 
-# out_dir = f"{data_bucket}SAYT_semantic_search_test_results/"
-out_dir = "data/SAYT_semantic_search_results/"
+out_dir = "data/SAYT_semantic_search_results"
 
 if not out_dir.startswith("gs://"):
     os.makedirs(out_dir, exist_ok=True)

@@ -13,9 +13,9 @@ PREPROD_DATA_BUCKET_NAME = "<bucket-name>".
 # ruff: noqa: PLR2004
 
 # %%
-import dotenv
 import numpy as np
 import pandas as pd
+from dotenv import find_dotenv, get_key
 from scipy.stats import (
     chi2_contingency,
     contingency,
@@ -28,9 +28,17 @@ from scipy.stats import (
 from survey_assist_eval.data_cleaning.sic_codes import get_clean_n_digit_codes
 
 # %%
-bucket_name = dotenv.get_key(".env", "PREPROD_DATA_BUCKET_NAME") or ""
+env_file = find_dotenv(".env")
+if not env_file:
+    raise FileNotFoundError("No .env file found in the directory tree.")
+
+print(f"Environment variables will be read from {env_file}")
+
+bucket_name = get_key(env_file, "PREPROD_DATA_BUCKET_NAME")
 if not bucket_name:
-    raise ValueError("PREPROD_DATA_BUCKET_NAME not found in .env file. Please set it.")
+    raise ValueError("PREPROD_DATA_BUCKET_NAME environment variable not set")
+
+print(f"Using bucket for data loading: {bucket_name}")
 
 # %% [markdown]
 # ## None of the above (NOTA)

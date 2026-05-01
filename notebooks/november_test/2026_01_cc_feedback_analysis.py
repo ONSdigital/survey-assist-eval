@@ -8,20 +8,31 @@ from os import makedirs
 # pylint: disable=line-too-long,duplicate-code
 from textwrap import wrap
 
-import dotenv
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from dotenv import find_dotenv, get_key
 from scipy.stats import mannwhitneyu
 
 # %matplotlib inline
 
 # %%
-project_id = dotenv.get_key(".env", "PROJECT_ID")
-if not project_id:
-    raise ValueError("PROJECT_ID not found in .env file. Please set it.")
+env_file = find_dotenv(".env")
+if not env_file:
+    raise FileNotFoundError("No .env file found in the directory tree.")
 
-bucket_name = dotenv.get_key(".env", "PREPROD_DATA_BUCKET_NAME") or ""
+print(f"Environment variables will be read from {env_file}")
+
+project_id = get_key(env_file, "PROJECT_ID")
+if not project_id:
+    raise ValueError("PROJECT_ID environment variable not set")
+
+bucket_name = get_key(env_file, "PREPROD_DATA_BUCKET_NAME")
+if not bucket_name:
+    raise ValueError("PREPROD_DATA_BUCKET_NAME environment variable not set")
+
+print(f"Using bucket for data loading: {bucket_name}")
+
 work_dir = f"gs://{bucket_name}/analysis-interim-results"
 # out_dir = work_dir + "/CC_SocSurveys_feedback"
 out_dir = None

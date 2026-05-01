@@ -4,15 +4,27 @@
 # pylint: disable=protected-access,redefined-outer-name,C0103
 
 # %%
-import dotenv
 import pandas as pd
 import plotly.express as px
+from dotenv import find_dotenv, get_key
 from industrial_classification_utils.sayt import SAYTSuggester
 
 from survey_assist_eval.data_cleaning.sic_codes import get_clean_n_digit_codes
 
+# pylint: disable=R0801
+
 # %%
-bucket_name = dotenv.get_key(".env", "EVALUATION_BUCKET_NAME") or "data/"
+env_file = find_dotenv(".env")
+if not env_file:
+    raise FileNotFoundError("No .env file found in the directory tree.")
+
+print(f"Environment variables will be read from {env_file}")
+
+bucket_name = get_key(env_file, "EVALUATION_BUCKET_NAME")
+if not bucket_name:
+    raise ValueError("EVALUATION_BUCKET_NAME environment variable not set")
+
+print(f"Using bucket for data loading: {bucket_name}")
 
 # %%
 test_df = pd.read_excel(

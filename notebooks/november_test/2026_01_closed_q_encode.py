@@ -17,17 +17,29 @@ EVALUATION_BUCKET_NAME - location where the reference / knowledge base files are
 
 import re
 
-# %%
-import dotenv
 import pandas as pd
 
 # %%
-evaluation_bucket = dotenv.get_key(".env", "EVALUATION_BUCKET_NAME") or ""
-bucket_name = dotenv.get_key(".env", "PREPROD_DATA_BUCKET_NAME") or ""
+from dotenv import find_dotenv, get_key
+
+# %%
+env_file = find_dotenv(".env")
+if not env_file:
+    raise FileNotFoundError("No .env file found in the directory tree.")
+
+print(f"Environment variables will be read from {env_file}")
+
+evaluation_bucket = get_key(env_file, "EVALUATION_BUCKET_NAME")
 if not evaluation_bucket:
-    raise ValueError("EVALUATION_BUCKET_NAME not found in .env file. Please set it.")
+    raise ValueError("EVALUATION_BUCKET_NAME environment variable not set")
+
+print(f"Using bucket for data loading: {evaluation_bucket}")
+
+bucket_name = get_key(env_file, "PREPROD_DATA_BUCKET_NAME")
 if not bucket_name:
-    raise ValueError("PREPROD_DATA_BUCKET_NAME not found in .env file. Please set it.")
+    raise ValueError("PREPROD_DATA_BUCKET_NAME environment variable not set")
+
+print(f"Using bucket for data loading: {bucket_name}")
 
 # %%
 data = pd.read_parquet(

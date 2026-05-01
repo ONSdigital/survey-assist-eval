@@ -4,12 +4,23 @@
 # pylint: disable=protected-access,C0103,R0801
 
 # %%
-import dotenv
 import pandas as pd
+from dotenv import find_dotenv, get_key
 from industrial_classification_utils.sayt import SAYTSuggester
 
 # %%
-bucket_name = dotenv.get_key(".env", "EVALUATION_BUCKET_NAME") or "data/"
+env_file = find_dotenv(".env")
+if not env_file:
+    raise FileNotFoundError("No .env file found in the directory tree.")
+
+print(f"Environment variables will be read from {env_file}")
+
+bucket_name = get_key(env_file, "EVALUATION_BUCKET_NAME")
+if not bucket_name:
+    raise ValueError("EVALUATION_BUCKET_NAME environment variable not set")
+
+print(f"Using bucket for data loading: {bucket_name}")
+
 
 # %%
 ############# toy example to verify SAYT does something #############

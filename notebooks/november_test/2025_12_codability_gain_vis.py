@@ -12,14 +12,25 @@ Disabled check for too long lines (f strings) and variables names (uppercase for
 import os
 import re
 
-import dotenv
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+from dotenv import find_dotenv, get_key
 from plotly.subplots import make_subplots
 
 # %%
-bucket_name = dotenv.get_key(".env", "PREPROD_DATA_BUCKET_NAME") or ""
+env_file = find_dotenv(".env")
+if not env_file:
+    raise FileNotFoundError("No .env file found in the directory tree.")
+
+print(f"Environment variables will be read from {env_file}")
+
+bucket_name = get_key(env_file, "PREPROD_DATA_BUCKET_NAME")
+if not bucket_name:
+    raise ValueError("PREPROD_DATA_BUCKET_NAME environment variable not set")
+
+print(f"Using bucket for data loading: {bucket_name}")
+
 work_dir = f"gs://{bucket_name}/analysis-interim-results"
 out_dir = "data/figures/november_test"  # needs local folder unfortunately, set to None to skip saving
 if out_dir:

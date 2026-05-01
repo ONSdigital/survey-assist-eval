@@ -12,10 +12,10 @@ from os import makedirs
 from textwrap import wrap
 from typing import Any
 
-import dotenv
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from dotenv import find_dotenv, get_key
 from helper_load_data import load_data
 from matplotlib.gridspec import GridSpec
 from scipy.stats import kruskal, mannwhitneyu
@@ -29,7 +29,17 @@ from survey_assist_eval.data_cleaning.sic_codes import (
 # Load environmental variables & set data input/output locations:
 ## %matplotlib inline
 
-bucket_name = dotenv.get_key(".env", "PREPROD_DATA_BUCKET_NAME") or ""
+env_file = find_dotenv(".env")
+if not env_file:
+    raise FileNotFoundError("No .env file found in the directory tree.")
+
+print(f"Environment variables will be read from {env_file}")
+
+bucket_name = get_key(env_file, "PREPROD_DATA_BUCKET_NAME")
+if not bucket_name:
+    raise ValueError("PREPROD_DATA_BUCKET_NAME environment variable not set")
+
+print(f"Using bucket for data loading: {bucket_name}")
 
 small_nonzero_number = 1e-256
 SIGNIFICANCE_THRESHOLD = 0.05

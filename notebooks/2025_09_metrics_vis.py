@@ -14,9 +14,9 @@ Disabled check for too long lines (f strings) and variables names (uppercase for
 import logging
 import os
 
-import dotenv
 import pandas as pd
 import plotly.express as px
+from dotenv import find_dotenv, get_key
 
 from survey_assist_eval.data_cleaning.prep_data import (
     prep_clerical_codes,
@@ -32,11 +32,20 @@ logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 
-evaluation_bucket_name = dotenv.get_key(".env", "EVALUATION_BUCKET_NAME")
+env_file = find_dotenv(".env")
+if not env_file:
+    raise FileNotFoundError("No .env file found in the directory tree.")
+
+print(f"Environment variables will be read from {env_file}")
+
+evaluation_bucket_name = get_key(env_file, "EVALUATION_BUCKET_NAME")
 if not evaluation_bucket_name:
     raise ValueError("EVALUATION_BUCKET_NAME not found in .env file. Please set it.")
+
+print(f"Using bucket for data loading: {evaluation_bucket_name}")
+
 bucket_prefix = f"gs://{evaluation_bucket_name}/evaluation-pipeline"
-output_folder = "data/temp/"  # set to None if no output saving is needed
+output_folder = "data/temp"  # set to None if no output saving is needed
 
 if output_folder:
     os.makedirs(output_folder, exist_ok=True)
