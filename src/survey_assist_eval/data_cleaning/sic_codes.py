@@ -163,7 +163,7 @@ def get_clean_n_digit_codes(
         return set(), set()
     if isinstance(input_list, str):
         input_list = [input_list]
-    if not isinstance(input_list, (set, list)):
+    if not isinstance(input_list, set | list):
         logger.warning(
             "Expected a list or set of strings for input_list, got %s", type(input_list)
         )
@@ -194,7 +194,7 @@ def validate_sic_codes(input_set: str | set[str] | list[str]) -> set[str]:
     """
     if isinstance(input_set, str):
         input_set = {input_set}
-    if not isinstance(input_set, (set, list)):
+    if not isinstance(input_set, set | list):
         logger.warning(
             "Expected a list or set of strings for input_list, got %s", type(input_set)
         )

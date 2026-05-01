@@ -1,11 +1,8 @@
 """Work in progress notebook to visualize metrics for different models.
 
-It loads specific clerical coding data and model outputs from bucket.
-The bucket name and folder (on line 32) can be manually entered or it is read from
-the .env file, where it should be stored as BUCKET_PREFIX variable, i.e.:
-BUCKET_PREFIX = "gs://<bucket-name>/<folder>/"
-
-Disabled check for too long lines (f strings) and variables names (uppercase for constants)
+Expects following environment variables to be set:
+- EVALUATION_BUCKET_NAME: name of GCS bucket where the data is stored
+The variables  will be loaded from the .env file.
 """
 
 # pylint: disable=C0301,C0103,R0801
@@ -14,9 +11,9 @@ Disabled check for too long lines (f strings) and variables names (uppercase for
 import logging
 import os
 
-import dotenv
 import pandas as pd
 import plotly.express as px
+from dotenv import load_dotenv
 
 from survey_assist_eval.data_cleaning.prep_data import (
     prep_clerical_codes,
@@ -32,11 +29,15 @@ logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 
-bucket_prefix = dotenv.get_key(".env", "BUCKET_PREFIX")
-if not bucket_prefix:
-    raise ValueError("BUCKET_PREFIX not found in .env file. Please set it.")
+load_dotenv()
+evaluation_bucket_name = os.getenv("EVALUATION_BUCKET_NAME")
+if not evaluation_bucket_name:
+    raise ValueError("EVALUATION_BUCKET_NAME environment variable not set")
 
-output_folder = "data/temp/"  # set to None if no output saving is needed
+print(f"Using bucket for data loading: {evaluation_bucket_name}")
+
+bucket_prefix = f"gs://{evaluation_bucket_name}/evaluation-pipeline"
+output_folder = "data/temp"  # set to None if no output saving is needed
 
 if output_folder:
     os.makedirs(output_folder, exist_ok=True)
@@ -44,13 +45,13 @@ if output_folder:
 
 # %%
 # load clerical data
-clerical_it1_file = f"{bucket_prefix}original_datasets/DSC_Rep_Sample.csv"
+clerical_it1_file = f"{bucket_prefix}/original_datasets/DSC_Rep_Sample.csv"
 clerical_it1_4plus_file = (
-    f"{bucket_prefix}original_datasets/Codes_for_4_plus_DSC_Rep_Sample.csv"
+    f"{bucket_prefix}/original_datasets/Codes_for_4_plus_DSC_Rep_Sample.csv"
 )
-clerical_it2_file = f"{bucket_prefix}original_datasets/DSC_Rep_Sample_IT2.csv"
+clerical_it2_file = f"{bucket_prefix}/original_datasets/DSC_Rep_Sample_IT2.csv"
 clerical_it2_4plus_file = (
-    f"{bucket_prefix}original_datasets/Codes_for_4_plus_DSC_Rep_Sample_IT2.csv"
+    f"{bucket_prefix}/original_datasets/Codes_for_4_plus_DSC_Rep_Sample_IT2.csv"
 )
 cc_it1_df = pd.read_csv(clerical_it1_file)
 cc_it1_4plus_df = pd.read_csv(clerical_it1_4plus_file)
@@ -63,11 +64,11 @@ cc_it2_4plus_df = pd.read_csv(clerical_it2_4plus_file)
 latest_model_name = "m_2p_g2.5"
 model_files = {
     # one-prompt survey assist outputs
-    "m_1p_g2.5": f"{bucket_prefix}one_prompt_pipeline/2025_10_full_2k_gemini25/STG5.parquet",
-    "m_1p_g2.0": f"{bucket_prefix}one_prompt_pipeline/2025_10_full_2k_gemini20/STG5.parquet",
+    "m_1p_g2.5": f"{bucket_prefix}/one_prompt_pipeline/2025_10_full_2k_gemini25/STG5.parquet",
+    "m_1p_g2.0": f"{bucket_prefix}/one_prompt_pipeline/2025_10_full_2k_gemini20/STG5.parquet",
     # two-prompt survey assist outputs
-    "m_2p_g2.0": f"{bucket_prefix}two_prompt_pipeline/2025_08_full_2k_gemini20/STG5.parquet",
-    "m_2p_g2.5": f"{bucket_prefix}two_prompt_pipeline/2025_09_full_2k_gemini25/STG5.parquet",
+    "m_2p_g2.0": f"{bucket_prefix}/two_prompt_pipeline/2025_08_full_2k_gemini20/STG5.parquet",
+    "m_2p_g2.5": f"{bucket_prefix}/two_prompt_pipeline/2025_09_full_2k_gemini25/STG5.parquet",
 }
 
 model_dfs = {name: pd.read_parquet(path) for name, path in model_files.items()}

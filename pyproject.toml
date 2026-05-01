@@ -1,25 +1,29 @@
-[tool.poetry]
+[project]
 name = "survey-assist-eval"
 version = "0.0.1"
 description = "Evaluation module for Survey Assist"
-authors = ["ONS Data Science Campus <datasciencecampus@ons.gov.uk>"]
+authors = [{ name = "ONS Data Science Campus", email = "datasciencecampus@ons.gov.uk" }]
 license = "MIT"
 readme = "README.md"
+requires-python = ">=3.12,<4.0"
+dynamic = ["dependencies"]
+
+[tool.poetry]
 
 packages = [{ include = "survey_assist_eval", from = "src" }]
 
 [tool.poetry.dependencies]
+gcsfs = "^2025.3.2"
 numpy = "^2.3.3"
 pandas = "^2.3.3"
-python = "^3.12"
-toml = "^0.10.2"
+pydantic = "^2.12.5"
 survey-assist-utils = { git = "https://github.com/ONSdigital/survey-assist-utils.git", tag = "v0.0.8" }
+toml = "^0.10.2"
 
 [tool.poetry.group.dev.dependencies]
 bandit = "^1.8.3"
 black = "^25.1.0"
 firebase-admin = "6.9.0"
-gcsfs = "^2025.3.2"
 google-genai = "^1.66.0"
 ipykernel = "^6.29.5"
 isort = "^6.0.1"
@@ -32,7 +36,6 @@ openpyxl = "^3.1.5"
 pandas-gbq = "^0.26.1"
 plotly = "^6.3.0"
 pre-commit = "^4.2.0"
-pydantic = "^2.12.5"
 pylint = "^3.3.5"
 pytest = "^8.3.5"
 pytest-cov = "^6.0.0"
@@ -40,8 +43,7 @@ python-dotenv = "^1.1.0"
 ruff = "^0.9.10"
 scikit-learn = "^1.8.0"
 scipy = "^1.16.3"
-types-toml = "^0.10.8"
-sic-classification-utils = { git = "https://github.com/ONSdigital/sic-classification-utils.git", rev = "7ab9ce3"}  # Placeholder before a tag is created
+sic-classification-utils = { git = "https://github.com/ONSdigital/sic-classification-utils.git", tag = "v0.1.11" }
 
 [tool.isort]
 profile = "black"

@@ -5,7 +5,6 @@ import datetime
 import os
 import random
 import time
-from pathlib import Path
 
 import requests
 from dotenv import load_dotenv
@@ -16,9 +15,8 @@ from survey_assist_utils.api_token.jwt_utils import (  # pylint: disable=C0411
 
 from .export_to_bq import confirm_bq_table_exists, schema_entry, write_to_bq
 
-env_path = Path(__file__).resolve().parent.parent.parent / ".env"
-if env_path.exists():
-    load_dotenv(dotenv_path=env_path)
+# Load environment variables from .env file
+load_dotenv()
 
 
 def check_constant(
@@ -230,16 +228,15 @@ def main(args, logger_tool):
         "../../data/artificial_data/fake_responses.csv", logger_tool, args.userow
     )
     request_headers = prepare_auth(API_GATEWAY, SA_EMAIL, logger_tool)
-    now = datetime.datetime.now(datetime.timezone.utc)
+    now = datetime.datetime.now(datetime.UTC)
     time_to_wait = (
-        datetime.datetime.combine(now.date(), sync_time, tzinfo=datetime.timezone.utc)
-        - now
+        datetime.datetime.combine(now.date(), sync_time, tzinfo=datetime.UTC) - now
     ).total_seconds()
     logger_tool.debug(
         f"Waiting for sync time {sync_time} (in {time_to_wait:.2f} " "seconds)..."
     )
     time.sleep(time_to_wait)
-    start_time = datetime.datetime.now(datetime.timezone.utc)
+    start_time = datetime.datetime.now(datetime.UTC)
     logger_tool.debug("Starting loadrunner run...")
     logger_tool.debug(f"Test ID: {args.test_id}")
     logger_tool.debug(f"Test description: {args.test_description}")

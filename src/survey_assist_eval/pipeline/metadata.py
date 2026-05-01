@@ -2,7 +2,7 @@
 
 from argparse import Namespace
 from datetime import UTC, datetime
-from typing import Any, Optional
+from typing import Any
 
 
 def _get_default_metadata() -> dict:
@@ -36,7 +36,7 @@ def _get_default_metadata() -> dict:
 
 def update_metadata_with_args_and_defaults(
     parsed_args: Namespace,
-    in_metadata: Optional[dict],
+    in_metadata: dict | None,
 ) -> dict[str, Any]:
     """Updates a metadata dict with CLI args and stage-specific defaults.
 

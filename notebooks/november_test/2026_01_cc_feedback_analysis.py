@@ -3,30 +3,37 @@
 """This file is a notebook (convert with `jupytext`) for investigation of feedback
 from the SurveyAssist testing.
 """
+import os
 from os import makedirs
 
 # pylint: disable=line-too-long,duplicate-code
 from textwrap import wrap
 
-import dotenv
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from dotenv import load_dotenv
 from scipy.stats import mannwhitneyu
 
 # %matplotlib inline
 
 # %%
-project_id = dotenv.get_key(".env", "PROJECT_ID")
+load_dotenv()
+project_id = os.getenv("PROJECT_ID")
 if not project_id:
-    raise ValueError("PROJECT_ID not found in .env file. Please set it.")
+    raise ValueError("PROJECT_ID environment variable not set")
 
-data_bucket = dotenv.get_key(".env", "PREPROD_DATA_BUCKET") or ""
-work_dir = data_bucket + "analysis-interim-results"
+bucket_name = os.getenv("PREPROD_DATA_BUCKET_NAME")
+if not bucket_name:
+    raise ValueError("PREPROD_DATA_BUCKET_NAME environment variable not set")
+
+print(f"Using bucket for data loading: {bucket_name}")
+
+work_dir = f"gs://{bucket_name}/analysis-interim-results"
 # out_dir = work_dir + "/CC_SocSurveys_feedback"
 out_dir = None
 
-figures_output_folder = "data/figures/cc_feedback_analysis/"
+figures_output_folder = "data/figures/cc_feedback_analysis"
 makedirs(figures_output_folder, exist_ok=True)
 
 # %%
@@ -199,7 +206,7 @@ bar_no = ax.bar(x, no_counts, bottom=yes_counts, label="No", color="#F46A25")
 bar_missing = ax.bar(
     x,
     missing_counts,
-    bottom=[i + j for i, j in zip(yes_counts, no_counts)],
+    bottom=[i + j for i, j in zip(yes_counts, no_counts, strict=False)],
     label="Missing",
     color="#A285D1",
 )

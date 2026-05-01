@@ -110,10 +110,6 @@ def _make_embedding_handler(in_metadata: dict) -> EmbeddingHandler:
         embedding_model_name=in_metadata["embedding_model_name"],
         db_dir=in_metadata["embedding_db_dir"],
         k_matches=in_metadata["embedding_k_matches"],
-    )
-
-    new_embedding_handler.embed_index(
-        from_empty=True,
         sic_index_file=in_metadata["sic_index_file"],
         sic_structure_file=in_metadata["sic_structure_file"],
     )

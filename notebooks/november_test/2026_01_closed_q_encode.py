@@ -1,42 +1,49 @@
 # %%
 """Notebook that converts options presented to (and selected by) respondents back into SIC codes.
 
-Saves to the storage in a location specified in .env file (cell with that functionality
-is currently commented out, at the very bottom of this notebook).
+Saves to the storage in a location specified by environment variables (cell with that
+functionality is currently commented out, at the very bottom of this notebook).
 
-Before running the notebook, create .env file with bucket variables, such as
-PREPROD_DATA_BUCKET = "gs://<bucket-name>/<folder>/", and EVALUATION_BUCKET similarly.
-
-PREPROD_DATA_BUCKET - location of the input files.
-EVALUATION_BUCKET - location where the file is to be saved.
+Expects following environment variables to be set:
+- PREPROD_DATA_BUCKET_NAME - name of the input bucket.
+- EVALUATION_BUCKET_NAME - location where the reference / knowledge base files are stored.
+The variables can be loaded from the .env file in the root of the repository into the
+environment using `dotenv.load_dotenv()`.
 """
 
 # %%
 # pylint: disable=C0103, C0116, C0301, C0114, R0801
 # ruff: noqa: PLR2004
 
+import os
 import re
 
-# %%
-import dotenv
 import pandas as pd
+from dotenv import load_dotenv
 
 # %%
-evaluation_bucket = dotenv.get_key(".env", "EVALUATION_BUCKET")
-preprod_bucket = dotenv.get_key(".env", "PREPROD_DATA_BUCKET")
+load_dotenv()
+evaluation_bucket = os.getenv("EVALUATION_BUCKET_NAME")
 if not evaluation_bucket:
-    raise ValueError("EVALUATION_BUCKET not found in .env file. Please set it.")
-if not preprod_bucket:
-    raise ValueError("PREPROD_DATA_BUCKET not found in .env file. Please set it.")
+    raise ValueError("EVALUATION_BUCKET_NAME environment variable not set")
+
+print(f"Using bucket for data loading: {evaluation_bucket}")
+
+bucket_name = os.getenv("PREPROD_DATA_BUCKET_NAME")
+if not bucket_name:
+    raise ValueError("PREPROD_DATA_BUCKET_NAME environment variable not set")
+
+print(f"Using bucket for data loading: {bucket_name}")
 
 # %%
 data = pd.read_parquet(
-    f"{preprod_bucket}analysis-interim-results/evaluation_df_with_sa_clean_codes.parquet"
+    f"gs://{bucket_name}/analysis-interim-results/evaluation_df_with_sa_clean_codes.parquet"
 )
 
 # %%
 sic_rephrased = pd.read_csv(
-    f"{evaluation_bucket}sic_rephrased_descriptions_2025_02_03.csv", dtype=str
+    f"gs://{evaluation_bucket}/sic_knowledgebase/sic_rephrased_descriptions_2025_02_03.csv",
+    dtype=str,
 )
 
 # %%
@@ -199,5 +206,5 @@ closed_q_data["survey_assist_closed_question_response_code"] = response_codes
 
 # %%
 # closed_q_data.to_parquet(
-#     f"{preprod_bucket}closed_questions/closed_questions_codes.parquet", index=False
+#     f"gs://{bucket_name}/analysis-interim-results/closed_questions/closed_questions_codes.parquet", index=False
 # )

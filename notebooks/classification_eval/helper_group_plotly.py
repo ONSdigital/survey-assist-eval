@@ -2,8 +2,8 @@
 
 # pylint: disable=too-many-locals
 
+from collections.abc import Callable
 from copy import deepcopy
-from typing import Callable
 
 import pandas as pd
 import plotly.graph_objects as go

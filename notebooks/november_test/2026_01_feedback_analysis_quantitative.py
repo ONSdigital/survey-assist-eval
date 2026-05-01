@@ -3,19 +3,20 @@
 
 Note: ### = commented out to pass linting
 
-Using 'type: ignore' to satisfy mypy checks.
+Expects environment variable PREPROD_DATA_BUCKET_NAME to be set.
 """
 
 # pylint: disable=C0301,C0103,R0801,C0302,C0121
 
+import os
 from os import makedirs
 from textwrap import wrap
 from typing import Any
 
-import dotenv
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from dotenv import load_dotenv
 from helper_load_data import load_data
 from matplotlib.gridspec import GridSpec
 from scipy.stats import kruskal, mannwhitneyu
@@ -29,19 +30,22 @@ from survey_assist_eval.data_cleaning.sic_codes import (
 # Load environmental variables & set data input/output locations:
 ## %matplotlib inline
 
-data_bucket = dotenv.get_key(".env", "PREPROD_DATA_BUCKET") or ""
+load_dotenv()
+bucket_name = os.getenv("PREPROD_DATA_BUCKET_NAME")
+if not bucket_name:
+    raise ValueError("PREPROD_DATA_BUCKET_NAME environment variable not set")
+
+print(f"Using bucket for data loading: {bucket_name}")
 
 small_nonzero_number = 1e-256
 SIGNIFICANCE_THRESHOLD = 0.05
 
-folder = data_bucket + "analysis-interim-results"
+folder = f"gs://{bucket_name}/analysis-interim-results"
 
-out_folder = (
-    data_bucket + "analysis-interim-results/feedback-analysis"
-)  # set to None to skip saving
+out_folder = f"gs://{bucket_name}/analysis-interim-results/feedback-analysis"  # set to None to skip saving
 out_folder = None  # type: ignore[assignment]
 
-figures_output_folder = "data/figures/quantitative_feedback_analysis/"
+figures_output_folder = "data/figures/quantitative_feedback_analysis"
 makedirs(figures_output_folder, exist_ok=True)
 
 # %%
@@ -550,7 +554,7 @@ effect_strength_ease = [
         len(feedback_given_df_SIC_dummies[feedback_given_df_SIC_dummies[sec] == 1])
         * len(feedback_given_df_SIC_dummies[feedback_given_df_SIC_dummies[sec] == 0])
     )
-    for res, sec in zip(results_ease, ordered_SIC_sections)
+    for res, sec in zip(results_ease, ordered_SIC_sections, strict=False)
 ]
 
 effect_strength_relevance: Any = [
@@ -559,7 +563,7 @@ effect_strength_relevance: Any = [
         len(feedback_given_df_SIC_dummies[feedback_given_df_SIC_dummies[sec] == 1])
         * len(feedback_given_df_SIC_dummies[feedback_given_df_SIC_dummies[sec] == 0])
     )
-    for res, sec in zip(results_relevance, ordered_SIC_sections)
+    for res, sec in zip(results_relevance, ordered_SIC_sections, strict=False)
 ]
 
 effect_strength_comfort: Any = [
@@ -568,7 +572,7 @@ effect_strength_comfort: Any = [
         len(feedback_given_df_SIC_dummies[feedback_given_df_SIC_dummies[sec] == 1])
         * len(feedback_given_df_SIC_dummies[feedback_given_df_SIC_dummies[sec] == 0])
     )
-    for res, sec in zip(results_comfort, ordered_SIC_sections)
+    for res, sec in zip(results_comfort, ordered_SIC_sections, strict=False)
 ]
 
 effect_strengths_SIC = np.array(

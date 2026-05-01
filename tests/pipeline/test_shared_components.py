@@ -140,9 +140,10 @@ def test_persist_results_final_writes_outputs_and_deletes_intermediate(tmp_path:
     intermediate.mkdir(parents=True)
     (intermediate / "dummy.txt").write_text("x", encoding="utf8")
 
-    with patch.object(
-        pd.DataFrame, "to_parquet", autospec=True
-    ) as to_parquet, patch.object(pd.DataFrame, "to_csv", autospec=True) as to_csv:
+    with (
+        patch.object(pd.DataFrame, "to_parquet", autospec=True) as to_parquet,
+        patch.object(pd.DataFrame, "to_csv", autospec=True) as to_csv,
+    ):
         shared_components.persist_results(
             df=df,
             metadata=metadata,
@@ -199,9 +200,12 @@ def test_set_up_initial_state_restart_success_short_circuits(tmp_path: Path):
         second_run=False,
     )
 
-    with patch.object(
-        shared_components, "_try_to_restart", return_value=(df, meta, 4)
-    ) as tr, patch("pandas.read_csv") as read_csv:
+    with (
+        patch.object(
+            shared_components, "_try_to_restart", return_value=(df, meta, 4)
+        ) as tr,
+        patch("pandas.read_csv") as read_csv,
+    ):
         out_df, out_meta, start = shared_components.set_up_initial_state(args)
 
     tr.assert_called_once()
