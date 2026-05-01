@@ -1,11 +1,8 @@
 """Work in progress notebook to visualize metrics for different models.
 
-It loads specific clerical coding data and model outputs from bucket.
-The bucket name and folder (on line 32) can be manually entered or it is read from
-the .env file, where it should be stored as EVALUATION_BUCKET_NAME variable, i.e.:
-EVALUATION_BUCKET_NAME = "<bucket-name>"
-
-Disabled check for too long lines (f strings) and variables names (uppercase for constants)
+Expects following environment variables to be set:
+- EVALUATION_BUCKET_NAME: name of GCS bucket where the data is stored
+The variables  will be loaded from the .env file.
 """
 
 # pylint: disable=C0301,C0103,R0801
@@ -14,9 +11,9 @@ Disabled check for too long lines (f strings) and variables names (uppercase for
 import logging
 import os
 
-import dotenv
 import pandas as pd
 import plotly.express as px
+from dotenv import load_dotenv
 
 from survey_assist_eval.data_cleaning.prep_data import (
     prep_clerical_codes,
@@ -32,11 +29,15 @@ logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 
-evaluation_bucket_name = dotenv.get_key(".env", "EVALUATION_BUCKET_NAME")
+load_dotenv()
+evaluation_bucket_name = os.getenv("EVALUATION_BUCKET_NAME")
 if not evaluation_bucket_name:
-    raise ValueError("EVALUATION_BUCKET_NAME not found in .env file. Please set it.")
+    raise ValueError("EVALUATION_BUCKET_NAME environment variable not set")
+
+print(f"Using bucket for data loading: {evaluation_bucket_name}")
+
 bucket_prefix = f"gs://{evaluation_bucket_name}/evaluation-pipeline"
-output_folder = "data/temp/"  # set to None if no output saving is needed
+output_folder = "data/temp"  # set to None if no output saving is needed
 
 if output_folder:
     os.makedirs(output_folder, exist_ok=True)

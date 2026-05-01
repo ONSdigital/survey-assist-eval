@@ -11,8 +11,10 @@ Disabled check for too long lines (f strings) and variables names (uppercase for
 
 # pylint: disable=C0301,C0103,R0801
 # %%
-import dotenv
+import os
+
 import pandas as pd
+from dotenv import load_dotenv
 
 from survey_assist_eval.data_cleaning.prep_data import prep_clerical_codes
 from survey_assist_eval.data_cleaning.sic_codes import (
@@ -21,7 +23,13 @@ from survey_assist_eval.data_cleaning.sic_codes import (
 )
 
 # %%
-bucket_name = dotenv.get_key(".env", "PREPROD_DATA_BUCKET_NAME") or ""
+load_dotenv()
+bucket_name = os.getenv("PREPROD_DATA_BUCKET_NAME")
+if not bucket_name:
+    raise ValueError("PREPROD_DATA_BUCKET_NAME environment variable not set")
+
+print(f"Using bucket for data loading: {bucket_name}")
+
 work_dir = f"gs://{bucket_name}/analysis-interim-results/clerically-coded"
 
 

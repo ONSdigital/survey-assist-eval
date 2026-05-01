@@ -1,4 +1,9 @@
-"""Notebook for visualizing impact of Surveyassist on codability levels using a Sankey diagram."""
+"""Notebook for visualizing impact of Surveyassist on codability levels using a Sankey diagram.
+
+Expects following environment variables to be set:
+- EVALUATION_BUCKET_NAME: name of GCS bucket where the data is stored
+The variables  will be loaded from the .env file.
+"""
 
 # pylint: disable=C0301,C0103,R0801
 # %%
@@ -6,9 +11,9 @@ import logging
 import os
 import re
 
-import dotenv
 import pandas as pd
 import plotly.graph_objects as go
+from dotenv import load_dotenv
 
 from survey_assist_eval.data_cleaning.prep_data import prep_model_codes
 from survey_assist_eval.data_cleaning.sic_codes import get_codability_level
@@ -19,13 +24,16 @@ logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 
-evaluation_bucket_name = dotenv.get_key(".env", "EVALUATION_BUCKET_NAME")
+load_dotenv()
+evaluation_bucket_name = os.getenv("EVALUATION_BUCKET_NAME")
 
 if not evaluation_bucket_name:
-    raise ValueError("EVALUATION_BUCKET_NAME not found in .env file. Please set it.")
+    raise ValueError("EVALUATION_BUCKET_NAME environment variable not set")
+
+print(f"Using bucket for data loading: {evaluation_bucket_name}")
 bucket_prefix = f"gs://{evaluation_bucket_name}/evaluation-pipeline"
 
-output_folder = "data/temp/"  # set to None if no output saving is needed
+output_folder = "data/temp"  # set to None if no output saving is needed
 
 if output_folder:
     os.makedirs(output_folder, exist_ok=True)
@@ -133,5 +141,8 @@ sankey_fig.update_layout(
     width=600,
 )
 sankey_fig.show()
+
+if output_folder:
+    sankey_fig.write_html(os.path.join(output_folder, "sankey_codability.html"))
 
 # %%

@@ -1,6 +1,8 @@
 # %%
 """Additional checks for SAYT, SA and CC overlap and lack of overlap.
 
+Expects environment variable PREPROD_DATA_BUCKET_NAME to be set.
+
 Disabled:
     - Line too long: print statements.
     - Constant name: naming style.
@@ -9,13 +11,18 @@ Disabled:
 # pylint: disable= C0103, C0301
 
 # %%
-import dotenv
+import os
+
 import pandas as pd
+from dotenv import load_dotenv
 
 # %%
-bucket_name = dotenv.get_key(".env", "PREPROD_DATA_BUCKET_NAME") or ""
+load_dotenv()
+bucket_name = os.getenv("PREPROD_DATA_BUCKET_NAME")
 if not bucket_name:
-    raise ValueError("PREPROD_DATA_BUCKET_NAME not found in .env file. Please set it.")
+    raise ValueError("PREPROD_DATA_BUCKET_NAME environment variable not set")
+
+print(f"Using bucket for data loading: {bucket_name}")
 
 # %%
 data = pd.read_parquet(

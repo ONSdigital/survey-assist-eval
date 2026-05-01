@@ -3,25 +3,32 @@
 """This file is a notebook (convert with `jupytext`) for investigation of feedback
 from the SurveyAssist testing.
 """
+import os
 from os import makedirs
 
 # pylint: disable=line-too-long,duplicate-code
 from textwrap import wrap
 
-import dotenv
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from dotenv import load_dotenv
 from scipy.stats import mannwhitneyu
 
 # %matplotlib inline
 
 # %%
-project_id = dotenv.get_key(".env", "PROJECT_ID")
+load_dotenv()
+project_id = os.getenv("PROJECT_ID")
 if not project_id:
-    raise ValueError("PROJECT_ID not found in .env file. Please set it.")
+    raise ValueError("PROJECT_ID environment variable not set")
 
-bucket_name = dotenv.get_key(".env", "PREPROD_DATA_BUCKET_NAME") or ""
+bucket_name = os.getenv("PREPROD_DATA_BUCKET_NAME")
+if not bucket_name:
+    raise ValueError("PREPROD_DATA_BUCKET_NAME environment variable not set")
+
+print(f"Using bucket for data loading: {bucket_name}")
+
 work_dir = f"gs://{bucket_name}/analysis-interim-results"
 # out_dir = work_dir + "/CC_SocSurveys_feedback"
 out_dir = None

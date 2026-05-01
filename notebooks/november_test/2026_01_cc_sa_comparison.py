@@ -12,9 +12,9 @@ Disabled check for too long lines (f strings) and variables names (uppercase for
 # %%
 import os
 
-import dotenv
 import pandas as pd
 import plotly.express as px
+from dotenv import load_dotenv
 
 from notebooks.november_test.helper_load_data import load_data
 from survey_assist_eval.data_cleaning.prep_data import get_clean_n_digit_codes
@@ -23,7 +23,13 @@ from survey_assist_eval.evaluation.metrics import (
 )
 
 # %%
-bucket_name = dotenv.get_key(".env", "PREPROD_DATA_BUCKET_NAME") or ""
+load_dotenv()
+bucket_name = os.getenv("PREPROD_DATA_BUCKET_NAME")
+if not bucket_name:
+    raise ValueError("PREPROD_DATA_BUCKET_NAME environment variable not set")
+
+print(f"Using bucket for data loading: {bucket_name}")
+
 work_dir = f"gs://{bucket_name}/analysis-interim-results"
 out_dir = "data/figures/november_test"  # needs local folder unfortunately, set to None to skip saving
 if out_dir:
