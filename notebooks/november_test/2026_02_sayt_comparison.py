@@ -18,7 +18,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import plotly.express as px
-from dotenv import find_dotenv, get_key
+from dotenv import load_dotenv
 from google import genai
 from helper_load_data import load_data
 from matplotlib_venn import venn3
@@ -30,19 +30,14 @@ from survey_assist_eval.data_cleaning.sic_codes import (
 )
 
 # %%
-env_file = find_dotenv(".env")
-if not env_file:
-    raise FileNotFoundError("No .env file found in the directory tree.")
-
-print(f"Environment variables will be read from {env_file}")
-
-bucket_name = get_key(env_file, "PREPROD_DATA_BUCKET_NAME")
+load_dotenv()
+bucket_name = os.getenv("PREPROD_DATA_BUCKET_NAME")
 if not bucket_name:
     raise ValueError("PREPROD_DATA_BUCKET_NAME environment variable not set")
 
 print(f"Using bucket for data loading: {bucket_name}")
 
-project_id = get_key(env_file, "PROJECT_ID")
+project_id = os.getenv("PROJECT_ID")
 if not project_id:
     raise ValueError("PROJECT_ID environment variable not set")
 

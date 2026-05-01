@@ -11,8 +11,10 @@ Disabled check for too long lines (f strings) and variables names (uppercase for
 
 # pylint: disable=C0301,C0103,R0801
 # %%
+import os
+
 import pandas as pd
-from dotenv import find_dotenv, get_key
+from dotenv import load_dotenv
 
 from survey_assist_eval.data_cleaning.prep_data import prep_clerical_codes
 from survey_assist_eval.data_cleaning.sic_codes import (
@@ -21,13 +23,8 @@ from survey_assist_eval.data_cleaning.sic_codes import (
 )
 
 # %%
-env_file = find_dotenv(".env")
-if not env_file:
-    raise FileNotFoundError("No .env file found in the directory tree.")
-
-print(f"Environment variables will be read from {env_file}")
-
-bucket_name = get_key(env_file, "PREPROD_DATA_BUCKET_NAME")
+load_dotenv()
+bucket_name = os.getenv("PREPROD_DATA_BUCKET_NAME")
 if not bucket_name:
     raise ValueError("PREPROD_DATA_BUCKET_NAME environment variable not set")
 

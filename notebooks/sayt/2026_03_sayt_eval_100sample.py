@@ -1,12 +1,19 @@
-"""Run small tests for industry/organisation descriptions SAYT."""
+"""Run small tests for industry/organisation descriptions SAYT.
+
+Expects following environment variables to be set:
+- EVALUATION_BUCKET_NAME: name of GCS bucket where the data is stored
+The variables are loaded from the ".env" file.
+"""
 
 # ruff: noqa: PLR2004
 # pylint: disable=protected-access,redefined-outer-name,C0103
 
 # %%
+import os
+
 import pandas as pd
 import plotly.express as px
-from dotenv import find_dotenv, get_key
+from dotenv import load_dotenv
 from industrial_classification_utils.sayt import SAYTSuggester
 
 from survey_assist_eval.data_cleaning.sic_codes import get_clean_n_digit_codes
@@ -14,13 +21,8 @@ from survey_assist_eval.data_cleaning.sic_codes import get_clean_n_digit_codes
 # pylint: disable=R0801
 
 # %%
-env_file = find_dotenv(".env")
-if not env_file:
-    raise FileNotFoundError("No .env file found in the directory tree.")
-
-print(f"Environment variables will be read from {env_file}")
-
-bucket_name = get_key(env_file, "EVALUATION_BUCKET_NAME")
+load_dotenv()
+bucket_name = os.getenv("EVALUATION_BUCKET_NAME")
 if not bucket_name:
     raise ValueError("EVALUATION_BUCKET_NAME environment variable not set")
 

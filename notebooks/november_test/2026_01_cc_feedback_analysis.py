@@ -3,6 +3,7 @@
 """This file is a notebook (convert with `jupytext`) for investigation of feedback
 from the SurveyAssist testing.
 """
+import os
 from os import makedirs
 
 # pylint: disable=line-too-long,duplicate-code
@@ -11,23 +12,18 @@ from textwrap import wrap
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from dotenv import find_dotenv, get_key
+from dotenv import load_dotenv
 from scipy.stats import mannwhitneyu
 
 # %matplotlib inline
 
 # %%
-env_file = find_dotenv(".env")
-if not env_file:
-    raise FileNotFoundError("No .env file found in the directory tree.")
-
-print(f"Environment variables will be read from {env_file}")
-
-project_id = get_key(env_file, "PROJECT_ID")
+load_dotenv()
+project_id = os.getenv("PROJECT_ID")
 if not project_id:
     raise ValueError("PROJECT_ID environment variable not set")
 
-bucket_name = get_key(env_file, "PREPROD_DATA_BUCKET_NAME")
+bucket_name = os.getenv("PREPROD_DATA_BUCKET_NAME")
 if not bucket_name:
     raise ValueError("PREPROD_DATA_BUCKET_NAME environment variable not set")
 

@@ -1,6 +1,11 @@
 """Experimenting with different approaches to improve SAYT results.
 
 This is initial experiment not using the SAYTSuggester class.
+
+Expects following environment variables to be set:
+- EVALUATION_BUCKET_NAME: name of GCS bucket where the data is stored
+- PROJECT_ID: GCP project ID to use for GCP vectoriser
+The variables are loaded from the ".env" file.
 """
 
 # ruff: noqa: PLR2004
@@ -12,25 +17,19 @@ import pandas as pd
 from classifai.indexers import VectorStore
 from classifai.indexers.dataclasses import VectorStoreSearchInput
 from classifai.vectorisers import GcpVectoriser, HuggingFaceVectoriser, VectoriserBase
-from dotenv import find_dotenv, get_key
+from dotenv import load_dotenv
 from sklearn.feature_extraction.text import CountVectorizer
 
-env_file = find_dotenv(".env")
-if not env_file:
-    raise FileNotFoundError("No .env file found in the directory tree.")
-
-print(f"Environment variables will be read from {env_file}")
-
-bucket_name = get_key(env_file, "EVALUATION_BUCKET_NAME")
+# %%
+load_dotenv()
+bucket_name = os.getenv("EVALUATION_BUCKET_NAME")
 if not bucket_name:
     raise ValueError("EVALUATION_BUCKET_NAME environment variable not set")
-
 print(f"Using bucket for data loading: {bucket_name}")
 
-project_id = get_key(env_file, "PROJECT_ID")
+project_id = os.getenv("PROJECT_ID")
 if not project_id:
-    raise ValueError("PROJECT_ID not found in .env file. Please set it.")
-
+    raise ValueError("PROJECT_ID environment variable not set.")
 print(f"Using project ID for GCP vectoriser: {project_id}")
 
 out_dir = "data/SAYT_semantic_search_results"

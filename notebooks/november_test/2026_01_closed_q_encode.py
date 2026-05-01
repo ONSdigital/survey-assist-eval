@@ -1,41 +1,35 @@
 # %%
 """Notebook that converts options presented to (and selected by) respondents back into SIC codes.
 
-Saves to the storage in a location specified in .env file (cell with that functionality
-is currently commented out, at the very bottom of this notebook).
+Saves to the storage in a location specified by environment variables (cell with that
+functionality is currently commented out, at the very bottom of this notebook).
 
-Before running the notebook, create .env file with bucket variables, such as
-PREPROD_DATA_BUCKET_NAME = "<bucket-name>", and EVALUATION_BUCKET_NAME similarly.
-
-PREPROD_DATA_BUCKET_NAME - name of the input bucket.
-EVALUATION_BUCKET_NAME - location where the reference / knowledge base files are stored.
+Expects following environment variables to be set:
+- PREPROD_DATA_BUCKET_NAME - name of the input bucket.
+- EVALUATION_BUCKET_NAME - location where the reference / knowledge base files are stored.
+The variables can be loaded from the .env file in the root of the repository into the
+environment using `dotenv.load_dotenv()`.
 """
 
 # %%
 # pylint: disable=C0103, C0116, C0301, C0114, R0801
 # ruff: noqa: PLR2004
 
+import os
 import re
 
 import pandas as pd
+from dotenv import load_dotenv
 
 # %%
-from dotenv import find_dotenv, get_key
-
-# %%
-env_file = find_dotenv(".env")
-if not env_file:
-    raise FileNotFoundError("No .env file found in the directory tree.")
-
-print(f"Environment variables will be read from {env_file}")
-
-evaluation_bucket = get_key(env_file, "EVALUATION_BUCKET_NAME")
+load_dotenv()
+evaluation_bucket = os.getenv("EVALUATION_BUCKET_NAME")
 if not evaluation_bucket:
     raise ValueError("EVALUATION_BUCKET_NAME environment variable not set")
 
 print(f"Using bucket for data loading: {evaluation_bucket}")
 
-bucket_name = get_key(env_file, "PREPROD_DATA_BUCKET_NAME")
+bucket_name = os.getenv("PREPROD_DATA_BUCKET_NAME")
 if not bucket_name:
     raise ValueError("PREPROD_DATA_BUCKET_NAME environment variable not set")
 
