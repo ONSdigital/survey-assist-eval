@@ -11,9 +11,10 @@ Disabled check for too long lines (f strings) and variables names (uppercase for
 # pylint: disable=C0301,C0103
 
 # %%
-import dotenv
+import os
+
 import pandas as pd
-from survey_assist_utils import get_logger
+from dotenv import load_dotenv
 
 from survey_assist_eval.data_cleaning.prep_data import (
     prep_clerical_codes,
@@ -25,11 +26,11 @@ from survey_assist_eval.data_cleaning.sic_codes import (
 )
 
 # %%
-logger = get_logger(__name__)
-
-bucket_name = dotenv.get_key(".env", "EVALUATION_BUCKET_NAME")
+load_dotenv()
+bucket_name = os.getenv("EVALUATION_BUCKET_NAME")
 if not bucket_name:
-    raise ValueError("EVALUATION_BUCKET_NAME not found in .env file. Please set it.")
+    raise ValueError("EVALUATION_BUCKET_NAME environment variable not set")
+print(f"Using bucket for data loading: {bucket_name}")
 
 work_folder = f"gs://{bucket_name}/evaluation-pipeline/two_prompt_pipeline/2026_03_tlfs_it11_gemini25_europe_west9/"
 
@@ -147,7 +148,6 @@ combined_df.to_parquet(
 cims_df = pd.read_excel(
     f"{cims_folder}TLFS_IT11_raw_data_stage_1_SIC07_multidig_lr_2_stage_20260402-2152_2026_04_13_13_57.xlsx"
 )
-
 
 # %%
 mock_cims_df = pd.DataFrame(

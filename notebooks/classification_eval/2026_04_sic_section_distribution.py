@@ -10,15 +10,20 @@ Expects environment variable EVALUATION_BUCKET_NAME to be set.
 # %%
 import os
 
-import dotenv
 import pandas as pd
 import plotly.express as px
+from dotenv import load_dotenv
 from scipy.stats import binomtest
 
 from survey_assist_eval.data_cleaning.prep_data import get_clean_n_digit_codes
 
 # %%
-bucket_name = dotenv.get_key(".env", "EVALUATION_BUCKET_NAME")
+load_dotenv()
+bucket_name = os.getenv("EVALUATION_BUCKET_NAME")
+if not bucket_name:
+    raise ValueError("EVALUATION_BUCKET_NAME environment variable not set")
+print(f"Using bucket for data loading: {bucket_name}")
+
 out_dir = "data/figures/tlfs_it11/"  # needs local folder unfortunately, set to None to skip saving
 if out_dir:
     os.makedirs(out_dir, exist_ok=True)

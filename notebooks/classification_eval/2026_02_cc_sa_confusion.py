@@ -13,14 +13,19 @@ Disabled check for too long lines (f strings) and variables names (uppercase for
 # %%
 import os
 
-import dotenv
 import pandas as pd
 import plotly.express as px
+from dotenv import load_dotenv
 
 from survey_assist_eval.data_cleaning.prep_data import get_clean_n_digit_codes
 
 # %%
-bucket_name = dotenv.get_key(".env", "EVALUATION_BUCKET_NAME")
+load_dotenv()
+bucket_name = os.getenv("EVALUATION_BUCKET_NAME")
+if not bucket_name:
+    raise ValueError("EVALUATION_BUCKET_NAME environment variable not set")
+print(f"Using bucket for data loading: {bucket_name}")
+
 out_dir = "data/figures/tlfs_it11/"  # needs local folder unfortunately, set to None to skip saving
 if out_dir:
     os.makedirs(out_dir, exist_ok=True)
@@ -37,13 +42,12 @@ for col in [col for col in combined_df.columns if "codes" in col.lower()]:
 # %%
 for prefix in ["cc", "sa", "sa_without_kb", "cims"]:
     for DIGITS in [0, 2, 5]:
-        combined_df[f"{prefix}_initial_codes_to_{DIGITS}digits"] = (
-            combined_df[f"{prefix}_initial_codes"]
-            .apply(
-                get_clean_n_digit_codes,
-                n=DIGITS,
+        combined_df[f"{prefix}_initial_codes_to_{DIGITS}digits"] = combined_df[
+            f"{prefix}_initial_codes"
+        ].map(
+            lambda x, n=DIGITS: (
+                set() if pd.isna(x) else get_clean_n_digit_codes(x, n=n)[0]
             )
-            .map(lambda x: x[0])
         )
 
 

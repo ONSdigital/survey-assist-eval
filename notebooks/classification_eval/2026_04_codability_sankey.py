@@ -14,9 +14,9 @@ Disabled check for too long lines (f strings) and variables names (uppercase for
 import os
 import re
 
-import dotenv
 import pandas as pd
 import plotly.graph_objects as go
+from dotenv import load_dotenv
 
 from notebooks.classification_eval.helper_group_plotly import create_grouped_selector
 from notebooks.november_test.helper_load_data import combine_small_groups
@@ -25,7 +25,12 @@ from survey_assist_eval.data_cleaning.sic_codes import (
 )
 
 # %%
-bucket_name = dotenv.get_key(".env", "EVALUATION_BUCKET_NAME")
+load_dotenv()
+bucket_name = os.getenv("EVALUATION_BUCKET_NAME")
+if not bucket_name:
+    raise ValueError("EVALUATION_BUCKET_NAME environment variable not set")
+print(f"Using bucket for data loading: {bucket_name}")
+
 out_dir = "data/figures/tlfs_it11/"  # needs local folder unfortunately, set to None to skip saving
 if out_dir:
     os.makedirs(out_dir, exist_ok=True)
