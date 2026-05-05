@@ -7,8 +7,7 @@ Expects environment variable EVALUATION_BUCKET_NAME to be set.
 Disabled check for too long lines (f strings) and variables names (uppercase for constants)
 """
 
-# ruff: noqa: B006
-# pylint: disable=C0301,C0103,W0104,R0914,R0801,W0102
+# pylint: disable=C0301,C0103,R0914,R0801
 
 # %%
 import os
@@ -87,7 +86,7 @@ def _flows_from_records(
     grouped = in_df.groupby([cols[0], "source", cols[1], "target"])
     # add size and most common examples
     df = (
-        grouped.size().reset_index(name="value")  #  type: ignore
+        grouped.size().reset_index(name="value")
         if not example_col
         else grouped.aggregate(
             value=(example_col, "size"),
@@ -122,11 +121,7 @@ def _flows_from_records(
 def create_sankey_codability_gain_loss(
     input_df: pd.DataFrame,
     *,
-    column_names: list[str] = [
-        "sa_codability_level",
-        "cc_codability_level",
-        "cims_codability_level",
-    ],
+    column_names: list[str] | None = None,
     column_labels: list[str] | None = None,
     example_col: str | None = None,
     levels: list[str] | None = None,
@@ -150,6 +145,13 @@ def create_sankey_codability_gain_loss(
     Raises:
         ValueError: If any of the requested stage columns are missing.
     """
+    if column_names is None:
+        column_names = [
+            "sa_codability_level",
+            "cc_codability_level",
+            "cims_codability_level",
+        ]
+
     selected_columns = column_names + (
         [example_col] if example_col in input_df.columns else []
     )
@@ -185,14 +187,14 @@ def create_sankey_codability_gain_loss(
         ],
         ignore_index=True,
     )
-    link = {
+    link: dict[str, object] = {
         "source": link_df["source"].tolist(),
         "target": link_df["target"].tolist(),
         "value": link_df["value"].tolist(),
         "color": link_df["color"].tolist(),
         "customdata": link_df["customdata"].tolist(),
     }
-    link["hovertemplate"] = "%{customdata}<extra></extra>"  # type: ignore
+    link["hovertemplate"] = "%{customdata}<extra></extra>"
 
     sankey_fig = go.Figure(data=[go.Sankey(node=node, link=link)])
     # label the left and right sides

@@ -7,8 +7,7 @@ Expects environment variable EVALUATION_BUCKET_NAME to be set.
 Disabled check for too long lines (f strings) and variables names (uppercase for constants)
 """
 
-# ruff: noqa: PLR2004
-# pylint: disable=C0301,C0103,W0104,R0801
+# pylint: disable=C0301,C0103,R0801
 
 # %%
 import os
@@ -24,6 +23,11 @@ from survey_assist_eval.data_cleaning.prep_data import get_clean_n_digit_codes
 from survey_assist_eval.evaluation.metrics import (
     calc_simple_metrics,
 )
+
+DIGIT_LEVELS = [0, 2, 3, 4, 5]
+AMBIGUITY_METRICS = ["Codability", "Precision", "Recall", "F1", "Accuracy"]
+ACCURACY_METRICS = ["OO Accuracy", "OM Accuracy", "MO Accuracy", "MM Accuracy"]
+MAX_HIGHLIGHT_GROUPS = 2
 
 # %%
 load_dotenv()
@@ -64,9 +68,9 @@ if "cims_initial_codes" in combined_df.columns:
     stage_cols["CIMS"] = ("cc_initial_codes", "cims_initial_codes")
 
 for col in set().union(*stage_cols.values()):
-    for DIGITS in [0, 2, 3, 4, 5]:
-        combined_df[f"{col}_to_{DIGITS}digits"] = combined_df[col].apply(
-            lambda x, n=DIGITS: get_clean_n_digit_codes(x, n=n)[0]
+    for digits in DIGIT_LEVELS:
+        combined_df[f"{col}_to_{digits}digits"] = combined_df[col].apply(
+            lambda x, n=digits: get_clean_n_digit_codes(x, n=n)[0]
         )
 
 # %% create groups by SIC sections
@@ -78,20 +82,20 @@ combined_df_sic = combine_small_groups(
 # %% calculate metrics at different digit levels for different methods
 eval_metrics = {}
 for stage, col_names in stage_cols.items():
-    for DIGITS in [0, 2, 3, 4, 5]:
+    for digits in DIGIT_LEVELS:
         for sic in sorted(combined_df_sic["sic_section"].unique()):
-            print(f"Processing {stage} codes to {DIGITS} digits for section {sic}...")
+            print(f"Processing {stage} codes to {digits} digits for section {sic}...")
             sub_df = combined_df_sic[combined_df_sic["sic_section"] == sic].copy()
-            eval_metrics[(DIGITS, stage, "sa_cc", sic)] = calc_simple_metrics(
+            eval_metrics[(digits, stage, "sa_cc", sic)] = calc_simple_metrics(
                 sub_df,
-                truth_col=f"{col_names[0]}_to_{DIGITS}digits",
-                initial_model_col=f"{col_names[1]}_to_{DIGITS}digits",
+                truth_col=f"{col_names[0]}_to_{digits}digits",
+                initial_model_col=f"{col_names[1]}_to_{digits}digits",
                 final_model_col=None,
             )
-            eval_metrics[(DIGITS, stage, "cc_cc", sic)] = calc_simple_metrics(
+            eval_metrics[(digits, stage, "cc_cc", sic)] = calc_simple_metrics(
                 sub_df,
-                truth_col=f"{col_names[0]}_to_{DIGITS}digits",
-                initial_model_col=f"{col_names[0]}_to_{DIGITS}digits",
+                truth_col=f"{col_names[0]}_to_{digits}digits",
+                initial_model_col=f"{col_names[0]}_to_{digits}digits",
                 final_model_col=None,
             )
 
@@ -103,12 +107,12 @@ plot_df = pd.DataFrame(
             "sic_section": k[3],
             "digits": str(k[0]) if k[0] > 0 else "S",
             "method": k[2][0:2].upper() + " " + k[1],
-            "codability": v.codability_metrics.initial_codable_prop,
-            "f1": v.ambiguity_metrics.f1 if k[2] == "sa_cc" else None,
-            "precision": v.ambiguity_metrics.precision if k[2] == "sa_cc" else None,
-            "recall": v.ambiguity_metrics.recall if k[2] == "sa_cc" else None,
-            "accuracy": v.ambiguity_metrics.accuracy if k[2] == "sa_cc" else None,
-            "confusion_matrix": (
+            "Codability": v.codability_metrics.initial_codable_prop,
+            "F1": v.ambiguity_metrics.f1 if k[2] == "sa_cc" else None,
+            "Precision": v.ambiguity_metrics.precision if k[2] == "sa_cc" else None,
+            "Recall": v.ambiguity_metrics.recall if k[2] == "sa_cc" else None,
+            "Accuracy": v.ambiguity_metrics.accuracy if k[2] == "sa_cc" else None,
+            "Confusion Matrix": (
                 f"TP={v.ambiguity_metrics.TP}, FP={v.ambiguity_metrics.FP}, FN={v.ambiguity_metrics.FN}, TN={v.ambiguity_metrics.TN}"
                 if k[2] == "sa_cc"
                 else None
@@ -153,7 +157,6 @@ plot_df["method"] = (
     .str.replace("CC SurveyAssist", "Clerical Coding", regex=False)
     .astype(method_dtype)
 )
-plot_df.method.value_counts()
 
 
 # %%
@@ -174,8 +177,8 @@ def create_f1_plot(
         A Plotly Figure object.
     """
     plot_df_f1 = in_df.melt(
-        id_vars=["digits", "method", "sic_section", "confusion_matrix"],
-        value_vars=["codability", "precision", "recall", "f1", "accuracy"],
+        id_vars=["digits", "method", "sic_section", "Confusion Matrix"],
+        value_vars=AMBIGUITY_METRICS,
         var_name="metrics",
         value_name="value",
     ).sort_values(["method", "sic_section"], ascending=[True, False])
@@ -185,7 +188,7 @@ def create_f1_plot(
     # plot_df_f1["ci"] = 1.96 * (plot_df_f1["value"] * (1 - plot_df_f1["value"]) / n).pow(
     #    0.5
     # )
-    # plot_df_f1.loc[~plot_df_f1["metrics"].isin(["codability", "accuracy"]), "ci"] = None
+    # plot_df_f1.loc[~plot_df_f1["metrics"].isin(["Codability", "Accuracy"]), "ci"] = None
 
     color_discrete_map = None
     legend_placement = "right"
@@ -193,12 +196,12 @@ def create_f1_plot(
     if (
         default_group is not None
         and (default_group in sections_used)
-        and (len(sections_used) <= 2)
+        and (len(sections_used) <= MAX_HIGHLIGHT_GROUPS)
     ):
         # change the colorscheme so that the default group is grey
         color_discrete_map = (
             {default_group: "lightgrey"}
-            if len(sections_used) == 2
+            if len(sections_used) == MAX_HIGHLIGHT_GROUPS
             else {default_group: "grey"}
         )
         legend_placement = "bottom"
@@ -214,12 +217,14 @@ def create_f1_plot(
         title="Ambiguity Decision Metrics by Number of Digits and Method",
         markers=True,
         template="simple_white",
-        hover_data={"confusion_matrix": True, "value": ":.2%"},
+        hover_data={"Confusion Matrix": True, "value": ":.2%"},
         # error_y="ci",
     )
     # drop first part of facet annotation
-    for i in fig.layout.annotations:  # type: ignore
-        i.text = i.text.split("=", maxsplit=1)[-1].capitalize()
+    annotations = fig.layout.annotations  # type: ignore
+    if annotations:
+        for annotation in annotations:
+            annotation.text = annotation.text.split("=", maxsplit=1)[-1].capitalize()
     # display y axes as percentages and remove axis title
     fig.update_yaxes(
         tickformat=".0%",
@@ -266,7 +271,7 @@ def create_f1_plot(
 
 
 ylimits = (
-    plot_df[["codability", "f1", "precision", "recall", "accuracy"]].min().min() - 0.01,
+    plot_df[AMBIGUITY_METRICS].min().min() - 0.01,
     1.01,
 )
 
@@ -307,12 +312,11 @@ def create_accu_plot(
     Returns:
         A Plotly Figure object.
     """
-    metric_order = ["OO Accuracy", "OM Accuracy", "MO Accuracy", "MM Accuracy"]
     plot_df_accu = (
         in_df[~in_df["method"].str.startswith("Clerical")]
         .melt(
             id_vars=["digits", "method", "sic_section"],
-            value_vars=metric_order,
+            value_vars=ACCURACY_METRICS,
             var_name="metrics",
             value_name="value_tuple",
         )
@@ -329,12 +333,12 @@ def create_accu_plot(
     if (
         default_group is not None
         and (default_group in sections_used)
-        and (len(sections_used) <= 2)
+        and (len(sections_used) <= MAX_HIGHLIGHT_GROUPS)
     ):
         # change the colorscheme so that the default group is grey
         color_discrete_map = (
             {default_group: "lightgrey"}
-            if len(sections_used) == 2
+            if len(sections_used) == MAX_HIGHLIGHT_GROUPS
             else {default_group: "grey"}
         )
         legend_placement = "bottom"
@@ -347,7 +351,7 @@ def create_accu_plot(
         color_discrete_map=color_discrete_map,
         line_dash="method",
         facet_col="metrics",
-        category_orders={"metrics": metric_order},
+        category_orders={"metrics": ACCURACY_METRICS},
         title="Classification Accuracy Metrics by Number of Digits",
         markers=True,
         template="simple_white",
@@ -355,8 +359,10 @@ def create_accu_plot(
     )
 
     # drop first part of facet annotation
-    for i in fig.layout.annotations:  # type: ignore
-        i.text = i.text.split("=", maxsplit=1)[1]
+    annotations = fig.layout.annotations  # type: ignore
+    if annotations:
+        for annotation in annotations:
+            annotation.text = annotation.text.split("=", maxsplit=1)[1]
     # display y axes as percentages and remove axis title
     fig.update_yaxes(
         tickformat=".0%",
@@ -404,7 +410,10 @@ def create_accu_plot(
     return fig
 
 
-ylimits = (plot_df[["OO Accuracy", "OM Accuracy", "MO Accuracy", "MM Accuracy"]].apply(lambda x: x.apply(lambda x: x[0])).min().min() - 0.01, 1.01)  # type: ignore
+accuracy_lower_bounds = [
+    value[0] for metric_name in ACCURACY_METRICS for value in plot_df[metric_name]
+]
+ylimits = (min(accuracy_lower_bounds) - 0.01, 1.01)
 
 fig1 = create_accu_plot(plot_df, default_group="Total", ylim=ylimits)
 fig1.update_layout(height=500, width=1000)

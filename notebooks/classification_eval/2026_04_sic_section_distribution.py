@@ -7,6 +7,7 @@ Expects environment variable EVALUATION_BUCKET_NAME to be set.
 """
 
 # pylint: disable=C0301,C0103,R0801
+
 # %%
 import os
 

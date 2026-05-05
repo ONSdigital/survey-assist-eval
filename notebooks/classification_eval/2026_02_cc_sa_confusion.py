@@ -8,7 +8,7 @@ Expects environment variable EVALUATION_BUCKET_NAME to be set.
 Disabled check for too long lines (f strings) and variables names (uppercase for constants)
 """
 
-# pylint: disable=C0301,C0103,W0104,R0801
+# pylint: disable=C0301,C0103,R0801
 
 # %%
 import os
@@ -212,8 +212,10 @@ print(examples)
 
 
 # %%
-tmp_df[(tmp_df.cc_codes_str == "43999") & (tmp_df.sa_codes_str == "41202")][
-    [*columns, "sic_ind_occ1", "sic_ind1"]
-]
+print(
+    tmp_df[(tmp_df.cc_codes_str == "43999") & (tmp_df.sa_codes_str == "41202")][
+        [*columns, "sic_ind_occ1", "sic_ind1"]
+    ]
+)
 
 # %%
