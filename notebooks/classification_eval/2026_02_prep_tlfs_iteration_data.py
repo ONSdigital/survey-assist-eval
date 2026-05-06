@@ -103,8 +103,6 @@ kb_df = pd.read_csv(knowledge_base_file)
 kb_df["sa_initial_codes"] = kb_df["label"].apply(
     lambda x: get_clean_n_digit_codes(parse_numerical_code(x), n=5)[0]
 )
-print(kb_df["sa_initial_codes"].apply(len).value_counts())
-kb_df = kb_df[kb_df["sa_initial_codes"].apply(len) == 1].reset_index(drop=True).copy()
 
 # %%
 stg3_df["description"] = stg3_df["sic2007_employee"]
@@ -118,6 +116,15 @@ for df in [stg3_df, kb_df]:
     )
     df.drop(columns=["description"], inplace=True)
 
+# Merge the code sets for duplicate descriptions before filtering to unambiguous KB rows.
+kb_df_gr = kb_df.groupby("clean_descr", as_index=False)["sa_initial_codes"].aggregate(
+    lambda code_sets: set().union(*code_sets.tolist())
+)
+
+print(kb_df_gr["sa_initial_codes"].apply(len).value_counts())
+kb_df_clean = (
+    kb_df_gr[kb_df_gr["sa_initial_codes"].apply(len) == 1].reset_index(drop=True).copy()
+)
 
 # %%
 combined_df = (
@@ -131,7 +138,9 @@ combined_df = (
         on="unique_id",
         how="left",
     )
-    .merge(kb_df[["sa_initial_codes", "clean_descr"]], how="left", on="clean_descr")
+    .merge(
+        kb_df_clean[["sa_initial_codes", "clean_descr"]], how="left", on="clean_descr"
+    )
 )
 
 combined_df["kb_used"] = combined_df["sa_initial_codes"].notna()
@@ -170,13 +179,32 @@ cims_codes["cims_confidence"] = cims_df["confidence_SIC07"]
 cims_combined_df = combined_df.merge(
     cims_codes[["unique_id", "cims_initial_codes", "cims_code", "cims_confidence"]],
     on="unique_id",
-    how="inner",
+    how="outer",
     indicator=True,
 )
 
 # %%
-cims_combined_df.to_parquet(
+# report row counts through the steps
+print("Number of records through the preprocessing steps:")
+print(f"Clerical codes df: {len(clerical_codes_df)}")
+print(f"SA model output df: {len(stg3_df)}")
+print(f"CIMS df: {len(cims_df)}")
+print(f"Combined with clerical codes: {len(combined_df)}")
+print(
+    f"Combined with CIMS (shared rows): {len(cims_combined_df[cims_combined_df['_merge'] == 'both'])}"
+)
+print(f"Combined with CIMS (all rows): {len(cims_combined_df)}")
+
+# %%
+# CIMS is missing some rows, so for comparison use only shared rows
+cims_combined_df[cims_combined_df["_merge"] == "both"].to_parquet(
     f"{work_folder}sa_cc_cims_combined.parquet",
     index=False,
 )
+
+cims_combined_df.to_parquet(
+    f"{work_folder}sa_cc_cims_combined_all.parquet",
+    index=False,
+)
+
 # %%
