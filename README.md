@@ -9,6 +9,7 @@ Survey Assist evaluation functions. This repository contains utilities for evalu
 ## Features
 
 * **Batch Processing:** Send large datasets to the API for SIC classification.
+* **Data Extraction and Processing:** Utilities to extract survey response data from a Firestore database, reformat it, and save it in CSV format for analysis.
 * **Performance Evaluation:** A comprehensive suite of metrics to analyze and compare LLM performance against human coders.
 
 ## Local Development & Setup
@@ -43,9 +44,18 @@ Ensure you have the following installed on your local machine:
     ```
 
 3.  **Install Dependencies**
+
     ```bash
     poetry install
     ```
+
+    Note this installs partner repos (e.g. `sic-classification-utils`, at a pinned version). To evaluate concurrent changes to the codebase locally, it may be preferable to install from a local path instead. To do this:
+
+    1. Clone the `sic-classification-utils` repository at the same directory level as this repository.
+    2. From the root of this repository (with the virtual environment activated), run:
+        ```bash
+        python -m pip install --no-deps --editable ../sic-classification-utils
+        ```
 
 4. **Generate an API Token**
 

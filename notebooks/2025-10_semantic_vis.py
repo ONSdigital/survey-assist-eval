@@ -1,11 +1,8 @@
 """Work in progress notebook to visualize metrics for different embeddings.
 
-It loads specific clerical coding data and model outputs from bucket.
-The bucket name and folder (on line 32) can be manually entered or it is read from
-the .env file, where it should be stored as BUCKET_PREFIX variable, i.e.:
-BUCKET_PREFIX = "gs://<bucket-name>/<folder>/"
-
-Disabled check for too long lines (f strings) and variables names (uppercase for constants)
+Expects following environment variables to be set:
+- EVALUATION_BUCKET_NAME: name of GCS bucket where the data is stored
+The variables  will be loaded from the .env file.
 """
 
 # pylint: disable=C0301,C0103,R0801
@@ -14,9 +11,9 @@ Disabled check for too long lines (f strings) and variables names (uppercase for
 import logging
 import os
 
-import dotenv
 import pandas as pd
 import plotly.express as px
+from dotenv import load_dotenv
 
 from survey_assist_eval.data_cleaning.prep_data import (
     prep_clerical_codes,
@@ -33,21 +30,25 @@ logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 
-bucket_prefix = dotenv.get_key(".env", "BUCKET_PREFIX")
+load_dotenv()
+evaluation_bucket_name = os.getenv("EVALUATION_BUCKET_NAME")
 
-if not bucket_prefix:
-    raise ValueError("BUCKET_PREFIX not found in .env file. Please set it.")
+if not evaluation_bucket_name:
+    raise ValueError("EVALUATION_BUCKET_NAME environment variable not set")
 
-output_folder = "data/temp/"  # set to None if no output saving is needed
+print(f"Using bucket for data loading: {evaluation_bucket_name}")
+bucket_prefix = f"gs://{evaluation_bucket_name}/evaluation-pipeline"
+
+output_folder = "data/temp"  # set to None if no output saving is needed
 
 if output_folder:
     os.makedirs(output_folder, exist_ok=True)
 
 # %%
 # load clerical data
-clerical_it2_file = f"{bucket_prefix}original_datasets/DSC_Rep_Sample_IT2.csv"
+clerical_it2_file = f"{bucket_prefix}/original_datasets/DSC_Rep_Sample_IT2.csv"
 clerical_it2_4plus_file = (
-    f"{bucket_prefix}original_datasets/Codes_for_4_plus_DSC_Rep_Sample_IT2.csv"
+    f"{bucket_prefix}/original_datasets/Codes_for_4_plus_DSC_Rep_Sample_IT2.csv"
 )
 cc_it2_df = pd.read_csv(clerical_it2_file)
 cc_it2_4plus_df = pd.read_csv(clerical_it2_4plus_file)
@@ -56,15 +57,15 @@ cc_it2_4plus_df = pd.read_csv(clerical_it2_4plus_file)
 # %%
 # load semantic outputs
 semantic_files = {
-    "minilm-l2": f"{bucket_prefix}semantic_stage/minilm-l6-v2-l2dist/STG1.parquet",
-    "te005-clastask-l2": f"{bucket_prefix}semantic_stage/text-embedding-005-clas-l2dist/STG1.parquet",
-    "te005-semtask-l2": f"{bucket_prefix}semantic_stage/text-embedding-005-sem-l2dist/STG1.parquet",
-    "te005-doctask-l2": f"{bucket_prefix}semantic_stage/text-embedding-005-doc-l2dist/STG1.parquet",
-    "te004-semtask-l2": f"{bucket_prefix}semantic_stage/text-embedding-004-sem-l2dist/STG1.parquet",
-    "te004-clastask-l2": f"{bucket_prefix}semantic_stage/text-embedding-004-clas-l2dist/STG1.parquet",
+    "minilm-l2": f"{bucket_prefix}/semantic_stage/minilm-l6-v2-l2dist/STG1.parquet",
+    "te005-clastask-l2": f"{bucket_prefix}/semantic_stage/text-embedding-005-clas-l2dist/STG1.parquet",
+    "te005-semtask-l2": f"{bucket_prefix}/semantic_stage/text-embedding-005-sem-l2dist/STG1.parquet",
+    "te005-doctask-l2": f"{bucket_prefix}/semantic_stage/text-embedding-005-doc-l2dist/STG1.parquet",
+    "te004-semtask-l2": f"{bucket_prefix}/semantic_stage/text-embedding-004-sem-l2dist/STG1.parquet",
+    "te004-clastask-l2": f"{bucket_prefix}/semantic_stage/text-embedding-004-clas-l2dist/STG1.parquet",
     # cosine is almost identical with l2dist, so we skip it (too many traces otherwise)
-    # "minilm-cos": f"{bucket_prefix}semantic_stage/minilm-l6-v2-cosine/STG1.parquet",
-    # "te005-clastask-cos": f"{bucket_prefix}semantic_stage/text-embedding-005-clas-cosine/STG1.parquet",
+    # "minilm-cos": f"{bucket_prefix}/semantic_stage/minilm-l6-v2-cosine/STG1.parquet",
+    # "te005-clastask-cos": f"{bucket_prefix}/semantic_stage/text-embedding-005-clas-cosine/STG1.parquet",
 }
 semantic_dfs = {name: pd.read_parquet(path) for name, path in semantic_files.items()}
 
@@ -291,7 +292,7 @@ for DIGITS in [5, 0]:
 # %%
 # get survey assist model metrics for comparison (one point, not a curve)
 model_df = pd.read_parquet(
-    f"{bucket_prefix}two_prompt_pipeline/2025_09_full_2k_gemini25/STG5.parquet"
+    f"{bucket_prefix}/two_prompt_pipeline/2025_09_full_2k_gemini25/STG5.parquet"
 )
 logger.info(
     """Starting metrics calculation for current SurveyAssist model...

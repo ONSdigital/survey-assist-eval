@@ -3,8 +3,7 @@
 
 Initial analysis of survey responses, focusing on ranks in Closed Follow up questions.
 
-Create .env file with bucket variables, such as
-PREPROD_DATA_BUCKET = "gs://<bucket-name>/<folder>/".
+Expects environment variable PREPROD_DATA_BUCKET_NAME to be set.
 """
 
 # %%
@@ -12,21 +11,26 @@ PREPROD_DATA_BUCKET = "gs://<bucket-name>/<folder>/".
 # ruff: noqa: PLR2004
 
 # %%
-import dotenv
+import os
+
 import numpy as np
 import pandas as pd
+from dotenv import load_dotenv
 from scipy.stats import (
     chisquare,
 )
 
 # %%
-preprod_bucket = dotenv.get_key(".env", "PREPROD_DATA_BUCKET")
-if not preprod_bucket:
-    raise ValueError("PREPROD_DATA_BUCKET not found in .env file. Please set it.")
+load_dotenv()
+bucket_name = os.getenv("PREPROD_DATA_BUCKET_NAME")
+if not bucket_name:
+    raise ValueError("PREPROD_DATA_BUCKET_NAME environment variable not set")
+
+print(f"Using bucket for data loading: {bucket_name}")
 
 # %%
 data = pd.read_parquet(
-    f"{preprod_bucket}analysis-interim-results/closed_questions/closed_questions_codes.parquet"
+    f"gs://{bucket_name}/analysis-interim-results/closed_questions/closed_questions_codes.parquet"
 )
 
 # %%

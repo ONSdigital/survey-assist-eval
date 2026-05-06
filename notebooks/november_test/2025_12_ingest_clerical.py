@@ -4,15 +4,17 @@ Loads clerical coding excel files from preprocessed data bucket,
 cleans and processes the clerical codes, assigns codability levels and
 calculates codability gain.
 
-Expects environment variable PREPROD_DATA_BUCKET to be set.
+Expects environment variable PREPROD_DATA_BUCKET_NAME to be set.
 
 Disabled check for too long lines (f strings) and variables names (uppercase for constants)
 """
 
 # pylint: disable=C0301,C0103,R0801
 # %%
-import dotenv
+import os
+
 import pandas as pd
+from dotenv import load_dotenv
 
 from survey_assist_eval.data_cleaning.prep_data import prep_clerical_codes
 from survey_assist_eval.data_cleaning.sic_codes import (
@@ -21,8 +23,14 @@ from survey_assist_eval.data_cleaning.sic_codes import (
 )
 
 # %%
-data_bucket = dotenv.get_key(".env", "PREPROD_DATA_BUCKET") or ""
-work_dir = data_bucket + "analysis-interim-results/clerically-coded/"
+load_dotenv()
+bucket_name = os.getenv("PREPROD_DATA_BUCKET_NAME")
+if not bucket_name:
+    raise ValueError("PREPROD_DATA_BUCKET_NAME environment variable not set")
+
+print(f"Using bucket for data loading: {bucket_name}")
+
+work_dir = f"gs://{bucket_name}/analysis-interim-results/clerically-coded"
 
 
 # %%
@@ -61,7 +69,7 @@ for batch in range(3):
         try:
             df = excel_columns_clean(
                 pd.read_excel(
-                    work_dir + file_name[batch],
+                    work_dir + "/" + file_name[batch],
                     dtype=str,
                 )
             ).rename(
@@ -168,6 +176,6 @@ clerical_codes_df["cc_codability_gain_open_q"] = clerical_codes_df.apply(
 )
 
 # %%
-clerical_codes_df.to_parquet(work_dir + "clerical_df_with_cc_clean_codes.parquet")
+clerical_codes_df.to_parquet(work_dir + "/clerical_df_with_cc_clean_codes.parquet")
 
 # %%

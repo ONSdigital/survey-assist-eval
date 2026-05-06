@@ -325,7 +325,9 @@ if __name__ == "__main__":
         merged_df["intermediate_feedback_column"] = merged_df.apply(
             lambda r: get_feedback(r, feedback_df), axis=1
         )
-        for fc_name, fc_raw_name in zip(FEEDBACK_COLUMN_NAMES, FEEDBACK_COLUMNS):
+        for fc_name, fc_raw_name in zip(
+            FEEDBACK_COLUMN_NAMES, FEEDBACK_COLUMNS, strict=False
+        ):
             extraction_func = make_extract_feedback_field_func(fc_raw_name)
             merged_df[fc_name] = merged_df["intermediate_feedback_column"].apply(
                 extraction_func

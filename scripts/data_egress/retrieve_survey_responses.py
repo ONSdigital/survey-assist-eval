@@ -105,10 +105,10 @@ def flatten_dict(
     for k, v in d.items():
         new_key = f"{parent_key}{sep}{k}" if parent_key else k
         # Handle item being a dictionary:
-        if isinstance(v, (MutableMapping, dict)):
+        if isinstance(v, MutableMapping | dict):
             items.extend(flatten_dict(v, parent_key=new_key, sep=sep).items())
         # Handle item being a list:
-        elif isinstance(v, (list, tuple)):
+        elif isinstance(v, list | tuple):
             if (
                 not v
             ):  # Handle empty lists by acting as if there's a single (empty) element:
@@ -117,7 +117,7 @@ def flatten_dict(
                 for i, item in enumerate(v):
                     # Create a key for each list item - e.g. 'responses_0'
                     list_key = f"{new_key}{sep}{i}"
-                    if isinstance(item, (MutableMapping, dict)):
+                    if isinstance(item, MutableMapping | dict):
                         items.extend(flatten_dict(item, list_key, sep=sep).items())
                     else:
                         # If the item in the list is not a dictionary, just save it with its index.
