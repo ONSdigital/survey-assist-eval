@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """This script performs semantic search on a dataset using a local vector store
 and persists the results. It reads in a CSV/PARQUET file as a DataFrame object,
 uses :class:`industrial_classification_utils.embed.embedding.EmbeddingHandler`
@@ -35,7 +36,7 @@ MERGED_INDUSTRY_DESC_COL = "merged_industry_desc"
 OUTPUT_COL_INITIAL = "semantic_search_results"
 
 # Constants for second run (final codes):
-MERGED_INDUSTRY_DESC_COL_FINAL = "extended_industry_desc"
+FOLLOWUP_ANSWER_COL = "followup_answer"
 OUTPUT_COL_FINAL = "second_semantic_search_results"
 #####################################################
 
@@ -84,29 +85,6 @@ def make_merged_industry_desc(row: pd.Series) -> str:
     return f"{ind_desc}{self_emp_desc}"
 
 
-def clean_text_industry(text: str) -> str:
-    """Cleans a text string by removing newlines, converting arbitrary
-    whitespace to a single space, removing -9's and standardizing case.
-
-    Args:
-        text (str): The input string to clean.
-
-    Returns:
-        str: The cleaned string.
-    """
-    text = text.replace("\n", " ")
-    text = text.replace("-9", "")
-    text = regex_sub(r"\s+", " ", text)
-    text = text.lower()
-    text = text.capitalize()
-    text = text.replace(
-        "- followup",
-        """
-- Followup""",
-    )
-    return text
-
-
 def _make_embedding_handler(in_metadata: dict) -> EmbeddingHandler:
     """Create an :class:`EmbeddingHandler` using settings from metadata where possible."""
     new_embedding_handler = EmbeddingHandler(
@@ -117,8 +95,8 @@ def _make_embedding_handler(in_metadata: dict) -> EmbeddingHandler:
 
     new_embedding_handler.embed_index(
         from_empty=True,
-        soc_index_file=in_metadata["soc_index_file"],
-        soc_structure_file=in_metadata["soc_structure_file"],
+        soc_index_file=tuple(in_metadata["soc_index_file"]),
+        soc_structure_file=tuple(in_metadata["soc_structure_file"]),
     )
 
     return new_embedding_handler
@@ -140,22 +118,14 @@ def _get_semantic_search_results(
             or not, which determines which column to use for the search query.
 
     """
-    industry_descr = (
-        row[MERGED_INDUSTRY_DESC_COL_FINAL]
-        if second_run_flag
-        else row[MERGED_INDUSTRY_DESC_COL]
-    )
-    industry_descr = industry_descr if isinstance(industry_descr, str) else ""
+    search_terms = [row[JOB_TITLE_COL]]
+    if second_run_flag:
+        search_terms.append(row[FOLLOWUP_ANSWER_COL])
 
-    job_title = row[JOB_TITLE_COL] if isinstance(row.get(JOB_TITLE_COL), str) else ""
-    job_description = (
-        row[JOB_DESCRIPTION_COL]
-        if isinstance(row.get(JOB_DESCRIPTION_COL), str)
-        else ""
-    )
+    search_terms += [row[JOB_DESCRIPTION_COL], row[MERGED_INDUSTRY_DESC_COL]]
 
     results = one_embedding_handler.search_index_multi(
-        [job_title, job_description, industry_descr]
+        search_terms,
     )
 
     reduced_results = [
@@ -182,18 +152,12 @@ if __name__ == "__main__":
     # Clean the Survey Response columns:
     df[JOB_DESCRIPTION_COL] = df[JOB_DESCRIPTION_COL].apply(clean_text)
     df[JOB_TITLE_COL] = df[JOB_TITLE_COL].apply(clean_text)
-    # Make a merged industry description column:
+    df[INDUSTRY_DESCR_COL] = df[INDUSTRY_DESCR_COL].apply(clean_text)
+    df[SELF_EMPLOYED_DESC_COL] = df[SELF_EMPLOYED_DESC_COL].apply(clean_text)
+    df[MERGED_INDUSTRY_DESC_COL] = df.apply(make_merged_industry_desc, axis=1)
+    df[MERGED_INDUSTRY_DESC_COL] = df[MERGED_INDUSTRY_DESC_COL].apply(clean_text)
     if args.second_run:
-        df[MERGED_INDUSTRY_DESC_COL_FINAL] = df[MERGED_INDUSTRY_DESC_COL_FINAL].apply(
-            clean_text_industry
-        )
-    else:
-        df[INDUSTRY_DESCR_COL] = df[INDUSTRY_DESCR_COL].apply(clean_text)
-        df[SELF_EMPLOYED_DESC_COL] = df[SELF_EMPLOYED_DESC_COL].apply(clean_text)
-        df[MERGED_INDUSTRY_DESC_COL] = df.apply(make_merged_industry_desc, axis=1)
-        df[MERGED_INDUSTRY_DESC_COL] = df[MERGED_INDUSTRY_DESC_COL].apply(
-            clean_text_industry
-        )
+        df[FOLLOWUP_ANSWER_COL] = df[FOLLOWUP_ANSWER_COL].apply(clean_text)
     print("Input loaded")
 
     OUTPUT_COL = OUTPUT_COL_FINAL if args.second_run else OUTPUT_COL_INITIAL

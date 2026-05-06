@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """This script generates a SOC classification based on respondent's data
 using a Retrieval Augmented Generation (RAG) approach and persists the results.
 It reloads the output from the previous stage as a DataFrame object,

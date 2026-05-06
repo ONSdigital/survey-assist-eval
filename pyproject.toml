@@ -46,7 +46,7 @@ scipy = "^1.16.3"
 sic-classification-utils = { git = "https://github.com/ONSdigital/sic-classification-utils.git", tag = "v0.1.11" }
 # soc-classification-utils = { git = "https://github.com/ONSdigital/soc-classification-utils.git", tag = "v0.1.3" }
 # while the soc-classification-utils is in development, install locally instead:
-# poetry run pip install --no-deps -e ../soc-classification-utils
+# poetry run pip install -e ../soc-classification-utils
 
 [tool.isort]
 profile = "black"
