@@ -8,6 +8,7 @@ import pandas as pd
 
 from survey_assist_eval.data_cleaning.sic_code_section_list import (
     SECTION_LOOKUP,
+    SECTION_UNWRAPPED,
     VALID_SIC_CODES,
 )
 
@@ -108,16 +109,17 @@ def get_clean_n_digit_one_code(input_str: str, n: int) -> set[str]:
     """
     # cut x's from the back if they are there
     input_str = str(input_str).rstrip("xX")
-    # check the rest is numeric
-    if not input_str.isdigit():
-        return set()
 
     n_digits = n if n > 0 else 2  # for section assignment
 
     prep_set = (
-        {input_str[:n_digits]}
-        if len(input_str) >= n_digits
-        else expand_to_n_digit_str(input_str, n_digits)
+        (
+            {input_str[:n_digits]}
+            if len(input_str) >= n_digits
+            else expand_to_n_digit_str(input_str, n_digits)
+        )
+        if input_str.isdigit()
+        else {x[:n_digits] for x in SECTION_UNWRAPPED.get(input_str, set())}
     )
 
     if n == 0:

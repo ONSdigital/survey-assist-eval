@@ -42,7 +42,7 @@ data = pd.read_parquet(
 
 # %%
 sic_rephrased = pd.read_csv(
-    f"gs://{evaluation_bucket}/sic_knowledgebase/sic_rephrased_2025_02_03_v2.csv",
+    f"gs://{evaluation_bucket}/sic_knowledgebase/sic_rephrased_descriptions_2025_02_03.csv",
     dtype=str,
 )
 
