@@ -110,7 +110,7 @@ def prep_clerical_codes(
 
     df[[out_col, invalid_col]] = (
         df[clerical_col]
-        .apply(parse_numerical_code)
+        .apply(parse_numerical_code, code_type=code_type)
         .apply(
             lambda x: pd.Series(
                 get_clean_n_digit_codes(x, n=digits, code_type=code_type)
@@ -186,13 +186,13 @@ def prep_model_codes(
             "At least one of 'codes_col' or 'alt_codes_col' must be provided."
         )
     out_df = input_df[[ID_COL]].copy()
-    out_df[out_col] = [set() for _ in range(len(input_df))]
-    out_df[invalid_col] = [set() for _ in range(len(input_df))]
+    out_df[out_col] = pd.Series([set() for _ in range(len(input_df))], dtype=object)
+    out_df[invalid_col] = pd.Series([set() for _ in range(len(input_df))], dtype=object)
 
     if codes_col is not None:
         out_df[[out_col, invalid_col]] = (
             input_df[codes_col]
-            .map(parse_numerical_code)
+            .apply(parse_numerical_code, code_type=code_type)
             .apply(
                 lambda x: pd.Series(
                     get_clean_n_digit_codes(x, n=digits, code_type=code_type)

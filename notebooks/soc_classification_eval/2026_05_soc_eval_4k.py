@@ -11,6 +11,10 @@ from dotenv import load_dotenv
 
 from survey_assist_eval.data_cleaning.prep_data import (
     prep_clerical_codes,
+    prep_model_codes,
+)
+from survey_assist_eval.evaluation.metrics import (
+    calc_simple_metrics,
 )
 
 # %%
@@ -54,13 +58,32 @@ if not os.path.exists(f"{output_folder}/STG4.parquet"):
 else:
     print("Evaluation pipeline already run, loading results...")
 
+# %%
 df = pd.read_parquet(f"{output_folder}/STG4.parquet")
+# df = pd.read_parquet(f"{work_folder}/STG2.parquet")
 print(df.head())
 
 # %%
-df = pd.read_parquet(f"{work_folder}/STG2.parquet")
-# %%
 df_clerical = prep_clerical_codes(
-    df, code_type="SOC", clerical_col="soc2020_code", digits=4, out_col="clerical_codes"
+    df.rename(columns={"final_uuid": "unique_id"}),
+    code_type="SOC",
+    clerical_col="soc2020_code",
+    digits=4,
+    out_col="clerical_codes",
+)
+df_model = prep_model_codes(
+    df.rename(columns={"final_uuid": "unique_id"}),
+    code_type="SOC",
+    codes_col="initial_code",
+    alt_codes_col="alt_soc_candidates",
+    digits=4,
+    out_col="model_codes",
 )
 # %%
+metrics_summary = calc_simple_metrics(
+    df_clerical.merge(df_model),
+    truth_col="clerical_codes",
+    initial_model_col="model_codes",
+    final_model_col=None,
+)
+print(metrics_summary.report_metrics())

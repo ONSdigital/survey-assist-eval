@@ -88,8 +88,9 @@ def _validate_n_digits_for_code_type(digits: int | None, code_type: str) -> int:
 
 def parse_numerical_code(
     candidates_str: str,
-    code_regex_pattern: str = SIC_REGEX_PATTERN,
-    padding: int = SIC_EXPECTED_CODE_LENGTH,
+    code_regex_pattern: str | None = None,
+    code_length: int | None = None,
+    code_type: str = "SIC",
 ) -> set[str]:
     """Converts the clerical coder responses from a
     stringified list to a proper list of strings.
@@ -98,12 +99,23 @@ def parse_numerical_code(
     Args:
         candidates_str: String containing the clerical coder responses.
         code_regex_pattern: Regex pattern to extract codes from the string.
-        padding: Number of digits to which the codes should be zero-padded.
+        code_length: Number of digits to which the codes should be zero-padded.
+        code_type: Type of code ('SIC' or 'SOC') to determine which validation to use.
 
     Returns:
         List of cleaned and zero-padded code strings.
-
     """
+    if code_regex_pattern is None:
+        code_regex_pattern = (
+            SOC_REGEX_PATTERN if code_type.lower() == "soc" else SIC_REGEX_PATTERN
+        )
+    if code_length is None:
+        code_length = (
+            SOC_EXPECTED_CODE_LENGTH
+            if code_type.lower() == "soc"
+            else SIC_EXPECTED_CODE_LENGTH
+        )
+
     candidates_str = str(candidates_str).strip()
     if candidates_str in INVALID_VALUES:
         return set()
@@ -112,7 +124,7 @@ def parse_numerical_code(
         candidates_str = candidates_str.replace("-9", "").replace("4+", "")
         # Extract all RagCandidate entries using regex
         matches = re.findall(code_regex_pattern, candidates_str)
-        return {matches.zfill(padding) for matches in matches}
+        return {matches.zfill(code_length) for matches in matches}
     except re.error as e:
         logger.warning("Error parsing numerical codes: %s \n %s", candidates_str, e)
         return set()
@@ -283,7 +295,7 @@ def extract_alt_candidates_n_digit_codes(
     if isinstance(alt_candidates, str):
         parsed_str = parse_numerical_code(
             alt_candidates,
-            padding=(
+            code_length=(
                 SOC_EXPECTED_CODE_LENGTH
                 if code_type.lower() == "soc"
                 else SIC_EXPECTED_CODE_LENGTH
