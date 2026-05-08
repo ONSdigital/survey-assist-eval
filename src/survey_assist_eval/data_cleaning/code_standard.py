@@ -59,6 +59,33 @@ SOC_CODABILITY_LEVELS = (
 )
 
 
+def _validate_n_digits_for_code_type(digits: int | None, code_type: str) -> int:
+    """Validate the 'digits' parameter based on the code type."""
+    if code_type.lower() not in {"sic", "soc"}:
+        raise ValueError(f"Invalid code_type '{code_type}'. Expected 'SIC' or 'SOC'.")
+    if digits is None:
+        return (
+            SIC_EXPECTED_CODE_LENGTH
+            if code_type.lower() == "sic"
+            else SOC_EXPECTED_CODE_LENGTH
+        )
+    if not isinstance(digits, int) or digits < 0:
+        raise ValueError(
+            f"'digits' must be a non-negative integer or None, got {digits}"
+        )
+    accepted_digits = (
+        [level[0] for level in SIC_CODABILITY_LEVELS]
+        if code_type.lower() == "sic"
+        else [level[0] for level in SOC_CODABILITY_LEVELS]
+    )
+    if digits not in accepted_digits:
+        raise ValueError(
+            f"Invalid 'digits' for {code_type} code type. "
+            + f"Expected one of {accepted_digits}, got {digits}"
+        )
+    return digits
+
+
 def parse_numerical_code(
     candidates_str: str,
     code_regex_pattern: str = SIC_REGEX_PATTERN,

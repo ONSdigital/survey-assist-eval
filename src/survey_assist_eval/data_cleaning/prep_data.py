@@ -11,6 +11,7 @@ import pandas as pd
 
 # Assuming these are imported from your utils
 from survey_assist_eval.data_cleaning.code_standard import (
+    _validate_n_digits_for_code_type,
     extract_alt_candidates_n_digit_codes,
     get_clean_n_digit_codes,
     parse_numerical_code,
@@ -26,8 +27,8 @@ def prep_clerical_codes(
     *,
     clerical_col: str = "sic_ind_occ",
     out_col: str = "clerical_codes",
-    digits: int = 5,
     code_type: str = "SIC",
+    digits: int | None = None,
 ) -> pd.DataFrame:
     """Prepare and clean clerical SIC codes from one or two DataFrames.
 
@@ -47,10 +48,9 @@ def prep_clerical_codes(
             Defaults to "sic_ind_occ".
         out_col: Name of the output column that will contain cleaned clerical codes.
             Defaults to "clerical_codes".
-        digits (int): Number of digits to which SIC codes should be cleaned or expanded.
-            Defaults to 5.
-        code_type (str): Type of code to clean (e.g., "SIC" or "SOC").
+        code_type: Type of code to clean (e.g., "SIC" or "SOC").
             This determines the valid code set used for cleaning. Defaults to "SIC".
+        digits: Number of digits to which codes should be cleaned or expanded.
 
     Returns:
         pd.DataFrame: A DataFrame containing:
@@ -70,13 +70,17 @@ def prep_clerical_codes(
         return df[[ID_COL, out_col, invalid_col]]
 
     clerical_3cols = list(
-        {clerical_col + str(i) for i in range(1, 4)}.intersection(df.columns)
+        {clerical_col + str(i) for i in range(1, 4)}
+        .union({clerical_col})
+        .intersection(df.columns)
     )
     if not clerical_3cols:
         raise ValueError(
             f"Input DataFrame must contain at least one of the clerical code columns: "
             f"{', '.join([clerical_col + str(i) for i in range(1, 4)])}"
         )
+
+    digits = _validate_n_digits_for_code_type(digits, code_type)
 
     df = df[[ID_COL, *clerical_3cols]].copy()
     df[clerical_col] = df[clerical_3cols].agg(
@@ -126,7 +130,7 @@ def prep_model_codes(
     out_col: str = "model_codes",
     alt_codes_name: str = "code",
     threshold: float = 0,
-    digits: int = 5,
+    digits: int | None = None,
     code_type: str = "SIC",
 ) -> pd.DataFrame:
     """Prepare the input DataFrame containing model-predicted SIC codes.
@@ -143,7 +147,7 @@ def prep_model_codes(
         out_col: Column name for the output cleaned model codes.
         alt_codes_name: Key name to extract codes from alternative predictions.
         threshold: Likelihood threshold for pruning alternative candidates.
-        digits: Number of digits to which SIC codes should be cleaned.
+        digits: Number of digits to which codes should be cleaned.
         code_type: Type of code to clean (e.g., "SIC" or "SOC"). This determines the valid
             code set used for cleaning. Defaults to "SIC".
 
@@ -170,6 +174,8 @@ def prep_model_codes(
         out_df[out_col] = pd.Series([], dtype=object)
         out_df[invalid_col] = pd.Series([], dtype=object)
         return out_df
+
+    digits = _validate_n_digits_for_code_type(digits, code_type)
 
     if codes_col not in input_df.columns:
         codes_col = None

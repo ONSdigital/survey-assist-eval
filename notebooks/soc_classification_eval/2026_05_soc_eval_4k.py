@@ -9,6 +9,10 @@ import os
 import pandas as pd
 from dotenv import load_dotenv
 
+from survey_assist_eval.data_cleaning.prep_data import (
+    prep_clerical_codes,
+)
+
 # %%
 load_dotenv()
 bucket_name = os.getenv("EVALUATION_BUCKET_NAME")
@@ -33,6 +37,7 @@ if not os.path.exists(f"{output_folder}/STG4.parquet"):
     df = pd.read_csv(input_data_file)
     df = df.rename(
         columns={
+            "final_uuid": "unique_id",
             "soc2020_job_title_main_job": "soc2020_job_title",
             "soc2020_job_description_main_job": "soc2020_job_description",
             "sic2007_employed_main_job": "sic2007_employee",
@@ -52,4 +57,10 @@ else:
 df = pd.read_parquet(f"{output_folder}/STG4.parquet")
 print(df.head())
 
+# %%
+df = pd.read_parquet(f"{work_folder}/STG2.parquet")
+# %%
+df_clerical = prep_clerical_codes(
+    df, code_type="SOC", clerical_col="soc2020_code", digits=4, out_col="clerical_codes"
+)
 # %%
