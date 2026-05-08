@@ -1,81 +1,119 @@
-# Scripts for Running End-to-End Pipeline
+# Scripts for Running End-to-End Pipelines
 
-This module allows user to run full classification pipeline using Survey Assist (**SA**), which goal is Standard Industry Classification (**SIC**) assignment based on responses provided.
+This module documents the end-to-end classification pipelines available in this repository for Survey Assist (**SA**). The codebase currently contains scripts for both Standard Industry Classification (**SIC**) and Standard Occupational Classification (**SOC**) workflows.
 
-The scripts are designed to perform different steps allowing SIC classification. The classification steps include initial classification, using only respondents answers. If the first attempt is ambiguous, then a follow-up question and synthetic follow-up answer is generated. Based on the follow-up answer, the industry description is extended and second classification attempt is performed. The final output includes SIC code assigned to each respondent, as well as the information about whether the classification was unambiguous or not.
+Both pipelines start from respondent-provided survey fields and persist intermediate outputs plus a metadata JSON file so runs can be resumed from checkpoints. The common input file (CSV or parquet) is expected to contain at least `sic2007_employee`, `soc2020_job_title`, `soc2020_job_description`, and `sic2007_self_employed`.
 
-The pipeline input file (csv or parquet) is expected to contain columns: sic2007_employee, soc2020_job_title, soc2020_job_description, sic2007_self_employed. The output file will include additional columns generated during the pipeline, as specified in the table below. Parameters of the pipeline, such as embedding model name, LLM model name, batch size, etc. can be configured using the metadata JSON file, details about the fields are provided in the table further below.
+## SIC pipeline
 
-## Pipeline stages
+The SIC pipeline supports the full multi-stage flow: initial classification, ambiguity assessment, follow-up question generation, synthetic follow-up answer generation, second semantic search, and final classification.
 
-The pipeline is intended to be used in specific order:
-Stage 1 -> Stage 2 -> Stage 3 -> Stage 4 -> Stage 5 -> Stage 6 (use the script for stage 1 with `-s` flag) -> Stage 7 (use the script for stage 2 with `-s` flag).
+The intended stage order is:
+Stage 1 -> Stage 2 -> Stage 3 -> Stage 4 -> Stage 5 -> Stage 6 (rerun stage 1 with `-s`) -> Stage 7 (rerun stage 2 with `-s`).
 
-|Stage|Pipeline process|Required columns|Columns added|
+| Stage | Pipeline process | Required columns | Columns added |
 |--|--|--|--|
-|1|Create `merged_industry_description`. Perform Semantic Search| `sic2007_employee`, `soc2020_job_title`, `soc2020_job_description`, `sic2007_self_employed`|`merged_industry_description`, `semantic_search_results`|
-|2|Initial classification and ambiguity assesment| `soc2020_job_title`, `soc2020_job_description`, `merged_industry_desc`, `semantic_search_results`|`unambiguously_codable`, `initial_code`, `alt_sic_candidates`|
-|3|Generate follow up question when `unambiguously_codable` is `False`| `unambiguously_codable`, `merged_industry_desc`, `soc2020_job_title`, `soc2020_job_description`, `alt_sic_candidates`|`followup_question`|
-|4|Generate follow up answer| `unambiguously_codable`, `merged_industry_desc`, `soc2020_job_title`, `soc2020_job_description`, `followup_question`|`followup_answer`|
-|5|Modify `merged_industry_desc`| `merged_industry_desc`, `followup_question`, `followup_answer`| `extended_industry_desc`|
-|6|Second semantic search, using modified industry label| `soc2020_job_title`, `soc2020_job_description`, `extended_industry_desc`|`second_semantic_search_results`|
-|7|Final classification and ambiguity assesment| `soc2020_job_title`, `soc2020_job_description`, `extended_industry_desc`, `second_semantic_search_results`|`unambiguously_codable_final`, `final_code`, `alt_sic_candidates_final`|
+| 1 | Create `merged_industry_desc` and perform semantic search | `sic2007_employee`, `soc2020_job_title`, `soc2020_job_description`, `sic2007_self_employed` | `merged_industry_desc`, `semantic_search_results` |
+| 2 | Initial classification and ambiguity assessment | `soc2020_job_title`, `soc2020_job_description`, `merged_industry_desc`, `semantic_search_results` | `unambiguously_codable`, `initial_code`, `alt_sic_candidates` |
+| 3 | Generate a follow-up question when `unambiguously_codable` is `False` | `unambiguously_codable`, `merged_industry_desc`, `soc2020_job_title`, `soc2020_job_description`, `alt_sic_candidates` | `followup_question` |
+| 4 | Generate a follow-up answer | `unambiguously_codable`, `merged_industry_desc`, `soc2020_job_title`, `soc2020_job_description`, `followup_question` | `followup_answer` |
+| 5 | Modify `merged_industry_desc` | `merged_industry_desc`, `followup_question`, `followup_answer` | `extended_industry_desc` |
+| 6 | Second semantic search using the extended description | `soc2020_job_title`, `soc2020_job_description`, `extended_industry_desc` | `second_semantic_search_results` |
+| 7 | Final classification and ambiguity assessment | `soc2020_job_title`, `soc2020_job_description`, `extended_industry_desc`, `second_semantic_search_results` | `unambiguously_codable_final`, `final_code`, `alt_sic_candidates_final` |
 
+### Run the full SIC pipeline
 
-## Usage
-### Prerequsites
+Use the runner in `scripts/sic_pipeline`:
+
+```bash
+./scripts/sic_pipeline/run_full_pipeline.sh [-p <1|2>] -i </path/to/input.{csv|parquet}> -o </path/to/output/folder> [-m </path/to/metadata.json>] [-b 20]
+```
+
+Where:
+- `-p 2` (optional): Select one-prompt (`1`) or two-prompt (`2`) pipeline. Default is `2`.
+- `-i`: Input CSV or parquet file.
+- `-o`: Output folder.
+- `-m` (optional): Existing metadata JSON file.
+- `-b` (optional): Batch size. For LLM stages the practical maximum is `10`.
+
+### Run individual SIC stages
+
+```bash
+poetry run python scripts/sic_pipeline/<stage_script>.py -i <path/to/input.{csv|parquet}> -o <path/to/output/folder> [-m <path/to/metadata.json>] [-n <output_shortname>] [-b <batch_size>] [-s] [-r]
+```
+
+Where:
+- `-n` (optional): Output file prefix. Defaults to the stage ID such as `STG1`.
+- `-s` (optional): Use the second-run behavior for scripts that support it.
+- `-r` (optional): Resume from the last persisted intermediate checkpoint.
+
+## SOC pipeline
+
+The SOC pipeline currently ships as a one-prompt classification flow with follow-up enrichment and a second semantic-search pass. Unlike the SIC pipeline, the full two-prompt / final-classification path is not currently implemented in `scripts/soc_pipeline`.
+
+The currently available stage order is:
+Stage 1 -> Stage 2 -> Stage 4 -> Stage 5 -> Stage 6 (rerun stage 1 with `-s`).
+
+| Stage | Available script | Pipeline process | Required columns | Columns added |
+|--|--|--|--|--|
+| 1 | `stage_1_add_semantic_search.py` | Create `merged_industry_desc` and perform SOC semantic search | `sic2007_employee`, `soc2020_job_title`, `soc2020_job_description`, `sic2007_self_employed` | `merged_industry_desc`, `semantic_search_results` |
+| 2 | `stage_2_one_prompt_assign_sic_code.py` | Run one-prompt SOC classification, ambiguity assessment, and follow-up question generation | `soc2020_job_title`, `soc2020_job_description`, `merged_industry_desc`, `semantic_search_results` | `unambiguously_codable`, `initial_code`, `alt_soc_candidates`, `followup_question` |
+| 4 | `stage_4_add_synthetic_responses.py` | Generate a follow-up answer | `unambiguously_codable`, `merged_industry_desc`, `soc2020_job_title`, `soc2020_job_description`, `followup_question` | `followup_answer` |
+| 5 | `stage_5_modify_job_description.py` | Extend the job description using follow-up question and answer | `soc2020_job_description`, `followup_question`, `followup_answer` | `extended_job_desccription` |
+| 6 | `stage_1_add_semantic_search.py -s` | Run a second semantic-search pass using the follow-up answer in the search query | `soc2020_job_title`, `soc2020_job_description`, `merged_industry_desc`, `followup_answer` | `second_semantic_search_results` |
+
+Notes:
+- The stage-2 SOC script keeps a legacy filename, `stage_2_one_prompt_assign_sic_code.py`, but it calls the SOC classifier and writes `alt_soc_candidates`.
+- The SOC `run_full_pipeline.sh` currently executes a complete runnable path only for `-p 1`. The `-p 2` branch still contains commented-out placeholder stages and should not be treated as a complete two-prompt pipeline.
+
+### Run the full SOC pipeline
+
+Use the runner in `scripts/soc_pipeline`:
+
+```bash
+./scripts/soc_pipeline/run_full_pipeline.sh -p 1 -i </path/to/input.{csv|parquet}> -o </path/to/output/folder> [-m </path/to/metadata.json>] [-b 20]
+```
+
+Where:
+- `-p 1`: Required for the currently complete SOC runner path.
+- `-i`: Input CSV or parquet file.
+- `-o`: Output folder.
+- `-m` (optional): Existing metadata JSON file.
+- `-b` (optional): Batch size.
+
+### Run individual SOC stages
+
+```bash
+poetry run python scripts/soc_pipeline/<stage_script>.py -i <path/to/input.{csv|parquet}> -o <path/to/output/folder> [-m <path/to/metadata.json>] [-n <output_shortname>] [-b <batch_size>] [-s] [-r]
+```
+
+All SOC stage scripts use the shared pipeline CLI. In practice:
+- `-s` is used by `stage_1_add_semantic_search.py` for the second semantic-search pass.
+- `-r` resumes from the last persisted checkpoint when intermediate outputs exist.
+
+## Prerequisites
+
 - Python 3.12
-- Poetry (This project uses Poetry for dependency management)
-- Authentication to gcloud with gcloud `gcloud auth application-default login`
+- Poetry
+- Google Cloud authentication for LLM-backed stages: `gcloud auth application-default login`
 
-### Running the pipeline
-To run the whole pipeline (two prompts approach), use `run_full_pipeline.sh`, available in `survey_assist_eval/sic_pipeline/scripts`:
+## Metadata
 
-```bash
-./scripts/sic_pipeline/run_full_pipeline.sh [-p <1|2>] -i </path/to/tlfs_data.{csv|parquet}> -o </path/to/output/folder> [-m </path/to/tlfs_data_metadata.json>] [-b 20]
-```
+The metadata JSON stores shared configuration values plus per-stage checkpoint state. If no metadata file is supplied, defaults from the pipeline package are used.
 
-Where:
-- `-p 2` (optional): Flag indicating whether to run one-prompt (1) or two-prompt (2) version of the pipeline. Default is 2.
-- `-i </path/to/tlfs_data.{csv|parquet}>`: Relative path to the input file in .csv or .parquet format. Requires columns as specified above.
-- `-o </path/to/output/folder>`: The path to the specified output folder.
-- `-m </path/to/tlfs_data_metadata.json>` (optional): The path to the persisted metadata JSON file. If not provided, default values for metadata fields will be used.
-- `-b 20` (optional): The size of processing batch. Default is 20. For stages 2 and 3 the maximum batch size is 10.
-
-
-
-### Running individual scripts (Stages 1 to 7):
-
-2. Run:
-```bash
-poetry run python scripts/sic_pipeline/path/to/stage/to/run.py -i <path/to/input/file.{csv|parquet}> -o <path/to/output/folder> [-m <path/to/metadata.json>] [-n <output_shortname>] [-b <batch_size>] [-s] [-r]
-```
-Where:
-- `path/to/stage/to/run.py`: relative path to the script.
-- `-i <path/to/input/file.{csv|parquet}>`: Relative path to the input file in .csv or .parquet format. Requires columns as specified above.
-- `-m <path/to/metadata.json>` (optional): The path to the persisted metadata JSON file from the previous stage.
-- `-o <path/to/output/folder>`: The path to the specified output folder.
-- `-n <output_shortname>` (optional): Optional output file name. Default: `STG[#]`, where # is the stage number.
-- `-b <batch_size>` (optional): The size of processing batch. For stages using LLM (2,3,4 and 7) the maximum batch size is 10.
-- `-s` (optional): Flag indicating second run of classification steps. If flag is present, returns results for final classification using modified output column names to avoid conflicts with initial classification outputs.
-- `-r` (optional): Flag indicating whether to resume from the last completed batch. If flag is present, the script will attempt to load persisted output and resume from the last completed batch. If not present, the script will start from the beginning, even if there is persisted output available.
-
-
-## Metadata (pipeline parameters)
-The metadata JSON file is used to store configuration values and the state of the pipeline. The input metadata is optional, and if not provided, default values will be used. Checkpointing is implemented by storing the state of the pipeline in the intermediate metadata file after each batch, such as the last completed batch ID for each stage. This allows the pipeline to be resumed from the last completed batch in case of interruptions or failures.
-The following fields are stored in the metadata file:
-
-| Field | Default Value | Description |
+| Field | Default value | Description |
 |--|--|--|
-| original_dataset_name | <path/to/input/file.{csv/parquet}> | Path to the original dataset |
-| embedding_model_name | all-MiniLM-L6-v2 | Embedding model used for semantic search |
-| embedding_db_dir | data/vector_store | Directory for vector store database |
-| embedding_k_matches | 20 | Number of semantic search matches |
-| llm_model_name | gemini-2.5-flash | LLM model used for classification |
-| llm_model_location | europe-west2 | Location of the LLM model |
-| llm_candidates_limit | 10 | Maximum number of SIC candidates |
-| sic_code_digits | 5 | Number of digits in SIC code |
-| sic_index_file | extended_SIC_index.xlsx | SIC index file |
-| sic_structure_file | publisheduksicsummaryofstructureworksheet.xlsx | SIC structure file |
-| batch_size | 100 | Processing batch size |
-| batch_size_async | 10 | Batch size for asynchronous processing |
+| `original_dataset_name` | `<path/to/input.{csv|parquet}>` | Path to the original dataset |
+| `embedding_model_name` | `all-MiniLM-L6-v2` | Embedding model used for semantic search |
+| `embedding_db_dir` | `data/vector_store` | Directory for the vector store |
+| `embedding_k_matches` | `20` | Number of semantic-search matches returned |
+| `llm_model_name` | `gemini-2.5-flash` | LLM model used for classification or synthetic responses |
+| `llm_model_location` | `europe-west2` | LLM location |
+| `llm_candidates_limit` | `10` | Maximum number of candidates returned by configurable pipeline stages |
+| `sic_code_digits` | `5` | Number of SIC digits |
+| `sic_index_file` | `industrial_classification_utils.data.sic_index / uksic2007indexeswithaddendumdecember2022.xlsx` | SIC index lookup file |
+| `sic_structure_file` | `industrial_classification_utils.data.sic_index / publisheduksicsummaryofstructureworksheet.xlsx` | SIC structure lookup file |
+| `soc_index_file` | `occupational_classification_utils.data.soc_index / soc2020volume2thecodingindexexcel16102024.xlsx` | SOC index lookup file |
+| `soc_structure_file` | `occupational_classification_utils.data.soc_index / soc2020volume1structureanddescriptionofunitgroupsexcel16102024.xlsx` | SOC structure lookup file |
+| `batch_size` | `100` | Checkpoint batch size |
+| `batch_size_async` | `10` | Async batch size for LLM stages |
