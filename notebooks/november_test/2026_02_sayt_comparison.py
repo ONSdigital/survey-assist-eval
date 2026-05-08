@@ -24,7 +24,7 @@ from helper_load_data import load_data
 from matplotlib_venn import venn3
 from sklearn.metrics.pairwise import cosine_similarity
 
-from survey_assist_eval.data_cleaning.sic_codes import (
+from survey_assist_eval.data_cleaning.code_standard import (
     get_clean_n_digit_codes,
     get_codability_level,
 )
@@ -208,7 +208,9 @@ def get_sayt_codes(input_str):
     stripped = input_str.strip().replace(".", "")
 
     for i in range(5):
-        good, bad = get_clean_n_digit_codes(stripped[: (6 - i)] + "x" * i, n=5)
+        good, bad = get_clean_n_digit_codes(
+            stripped[: (6 - i)] + "x" * i, n=5, code_type="SIC"
+        )
         if len(bad) == 0 and len(good) > 0:
             return good
     return {}
@@ -219,7 +221,7 @@ combined_df["sayt_codes"] = combined_df["SAYT_code"].apply(get_sayt_codes)
 # %%
 combined_df["SAYT_code"].apply(lambda x: len(x) if pd.notna(x) else 0).value_counts()
 combined_df["sayt_codability_level"] = combined_df["sayt_codes"].apply(
-    get_codability_level
+    lambda x: get_codability_level(x, code_type="SIC")
 )
 combined_df["sayt_codability_level"].value_counts()
 
@@ -235,11 +237,11 @@ combined_df.groupby(
 # calculate agreement for different SIC levels
 for digits in [0, 2, 5]:
     combined_df[f"sayt_codes_{digits}_digit"] = combined_df["sayt_codes"].apply(
-        lambda x, n=digits: get_clean_n_digit_codes(x, n=n)[0]
+        lambda x, n=digits: get_clean_n_digit_codes(x, n=n, code_type="SIC")[0]
     )
     combined_df[f"sa_final_codes_closed_q_{digits}_digit"] = combined_df[
         "sa_final_codes_closed_q"
-    ].apply(lambda x, n=digits: get_clean_n_digit_codes(x, n=n)[0])
+    ].apply(lambda x, n=digits: get_clean_n_digit_codes(x, n=n, code_type="SIC")[0])
     combined_df[f"both_codable_{digits}_digit"] = combined_df[
         f"sayt_codes_{digits}_digit"
     ].apply(lambda x: len(x) == 1) & combined_df[
@@ -248,7 +250,7 @@ for digits in [0, 2, 5]:
         lambda x: len(x) == 1
     )
     combined_df[f"cc_codes_{digits}_digit"] = combined_df["cc_initial_codes"].apply(
-        lambda x: get_clean_n_digit_codes(x, n=digits)[0]
+        lambda x: get_clean_n_digit_codes(x, n=digits, code_type="SIC")[0]
     )
     combined_df[f"sayt_closed_match_{digits}_digit"] = (
         combined_df[f"sayt_codes_{digits}_digit"]

@@ -2,7 +2,7 @@
 
 # pylint: disable=C0116
 
-from survey_assist_eval.data_cleaning.sic_code_section_list import (
+from survey_assist_eval.data_cleaning.sic_code_list import (
     SECTION_LOOKUP,
     VALID_SIC_CODES,
     generate_section_lookup,

@@ -19,7 +19,7 @@ from dotenv import load_dotenv
 
 from notebooks.classification_eval.helper_group_plotly import create_grouped_selector
 from notebooks.november_test.helper_load_data import combine_small_groups
-from survey_assist_eval.data_cleaning.sic_codes import (
+from survey_assist_eval.data_cleaning.code_standard import (
     get_codability_level,
 )
 
@@ -46,7 +46,9 @@ for col in [col for col in combined_df.columns if "codes" in col.lower()]:
 # %%
 for prefix in ["cc", "sa", "cims"]:
     combined_df[f"{prefix}_codability_level"] = combined_df.apply(
-        lambda row, pre=prefix: get_codability_level(row[f"{pre}_initial_codes"]),
+        lambda row, pre=prefix: get_codability_level(
+            row[f"{pre}_initial_codes"], code_type="SIC"
+        ),
         axis=1,
     )
 

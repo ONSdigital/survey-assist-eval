@@ -15,11 +15,11 @@ import pandas as pd
 import plotly.express as px
 from dotenv import load_dotenv
 
+from survey_assist_eval.data_cleaning.code_standard import get_clean_n_digit_one_code
 from survey_assist_eval.data_cleaning.prep_data import (
     prep_clerical_codes,
     prep_model_codes,
 )
-from survey_assist_eval.data_cleaning.sic_codes import get_clean_n_digit_one_code
 from survey_assist_eval.evaluation.metrics import (
     calc_simple_metrics,
 )
@@ -248,7 +248,9 @@ for DIGITS in [5, 0]:
             "semantic_search_results"
         ].apply(
             lambda x, digits=DIGITS: (
-                get_clean_n_digit_one_code(x[0]["code"], digits) if len(x) > 0 else None
+                get_clean_n_digit_one_code(x[0]["code"], digits, code_type="SIC")
+                if len(x) > 0
+                else None
             )
         )
         combined_dataframe_sem["top_in_cc"] = combined_dataframe_sem.apply(

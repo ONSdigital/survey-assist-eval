@@ -2,12 +2,15 @@
 Cleans and prepares clerical and model SIC codes for further processing.
 """
 
+# ruff: noqa: PLR0913
+# pylint: disable=R0913
+
 import logging
 
 import pandas as pd
 
 # Assuming these are imported from your utils
-from survey_assist_eval.data_cleaning.sic_codes import (
+from survey_assist_eval.data_cleaning.code_standard import (
     extract_alt_candidates_n_digit_codes,
     get_clean_n_digit_codes,
     parse_numerical_code,
@@ -20,9 +23,11 @@ ID_COL = "unique_id"
 def prep_clerical_codes(
     df: pd.DataFrame,
     df_four_plus: pd.DataFrame | None = None,
+    *,
     clerical_col: str = "sic_ind_occ",
     out_col: str = "clerical_codes",
     digits: int = 5,
+    code_type: str = "SIC",
 ) -> pd.DataFrame:
     """Prepare and clean clerical SIC codes from one or two DataFrames.
 
@@ -44,6 +49,8 @@ def prep_clerical_codes(
             Defaults to "clerical_codes".
         digits (int): Number of digits to which SIC codes should be cleaned or expanded.
             Defaults to 5.
+        code_type (str): Type of code to clean (e.g., "SIC" or "SOC").
+            This determines the valid code set used for cleaning. Defaults to "SIC".
 
     Returns:
         pd.DataFrame: A DataFrame containing:
@@ -100,21 +107,27 @@ def prep_clerical_codes(
     df[[out_col, invalid_col]] = (
         df[clerical_col]
         .apply(parse_numerical_code)
-        .apply(lambda x: pd.Series(get_clean_n_digit_codes(x, n=digits)))
+        .apply(
+            lambda x: pd.Series(
+                get_clean_n_digit_codes(x, n=digits, code_type=code_type)
+            )
+        )
     )
 
     return df[[ID_COL, out_col, invalid_col]]
 
 
 # pylint: disable=R0913, R0917
-def prep_model_codes(  # noqa:PLR0913
+def prep_model_codes(
     input_df: pd.DataFrame,
+    *,
     codes_col: str | None = "initial_code",
     alt_codes_col: str | None = "alt_sic_candidates",
     out_col: str = "model_codes",
     alt_codes_name: str = "code",
     threshold: float = 0,
     digits: int = 5,
+    code_type: str = "SIC",
 ) -> pd.DataFrame:
     """Prepare the input DataFrame containing model-predicted SIC codes.
     This function hasd been overloaded to accept either individual parameters
@@ -131,6 +144,8 @@ def prep_model_codes(  # noqa:PLR0913
         alt_codes_name: Key name to extract codes from alternative predictions.
         threshold: Likelihood threshold for pruning alternative candidates.
         digits: Number of digits to which SIC codes should be cleaned.
+        code_type: Type of code to clean (e.g., "SIC" or "SOC"). This determines the valid
+            code set used for cleaning. Defaults to "SIC".
 
     Args: (config style)
         input_df: Input DataFrame to be prepared.
@@ -171,8 +186,12 @@ def prep_model_codes(  # noqa:PLR0913
     if codes_col is not None:
         out_df[[out_col, invalid_col]] = (
             input_df[codes_col]
-            .apply(parse_numerical_code)
-            .apply(lambda x: pd.Series(get_clean_n_digit_codes(x, n=digits)))
+            .map(parse_numerical_code)
+            .apply(
+                lambda x: pd.Series(
+                    get_clean_n_digit_codes(x, n=digits, code_type=code_type)
+                )
+            )
         )
 
     if alt_codes_col is not None:
@@ -189,6 +208,7 @@ def prep_model_codes(  # noqa:PLR0913
                     code_name=alt_codes_name,
                     n=digits,
                     threshold=threshold,
+                    code_type=code_type,
                 ),
                 index=[out_col, invalid_col],
             )

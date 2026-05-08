@@ -5,7 +5,7 @@
 
 import pytest
 
-from survey_assist_eval.data_cleaning.sic_codes import (
+from survey_assist_eval.data_cleaning.code_standard import (
     asses_codability_gain,
     expand_to_n_digit_str,
     extract_alt_candidates_n_digit_codes,
@@ -13,7 +13,7 @@ from survey_assist_eval.data_cleaning.sic_codes import (
     get_clean_n_digit_one_code,
     get_codability_level,
     parse_numerical_code,
-    validate_sic_codes,
+    validate_codes,
 )
 
 
@@ -48,26 +48,26 @@ def test_expand_to_n_digit_str():
 
 
 def test_get_clean_n_digit_one_code():
-    assert get_clean_n_digit_one_code("861012", 5) == {"86101"}
-    assert get_clean_n_digit_one_code("86101", 5) == {"86101"}
+    assert get_clean_n_digit_one_code("861012", n=5, code_type="SIC") == {"86101"}
+    assert get_clean_n_digit_one_code("86101", n=5, code_type="SIC") == {"86101"}
     group86 = {"86100", "86102", "86230", "86220", "86900", "86101", "86210"}
-    assert get_clean_n_digit_one_code("86xxx", 5) == group86
-    assert get_clean_n_digit_one_code("86", 5) == group86
-    assert get_clean_n_digit_one_code("861012", 3) == {"861"}
-    assert get_clean_n_digit_one_code("86101", 0) == {"Q"}
+    assert get_clean_n_digit_one_code("86xxx", n=5, code_type="SIC") == group86
+    assert get_clean_n_digit_one_code("86", n=5, code_type="SIC") == group86
+    assert get_clean_n_digit_one_code("861012", n=3, code_type="SIC") == {"861"}
+    assert get_clean_n_digit_one_code("86101", n=0, code_type="SIC") == {"Q"}
 
 
 def test_get_clean_n_digit_codes_from_section():
-    assert get_clean_n_digit_codes("C", 0)[0] == {"C"}
-    assert len(get_clean_n_digit_codes("I", 5)[0]) == 16
-    assert len(get_clean_n_digit_codes("M", 2)[0]) == 7
-    assert get_clean_n_digit_codes("Z", 0)[1] == {"Z"}
+    assert get_clean_n_digit_codes("C", n=0, code_type="SIC")[0] == {"C"}
+    assert len(get_clean_n_digit_codes("I", n=5, code_type="SIC")[0]) == 16
+    assert len(get_clean_n_digit_codes("M", n=2, code_type="SIC")[0]) == 7
+    assert get_clean_n_digit_codes("Z", n=0, code_type="SIC")[1] == {"Z"}
 
 
 def test_get_clean_n_digit_codes_with_invalid():
     # Case 1: Mixed valid and invalid (alphanumeric/garbage)
     codes = ["86101", "NotACode", "123456789", "86210"]
-    valid, invalid = get_clean_n_digit_codes(codes, 5)
+    valid, invalid = get_clean_n_digit_codes(codes, n=5, code_type="SIC")
 
     # Check valid codes are processed
     assert "86101" in valid
@@ -82,21 +82,21 @@ def test_get_clean_n_digit_codes_with_invalid():
 
     # Case 2: Purely invalid codes
     bad_input = ["Bad1", "Bad2"]
-    valid, invalid = get_clean_n_digit_codes(bad_input, 5)
+    valid, invalid = get_clean_n_digit_codes(bad_input, n=5, code_type="SIC")
     assert valid == set()
     assert invalid == {"Bad1", "Bad2"}
 
     # Case 3: Numeric codes that shouldn't exist (assuming 00000 is not in VALID_SIC_CODES)
     # This tests the validation lookup failure path
     fake_codes = ["00000"]
-    valid, invalid = get_clean_n_digit_codes(fake_codes, 5)
+    valid, invalid = get_clean_n_digit_codes(fake_codes, n=5, code_type="SOC")
     if "00000" not in valid:  # Only assert if we are sure it's invalid in your lookup
         assert "00000" in invalid
 
 
 def test_get_clean_n_digit_codes_5d():
     codes = ["86101", "86210", "85xxx"]
-    result, invalid = get_clean_n_digit_codes(codes, 5)
+    result, invalid = get_clean_n_digit_codes(codes, n=5, code_type="SIC")
     assert "86101" in result
     assert "86210" in result
     assert "85100" in result
@@ -110,17 +110,17 @@ def test_get_clean_n_digit_codes_5d():
 
 def test_get_clean_n_digit_codes_logs(caplog):
     with caplog.at_level("WARNING"):
-        get_clean_n_digit_codes(3, 5)
+        get_clean_n_digit_codes(3, n=5, code_type="SIC")
     assert any("set of strings" in record.message.lower() for record in caplog.records)
 
 
 def test_get_clean_n_digit_codes_section():
-    cleaned, invalid = get_clean_n_digit_codes("2xxxx", 0)
+    cleaned, invalid = get_clean_n_digit_codes("2xxxx", n=0, code_type="SIC")
     assert cleaned == {"C"}
     assert invalid == set()
 
     codes = ["86101", "86210", "2xxxx"]
-    cleaned, invalid = get_clean_n_digit_codes(codes, 0)
+    cleaned, invalid = get_clean_n_digit_codes(codes, n=0, code_type="SIC")
     assert cleaned == {"Q", "C"}
     assert invalid == set()
 
@@ -129,7 +129,7 @@ def test_get_clean_n_digit_codes_logs_invalid_item(caplog):
     # Ensure we capture WARNING logs for this test
     with caplog.at_level("WARNING"):
         # Input contains an item that will produce no valid codes
-        cleaned, invalid = get_clean_n_digit_codes({"98765"}, n=5)
+        cleaned, invalid = get_clean_n_digit_codes({"98765"}, n=5, code_type="SIC")
 
     # Assert logging happened with the expected message fragment
     assert any(
@@ -144,8 +144,8 @@ def test_get_clean_n_digit_codes_logs_invalid_item(caplog):
 
 
 def test_validate_sic_codes():
-    assert validate_sic_codes("01110") == {"01110"}
-    valid = validate_sic_codes(["01110", "99999", "A"])
+    assert validate_codes("01110", code_type="SIC") == {"01110"}
+    valid = validate_codes(["01110", "99999", "A"], code_type="SIC")
     assert "01110" in valid
     assert "A" in valid
     assert "99999" not in valid
@@ -153,7 +153,7 @@ def test_validate_sic_codes():
 
 def test_validate_sic_codes_logs(caplog):
     with caplog.at_level("WARNING"):
-        validate_sic_codes(5)
+        validate_codes(5, code_type="SIC")
     assert any("set of strings" in record.message.lower() for record in caplog.records)
 
 
@@ -163,13 +163,21 @@ def test_extract_alt_candidates_n_digit_codes():
         {"code": "86210", "likelihood": 0.6},
     ]
     result_valid, result_invalid = extract_alt_candidates_n_digit_codes(
-        candidates, code_name="code", score_name="likelihood", threshold=0.7
+        candidates,
+        code_name="code",
+        score_name="likelihood",
+        threshold=0.7,
+        code_type="SIC",
     )
     assert result_valid == {"86101"}
     assert result_invalid == set()
     # No pruning
     result2_valid, result2_invalid = extract_alt_candidates_n_digit_codes(
-        candidates, code_name="code", score_name="likelihood", threshold=0
+        candidates,
+        code_name="code",
+        score_name="likelihood",
+        threshold=0,
+        code_type="SIC",
     )
     assert result2_valid == {"86101", "86210"}
     assert result2_invalid == set()
@@ -181,7 +189,11 @@ def test_extract_alt_candidates_n_digit_codes_invalid():
         {"code": "12345", "likelihood": 0.6},
     ]
     result_valid, result_invalid = extract_alt_candidates_n_digit_codes(
-        candidates, code_name="code", score_name="likelihood", threshold=0.7
+        candidates,
+        code_name="code",
+        score_name="likelihood",
+        threshold=0.7,
+        code_type="SIC",
     )
     assert result_valid == {"86101"}
     assert result_invalid == {"12345"}
@@ -201,7 +213,7 @@ def test_extract_alt_candidates_n_digit_codes_invalid():
     ],
 )
 def test_get_codability_level(codes, expected):
-    assert get_codability_level(codes) == expected
+    assert get_codability_level(codes, code_type="SIC") == expected
 
 
 @pytest.mark.parametrize(
@@ -224,5 +236,6 @@ def test_asses_codability_gain(left, right, expected):
         row,
         initial_level_col="initial",
         final_level_col="final",
+        code_type="SIC",
     )
     assert out == expected

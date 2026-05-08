@@ -21,12 +21,12 @@ import os
 import pandas as pd
 from dotenv import load_dotenv
 
-from survey_assist_eval.data_cleaning.prep_data import prep_model_codes
-from survey_assist_eval.data_cleaning.sic_codes import (
+from survey_assist_eval.data_cleaning.code_standard import (
     asses_codability_gain,
     get_clean_n_digit_codes,
     get_codability_level,
 )
+from survey_assist_eval.data_cleaning.prep_data import prep_model_codes
 
 load_dotenv()
 bucket_name = os.getenv("PREPROD_DATA_BUCKET_NAME")
@@ -57,14 +57,16 @@ def get_sa_initial_codes(row):
         A set of cleaned initial SIC codes assigned by SurveyAssist.
     """
     if row["direct_lookup_classified"]:
-        return get_clean_n_digit_codes({row["direct_lookup_assigned_code"]}, n=5)
+        return get_clean_n_digit_codes(
+            {row["direct_lookup_assigned_code"]}, n=5, code_type="SIC"
+        )
     codes = [row["survey_assist_assigned_code"]]
     if not row["survey_assist_classified"]:
         codes = codes + [
             row[f"survey_assist_alt_candidate_code_{i}"] for i in range(1, 6)
         ]
     codes = {code for code in codes if pd.notna(code)}
-    return get_clean_n_digit_codes(codes, n=5)
+    return get_clean_n_digit_codes(codes, n=5, code_type="SIC")
 
 
 # %%
@@ -72,7 +74,7 @@ eval_df["sa_initial_codes"] = eval_df.apply(
     lambda row: get_sa_initial_codes(row)[0], axis=1
 )
 eval_df["sa_initial_codability_level"] = eval_df["sa_initial_codes"].apply(
-    get_codability_level
+    lambda x: get_codability_level(x, code_type="SIC")
 )
 
 print(eval_df["sa_initial_codability_level"].value_counts())
@@ -121,7 +123,7 @@ msk = combined_df["sa_initial_codability_level"] == "Sub-class (5-digits)"
 combined_df.loc[msk, "sa_final_codes_open_q"] = combined_df.loc[msk, "sa_initial_codes"]
 combined_df["sa_final_codability_level_open_q"] = combined_df[
     "sa_final_codes_open_q"
-].apply(get_codability_level)
+].apply(lambda x: get_codability_level(x, code_type="SIC"))
 
 print(combined_df.head())
 combined_df.groupby(
@@ -150,12 +152,14 @@ combined_df["sa_codability_gain_open_q"] = combined_df.apply(
     axis=1,
     initial_level_col="sa_initial_codability_level",
     final_level_col="sa_final_codability_level_open_q",
+    code_type="SIC",
 )
 combined_df["sa_codability_gain_closed_q"] = combined_df.apply(
     asses_codability_gain,
     axis=1,
     initial_level_col="sa_initial_codability_level",
     final_level_col="sa_final_codability_level_closed_q",
+    code_type="SIC",
 )
 
 
@@ -170,7 +174,7 @@ def get_most_likely_section(
 ) -> str | None:
     """Get the most likely SIC section if only one section is present in the codes."""
     for col in columns_to_consider:
-        codes, _ = get_clean_n_digit_codes(row[col], n=0)
+        codes, _ = get_clean_n_digit_codes(row[col], n=0, code_type="SIC")
         if len(codes) == 1:
             return next(iter(codes))
     return None

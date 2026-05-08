@@ -16,11 +16,11 @@ import os
 import pandas as pd
 from dotenv import load_dotenv
 
-from survey_assist_eval.data_cleaning.prep_data import prep_clerical_codes
-from survey_assist_eval.data_cleaning.sic_codes import (
+from survey_assist_eval.data_cleaning.code_standard import (
     asses_codability_gain,
     get_codability_level,
 )
+from survey_assist_eval.data_cleaning.prep_data import prep_clerical_codes
 
 # %%
 load_dotenv()
