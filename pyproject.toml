@@ -99,6 +99,8 @@ convention = "google"
     "S101",
     # Allow unused imports in tests as they might be used in fixtures or mocks
     "F401",
+    # Allow magic values for comparison in tests
+    "PLR2004",
 ]
 
 [tool.ruff.format]

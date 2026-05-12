@@ -200,6 +200,172 @@ def test_prep_model_codes_missing_cols():
         prep_model_codes(df)
 
 
+# ---------------------------------------------------------------------------
+# SOC-specific tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def sample_soc_cc_df():
+    return pd.DataFrame(
+        [
+            {
+                "unique_id": "A1",
+                "soc_ind_occ1": "1111",
+                "soc_ind_occ2": "2111",
+                "soc_ind_occ3": "3111",
+            },
+            {
+                "unique_id": "A2",
+                "soc_ind_occ1": "2111",
+                "soc_ind_occ2": "311x",
+                "soc_ind_occ3": None,
+            },
+            {
+                "unique_id": "A3",
+                "soc_ind_occ1": "-9",
+                "soc_ind_occ2": "nan",
+                "soc_ind_occ3": "NAN",
+            },
+            {
+                "unique_id": "A4",
+                "soc_ind_occ1": "4+",
+                "soc_ind_occ2": None,
+                "soc_ind_occ3": None,
+            },
+        ]
+    )
+
+
+@pytest.fixture
+def sample_soc_cc_four_plus():
+    return pd.DataFrame(
+        {
+            "unique_id": ["A4"],
+            "soc_ind_occ": ["1111;2111;3111;1112"],
+        }
+    )
+
+
+def test_prep_clerical_codes_basic_soc(sample_soc_cc_df):
+    result = prep_clerical_codes(
+        sample_soc_cc_df, clerical_col="soc_ind_occ", code_type="SOC", digits=4
+    )
+    assert CLERICAL_COL in result.columns
+    assert INVALID_CLERICAL_COL in result.columns
+    assert len(result) == len(sample_soc_cc_df)
+    assert result[CLERICAL_COL].apply(lambda x: isinstance(x, set)).all()
+
+    a1_codes = result.loc[result["unique_id"] == "A1", CLERICAL_COL].iloc[0]
+    assert a1_codes == {"1111", "2111", "3111"}
+    assert (
+        result.loc[result["unique_id"] == "A1", INVALID_CLERICAL_COL].iloc[0] == set()
+    )
+
+    assert result.loc[result["unique_id"] == "A3", CLERICAL_COL].iloc[0] == set()
+    assert result.loc[result["unique_id"] == "A4", CLERICAL_COL].iloc[0] == set()
+
+
+def test_prep_clerical_codes_with_invalid_soc():
+    df = pd.DataFrame(
+        {
+            "unique_id": ["B1"],
+            "soc_ind_occ1": "9999",
+            "soc_ind_occ2": "1111",
+            "soc_ind_occ3": "0000",
+        }
+    )
+    result = prep_clerical_codes(df, clerical_col="soc_ind_occ", code_type="SOC")
+
+    row = result.loc[result["unique_id"] == "B1"].iloc[0]
+    assert "1111" in row[CLERICAL_COL]
+    assert "9999" in row[INVALID_CLERICAL_COL]
+    assert "0000" in row[INVALID_CLERICAL_COL]
+
+
+def test_prep_clerical_codes_with_four_plus_soc(
+    sample_soc_cc_df, sample_soc_cc_four_plus
+):
+    result = prep_clerical_codes(
+        sample_soc_cc_df,
+        sample_soc_cc_four_plus,
+        clerical_col="soc_ind_occ",
+        code_type="SOC",
+        digits=3,
+    )
+    assert result[CLERICAL_COL].apply(lambda x: isinstance(x, set)).all()
+
+    # A2: "2111" and "311x" rolled up to 3-digit minor groups
+    assert result.loc[result["unique_id"] == "A2", CLERICAL_COL].iloc[0] == {
+        "211",
+        "311",
+    }
+    # A4: "4+" replaced with "1111;2111;3111;1112" rolled up to 3-digit minor groups
+    assert result.loc[result["unique_id"] == "A4", CLERICAL_COL].iloc[0] == {
+        "111",
+        "211",
+        "311",
+    }
+
+
+def test_prep_clerical_codes_empty_df_soc():
+    df = pd.DataFrame(
+        columns=["unique_id", "soc_ind_occ1", "soc_ind_occ2", "soc_ind_occ3"]
+    )
+    result = prep_clerical_codes(df, clerical_col="soc_ind_occ", code_type="SOC")
+    assert result.empty
+
+
+def test_prep_model_codes_with_invalid_soc():
+    df = pd.DataFrame(
+        {
+            "unique_id": ["C1"],
+            "initial_code": ["9999"],
+            "alt_soc_candidates": [[{"code": "1111", "likelihood": 0.9}]],
+        }
+    )
+    result = prep_model_codes(df, alt_codes_col="alt_soc_candidates", code_type="SOC")
+
+    row = result.loc[result["unique_id"] == "C1"].iloc[0]
+    assert "9999" in row[INVALID_MODEL_COL]
+    assert "1111" in row[MODEL_COL]
+
+
+def test_prep_model_codes_initial_only_soc():
+    df = pd.DataFrame(
+        {
+            "unique_id": ["A1", "A2"],
+            "initial_code": ["9999", "0000"],
+        }
+    )
+    result = prep_model_codes(df, code_type="SOC")
+    assert MODEL_COL in result.columns
+    assert result[MODEL_COL].apply(lambda x: isinstance(x, set)).all()
+    assert "9999" in result.loc[result["unique_id"] == "A1", INVALID_MODEL_COL].iloc[0]
+    assert "0000" in result.loc[result["unique_id"] == "A2", INVALID_MODEL_COL].iloc[0]
+
+
+def test_prep_model_codes_alt_only_soc():
+    df = pd.DataFrame(
+        {
+            "unique_id": ["A1", "A2"],
+            "alt_soc_candidates": [
+                [{"code": "1111", "likelihood": 0.9}],
+                [{"code": "2111", "likelihood": 0.8}],
+            ],
+        }
+    )
+    result = prep_model_codes(
+        df, codes_col=None, alt_codes_col="alt_soc_candidates", code_type="SOC"
+    )
+    assert result[MODEL_COL].apply(lambda x: isinstance(x, set)).all()
+    assert result[MODEL_COL].all()
+    a1_codes = result.loc[result["unique_id"] == "A1", MODEL_COL].iloc[0]
+    a2_codes = result.loc[result["unique_id"] == "A2", MODEL_COL].iloc[0]
+    assert "1111" in a1_codes
+    assert "2111" in a2_codes
+
+
 def test_prep_model_codes_threshold():
     df = pd.DataFrame(
         {
@@ -330,3 +496,10 @@ def test_prep_model_codes_comprehensive_scenarios():
     r8 = get_row("Case8")
     assert r8[MODEL_COL] == set()
     assert r8[INVALID_MODEL_COL] == set()
+
+
+def test_prep_model_with_empty():
+    df = pd.DataFrame(columns=["unique_id", "initial_code", "alt_sic_candidates"])
+    result = prep_model_codes(df, alt_codes_col="alt_sic_candidates")
+    assert result.empty
+    assert result.shape == (0, 3)  # unique_id, model_codes, model_codes_invalid

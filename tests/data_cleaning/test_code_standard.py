@@ -1,7 +1,6 @@
 """Test SIC code parsing and validation."""
 
 # pylint: disable=C0116
-# ruff: noqa: PLR2004
 
 import pytest
 
@@ -237,5 +236,199 @@ def test_asses_codability_gain(left, right, expected):
         initial_level_col="initial",
         final_level_col="final",
         code_type="SIC",
+    )
+    assert out == expected
+
+
+# ---------------------------------------------------------------------------
+# SOC-specific tests
+# ---------------------------------------------------------------------------
+
+
+def test_parse_numerical_code_soc():
+    assert parse_numerical_code("1111", code_type="SOC") == {"1111"}
+    assert parse_numerical_code("[1111, 2111]", code_type="SOC") == {"1111", "2111"}
+    assert parse_numerical_code(1111, code_type="SOC") == {"1111"}
+
+
+def test_get_clean_n_digit_one_code_soc():
+    # Truncation: longer code -> take first 4 digits
+    assert get_clean_n_digit_one_code("11113", n=4, code_type="SOC") == {"1111"}
+    # Exact match
+    assert get_clean_n_digit_one_code("1111", n=4, code_type="SOC") == {"1111"}
+    # Wildcard / short code expands to all valid unit groups in minor group 111
+    group111 = {"1111", "1112"}
+    assert get_clean_n_digit_one_code("111x", n=4, code_type="SOC") == group111
+    assert get_clean_n_digit_one_code("111", n=4, code_type="SOC") == group111
+    # Roll up to Sub-Major group (2-digit)
+    assert get_clean_n_digit_one_code("11113", n=2, code_type="SOC") == {"11"}
+    # Roll up to Major group (1-digit)
+    assert get_clean_n_digit_one_code("1111", n=1, code_type="SOC") == {"1"}
+
+
+def test_get_clean_n_digit_codes_from_major_group():
+    # n=1 is the top codability level for SOC (Major group)
+    assert get_clean_n_digit_codes("1111", n=1, code_type="SOC")[0] == {"1"}
+    # All 4-digit unit groups under minor group "111" (only 1111 and 1112)
+    assert len(get_clean_n_digit_codes("111", n=4, code_type="SOC")[0]) == 2
+    # Sub-major groups under major group "1"
+    result_2d, _ = get_clean_n_digit_codes("1", n=2, code_type="SOC")
+    assert "11" in result_2d
+    assert "12" in result_2d
+    # Completely invalid code lands in invalid set
+    assert get_clean_n_digit_codes("Z", n=1, code_type="SOC")[1] == {"Z"}
+
+
+def test_get_clean_n_digit_codes_with_invalid_soc():
+    # Case 1: Mixed valid and invalid
+    codes = ["1111", "NotACode", "123456789", "2111"]
+    valid, invalid = get_clean_n_digit_codes(codes, n=4, code_type="SOC")
+    assert "1111" in valid
+    assert "2111" in valid
+    assert len(valid) == 2
+    assert "NotACode" in invalid
+    assert "123456789" in invalid
+    assert len(invalid) == 2
+
+    # Case 2: Purely invalid
+    valid, invalid = get_clean_n_digit_codes(["Bad1", "Bad2"], n=4, code_type="SOC")
+    assert valid == set()
+    assert invalid == {"Bad1", "Bad2"}
+
+    # Case 3: Numeric code not present in SOC lookup
+    valid, invalid = get_clean_n_digit_codes(["9999"], n=4, code_type="SOC")
+    assert "9999" in invalid
+
+
+def test_get_clean_n_digit_codes_4d():
+    codes = ["1111", "2111", "111x"]
+    result, invalid = get_clean_n_digit_codes(codes, n=4, code_type="SOC")
+    assert "1111" in result
+    assert "2111" in result
+    assert "1112" in result  # from 111x expansion
+    assert isinstance(result, set)
+    assert invalid == set()
+
+
+def test_get_clean_n_digit_codes_major_group():
+    # Roll up to Major group (n=1) - comparable to SIC section rollup
+    cleaned, invalid = get_clean_n_digit_codes("1xxx", n=1, code_type="SOC")
+    assert cleaned == {"1"}
+    assert invalid == set()
+
+    codes = ["1111", "2111", "1xxx"]
+    cleaned, invalid = get_clean_n_digit_codes(codes, n=1, code_type="SOC")
+    assert cleaned == {"1", "2"}
+    assert invalid == set()
+
+
+def test_get_clean_n_digit_codes_logs_invalid_item_soc(caplog):
+    with caplog.at_level("WARNING"):
+        cleaned, invalid = get_clean_n_digit_codes({"9999"}, n=4, code_type="SOC")
+    assert any(
+        "has no valid codes" in record.message.lower() for record in caplog.records
+    ), "Expected a warning about invalid codes to be logged"
+    assert "9999" in invalid
+    assert isinstance(cleaned, set)
+    assert isinstance(invalid, set)
+
+
+def test_validate_soc_codes():
+    assert validate_codes("1111", code_type="SOC") == {"1111"}
+    valid = validate_codes(["1111", "9999", "A"], code_type="SOC")
+    assert "1111" in valid
+    assert "A" not in valid  # SOC has no letter-based section codes
+    assert "9999" not in valid  # not a valid SOC unit group
+
+
+def test_validate_soc_codes_logs(caplog):
+    with caplog.at_level("WARNING"):
+        validate_codes(5, code_type="SOC")
+    assert any("set of strings" in record.message.lower() for record in caplog.records)
+
+
+def test_extract_alt_candidates_n_digit_codes_soc():
+    candidates = [
+        {"code": "1111", "likelihood": 0.8},
+        {"code": "2111", "likelihood": 0.6},
+    ]
+    result_valid, result_invalid = extract_alt_candidates_n_digit_codes(
+        candidates,
+        code_name="code",
+        score_name="likelihood",
+        threshold=0.7,
+        code_type="SOC",
+        n=4,
+    )
+    assert result_valid == {"1111"}
+    assert result_invalid == set()
+
+    # No pruning - both codes returned
+    result2_valid, result2_invalid = extract_alt_candidates_n_digit_codes(
+        candidates,
+        code_name="code",
+        score_name="likelihood",
+        threshold=0,
+        code_type="SOC",
+        n=4,
+    )
+    assert result2_valid == {"1111", "2111"}
+    assert result2_invalid == set()
+
+
+def test_extract_alt_candidates_n_digit_codes_invalid_soc():
+    candidates = [
+        {"code": "1111", "likelihood": 0.8},
+        {"code": "9999", "likelihood": 0.6},  # not a valid SOC code
+    ]
+    result_valid, result_invalid = extract_alt_candidates_n_digit_codes(
+        candidates,
+        code_name="code",
+        score_name="likelihood",
+        threshold=0.7,
+        code_type="SOC",
+        n=4,
+    )
+    assert result_valid == {"1111"}
+    assert result_invalid == {"9999"}
+
+
+@pytest.mark.parametrize(
+    "codes,expected",
+    [
+        (set(), "Uncodable"),
+        ({"1111", "2111"}, "Uncodable"),  # different major groups, no common root
+        ({"11", "12"}, "Major group (1-digit)"),  # both under major group 1
+        ({"11"}, "Sub-Major group (2-digits)"),
+        ({"111"}, "Minor group (3-digits)"),
+        ({"1111", "1112"}, "Minor group (3-digits)"),  # same minor group 111
+        ({"1111"}, "Unit group (4-digits)"),
+    ],
+)
+def test_get_codability_level_soc(codes, expected):
+    assert get_codability_level(codes, code_type="SOC") == expected
+
+
+@pytest.mark.parametrize(
+    "left,right,expected",
+    [
+        ("Uncodable", "Uncodable", 0),
+        ("Uncodable", "Major group (1-digit)", 2),  # -1 → 1
+        ("Major group (1-digit)", "Uncodable", -2),  # 1 → -1
+        ("Sub-Major group (2-digits)", "Minor group (3-digits)", 1),  # 2 → 3
+        ("Minor group (3-digits)", "Sub-Major group (2-digits)", -1),  # 3 → 2
+        ("Minor group (3-digits)", "Minor group (3-digits)", 0),
+        ("Unit group (4-digits)", "Minor group (3-digits)", -1),  # 4 → 3
+        ("not a label", "Unit group (4-digits)", None),
+        ("not a label", "not a label", None),
+    ],
+)
+def test_asses_codability_gain_soc(left, right, expected):
+    row = {"initial": left, "final": right}
+    out = asses_codability_gain(
+        row,
+        initial_level_col="initial",
+        final_level_col="final",
+        code_type="SOC",
     )
     assert out == expected

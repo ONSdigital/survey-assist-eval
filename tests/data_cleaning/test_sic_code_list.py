@@ -52,7 +52,7 @@ def test_generate_section_lookup_basic():
     lookup = generate_section_lookup(section_list)
     # Should map first two digits to section
     assert isinstance(lookup, dict), "Lookup is not a dictionary"
-    assert len(lookup) == 3, "Lookup should have 3 entries"  # noqa: PLR2004
+    assert len(lookup) == 3, "Lookup should have 3 entries"
     assert lookup["01"] == "A"
     assert lookup["05"] == "B"
     assert lookup["10"] == "C"
