@@ -13,8 +13,9 @@ SIC_EMBED_SOURCE_FILE = (
     f"gs://{os.getenv('EVALUATION_BUCKET_NAME')}"
     + "/sic_knowledgebase/sic_extended_index_for_classifai.csv"
 )
+# TO DO: Replace with official clean version of the data (for now I removed NAs)
 SOC_EMBED_SOURCE_FILE = (
-    f"gs://{os.getenv('EVALUATION_BUCKET_NAME')}/soc_knowledgebase/SOC_KB.csv"
+    f"gs://{os.getenv('EVALUATION_BUCKET_NAME')}/soc_knowledgebase/soc_kb_2cols.csv"
 )
 
 
