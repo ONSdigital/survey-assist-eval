@@ -1,4 +1,7 @@
-"""This module contains a list of valid SIC code and mapping to their corresponding sections."""
+"""This module contains a list of valid SIC code and mapping to their corresponding sections.
+
+This data reflects SIC2007.
+"""
 
 SIC_CODE_SECTION_LIST = (
     ("A", "01110"),

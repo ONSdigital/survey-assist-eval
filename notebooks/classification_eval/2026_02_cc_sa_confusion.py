@@ -46,7 +46,9 @@ for prefix in ["cc", "sa", "sa_without_kb", "cims"]:
             f"{prefix}_initial_codes"
         ].map(
             lambda x, n=DIGITS: (
-                set() if pd.isna(x) else get_clean_n_digit_codes(x, n=n)[0]
+                set()
+                if pd.isna(x)
+                else get_clean_n_digit_codes(x, n=n, code_type="SIC")[0]
             )
         )
 

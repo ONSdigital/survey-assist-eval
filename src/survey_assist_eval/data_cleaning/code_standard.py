@@ -1,4 +1,7 @@
-"""Helper functions for cleaning sic code data before evaluation."""
+"""Helper functions for cleaning SIC and SOC code data before evaluation."""
+
+# ruff: noqa:PLR0913
+# pylint: disable=R0913,R0914
 
 import logging
 import re
@@ -6,11 +9,12 @@ from collections.abc import Iterable
 
 import pandas as pd
 
-from survey_assist_eval.data_cleaning.sic_code_section_list import (
+from survey_assist_eval.data_cleaning.sic_code_list import (
     SECTION_LOOKUP,
     SECTION_UNWRAPPED,
     VALID_SIC_CODES,
 )
+from survey_assist_eval.data_cleaning.soc_code_list import VALID_SOC_CODES
 
 logger = logging.getLogger(__name__)
 
@@ -29,11 +33,11 @@ INVALID_VALUES = (
     "<NA>",
 )
 
-EXPECTED_CODE_LENGTH = 5
+SIC_EXPECTED_CODE_LENGTH = 5
 
 SIC_REGEX_PATTERN = r"([0-9]+x*X*)"
 
-CODABILITY_LEVELS = (
+SIC_CODABILITY_LEVELS = (
     (5, "Sub-class (5-digits)"),
     (4, "Class (4-digits)"),
     (3, "Group (3-digits)"),
@@ -42,11 +46,51 @@ CODABILITY_LEVELS = (
     (-1, "Uncodable"),
 )
 
+SOC_EXPECTED_CODE_LENGTH = 4
+
+SOC_REGEX_PATTERN = SIC_REGEX_PATTERN  # same format for SOC codes?
+
+SOC_CODABILITY_LEVELS = (
+    (4, "Unit group (4-digits)"),
+    (3, "Minor group (3-digits)"),
+    (2, "Sub-Major group (2-digits)"),
+    (1, "Major group (1-digit)"),
+    (-1, "Uncodable"),
+)
+
+
+def _validate_n_digits_for_code_type(digits: int | None, code_type: str) -> int:
+    """Validate the 'digits' parameter based on the code type."""
+    if code_type.lower() not in {"sic", "soc"}:
+        raise ValueError(f"Invalid code_type '{code_type}'. Expected 'SIC' or 'SOC'.")
+    if digits is None:
+        return (
+            SIC_EXPECTED_CODE_LENGTH
+            if code_type.lower() == "sic"
+            else SOC_EXPECTED_CODE_LENGTH
+        )
+    if not isinstance(digits, int) or digits < 0:
+        raise ValueError(
+            f"'digits' must be a non-negative integer or None, got {digits}"
+        )
+    accepted_digits = (
+        [level[0] for level in SIC_CODABILITY_LEVELS]
+        if code_type.lower() == "sic"
+        else [level[0] for level in SOC_CODABILITY_LEVELS]
+    )
+    if digits not in accepted_digits:
+        raise ValueError(
+            f"Invalid 'digits' for {code_type} code type. "
+            + f"Expected one of {accepted_digits}, got {digits}"
+        )
+    return digits
+
 
 def parse_numerical_code(
     candidates_str: str,
-    code_regex_pattern: str = SIC_REGEX_PATTERN,
-    padding: int = EXPECTED_CODE_LENGTH,
+    code_regex_pattern: str | None = None,
+    code_length: int | None = None,
+    code_type: str = "SIC",
 ) -> set[str]:
     """Converts the clerical coder responses from a
     stringified list to a proper list of strings.
@@ -55,12 +99,23 @@ def parse_numerical_code(
     Args:
         candidates_str: String containing the clerical coder responses.
         code_regex_pattern: Regex pattern to extract codes from the string.
-        padding: Number of digits to which the codes should be zero-padded.
+        code_length: Number of digits to which the codes should be zero-padded.
+        code_type: Type of code ('SIC' or 'SOC') to determine which validation to use.
 
     Returns:
         List of cleaned and zero-padded code strings.
-
     """
+    if code_regex_pattern is None:
+        code_regex_pattern = (
+            SOC_REGEX_PATTERN if code_type.lower() == "soc" else SIC_REGEX_PATTERN
+        )
+    if code_length is None:
+        code_length = (
+            SOC_EXPECTED_CODE_LENGTH
+            if code_type.lower() == "soc"
+            else SIC_EXPECTED_CODE_LENGTH
+        )
+
     candidates_str = str(candidates_str).strip()
     if candidates_str in INVALID_VALUES:
         return set()
@@ -69,7 +124,7 @@ def parse_numerical_code(
         candidates_str = candidates_str.replace("-9", "").replace("4+", "")
         # Extract all RagCandidate entries using regex
         matches = re.findall(code_regex_pattern, candidates_str)
-        return {matches.zfill(padding) for matches in matches}
+        return {matches.zfill(code_length) for matches in matches}
     except re.error as e:
         logger.warning("Error parsing numerical codes: %s \n %s", candidates_str, e)
         return set()
@@ -96,16 +151,17 @@ def expand_to_n_digit_str(input_str: str, n: int) -> set[str]:
     return {input_str + str(x).zfill(fill_digits) for x in range(10**fill_digits)}
 
 
-def get_clean_n_digit_one_code(input_str: str, n: int) -> set[str]:
-    """Converts a n-digit string to either a valid SIC code format
+def get_clean_n_digit_one_code(input_str: str, n: int, code_type: str) -> set[str]:
+    """Converts a n-digit string to either a valid SIC or SOC code format
     or an empty string. E.g. '860112' -> {'86011'}; '86xxx' -> {'86000', ..., '86999'}.
 
     Args:
         input_str: String containing a possible code.
         n: Number of digits to which the code should be cleaned/expanded.
+        code_type: Type of code ('SIC' or 'SOC').
 
     Returns:
-        Set of cleaned n-digit SIC code strings.
+        Set of cleaned n-digit SIC or SOC code strings.
     """
     # cut x's from the back if they are there
     input_str = str(input_str).rstrip("xX")
@@ -127,14 +183,16 @@ def get_clean_n_digit_one_code(input_str: str, n: int) -> set[str]:
             SECTION_LOOKUP.get(code, "") for code in prep_set if code in SECTION_LOOKUP
         }
 
-    return validate_sic_codes(prep_set)
+    return validate_codes(prep_set, code_type=code_type)
 
 
 def get_clean_n_digit_codes(
-    input_list: str | set[str] | list[str], n: int
+    input_list: str | set[str] | list[str],
+    n: int,
+    code_type: str,
 ) -> tuple[set[str], set[str]]:
     """Converts a list of possible codes to two sets of strings.
-    The first set contains valid n-digit SIC codes.
+    The first set contains valid n-digit SIC or SOC codes.
     The second set contains original codes that could not be cleaned.
 
     Example:
@@ -146,10 +204,11 @@ def get_clean_n_digit_codes(
     Args:
         input_list: A string, list, or set of strings containing possible codes.
         n: Number of digits to which the codes should be cleaned/expanded.
+        code_type: Type of code ('SIC' or 'SOC') to determine which validation to use.
 
     Returns:
         A tuple containing:
-            - cleaned_set: Set of cleaned n-digit SIC code strings.
+            - cleaned_set: Set of cleaned n-digit SIC or SOC code strings.
             - invalid_set: Set of original codes that could not be cleaned.
 
     Raises:
@@ -173,7 +232,9 @@ def get_clean_n_digit_codes(
     invalid_set: set[str] = set()
 
     for item in input_list:
-        result = get_clean_n_digit_one_code(item, n)  # result is a set[str]
+        result = get_clean_n_digit_one_code(
+            item, n, code_type=code_type
+        )  # result is a set[str]
         if not result:
             logger.warning("Item '%s' has no valid codes.", item)
             invalid_set.add(item)
@@ -183,11 +244,12 @@ def get_clean_n_digit_codes(
     return cleaned_set, invalid_set
 
 
-def validate_sic_codes(input_set: str | set[str] | list[str]) -> set[str]:
-    """Validate if the input code is a valid SIC code.
+def validate_codes(input_set: str | set[str] | list[str], code_type: str) -> set[str]:
+    """Validate if the input code is a valid SIC or SOC code.
 
     Args:
-        input_set: A string representing the SIC code to validate.
+        input_set: A string representing the SIC or SOC code to validate.
+        code_type: Type of code ('SIC' or 'SOC').
 
     Returns:
         A set of valid SIC codes.
@@ -200,26 +262,46 @@ def validate_sic_codes(input_set: str | set[str] | list[str]) -> set[str]:
         )
         return set()
 
+    if code_type.lower() == "soc":
+        return {str(x) for x in input_set}.intersection(VALID_SOC_CODES)
+
     return {str(x) for x in input_set}.intersection(VALID_SIC_CODES)
 
 
 def extract_alt_candidates_n_digit_codes(
     alt_candidates: list[dict],
     code_name: str,
-    n: int = EXPECTED_CODE_LENGTH,
+    code_type: str,
+    *,
+    n: int = SIC_EXPECTED_CODE_LENGTH,
     score_name: str = "likelihood",
     threshold: float = 0,
-) -> tuple[set[str], set[str]]:  # <--- Update type hint
-    """Extracts alternative sic codes from the model predictions.
+) -> tuple[set[str], set[str]]:
+    """Extracts alternative SIC/SOC codes from the model predictions.
+
+    Args:
+        alt_candidates: List of alternative candidate dictionaries.
+        code_name: Key name to extract codes from alternative predictions.
+        n: Number of digits to which the codes should be cleaned/expanded.
+        score_name: Key name to extract score from alternative predictions.
+        threshold: Score threshold for pruning alternative candidates.
+        code_type: Type of code ('SIC' or 'SOC').
 
     Returns:
         tuple[set[str], set[str]]:
             - cleaned_set: Set of extracted valid SIC codes.
             - invalid_set: Set of original codes that were invalid.
     """
-    # 1. Handle string edge case (ensure get_clean_n_digit_codes returns tuple too!)
     if isinstance(alt_candidates, str):
-        return get_clean_n_digit_codes(parse_numerical_code(alt_candidates), n)
+        parsed_str = parse_numerical_code(
+            alt_candidates,
+            code_length=(
+                SOC_EXPECTED_CODE_LENGTH
+                if code_type.lower() == "soc"
+                else SIC_EXPECTED_CODE_LENGTH
+            ),
+        )
+        return get_clean_n_digit_codes(parsed_str, n, code_type=code_type)
 
     if not isinstance(alt_candidates, Iterable):
         logger.warning(
@@ -239,7 +321,7 @@ def extract_alt_candidates_n_digit_codes(
 
         # This helper returns a set of valid codes (e.g. {'86101'})
         # If it returns empty set, the code was invalid
-        codes = get_clean_n_digit_one_code(raw_code, n)
+        codes = get_clean_n_digit_one_code(raw_code, n, code_type=code_type)
 
         if not codes:
             invalid_set.add(raw_code)
@@ -261,60 +343,13 @@ def extract_alt_candidates_n_digit_codes(
     return valid_set, invalid_set
 
 
-def extract_alt_candidates_n_digit_codes2(
-    alt_candidates: list[dict],
-    code_name: str,
-    n: int = EXPECTED_CODE_LENGTH,
-    score_name: str = "likelihood",
-    threshold: float = 0,
-) -> set[str]:
-    """Extracts alternative sic codes from the model predictions
-    and prunes them based on the threshold (i.e. if there is one entry
-    with score above the threshold, keep only that one.).
-
-    If threshold is 0 or negative, no pruning is done.
+def get_codability_level(codes: set[str], code_type: str) -> str:
+    """Determine the codability level of the given SIC or SOC codes.
 
     Args:
-        alt_candidates: List of alternative candidate dictionaries.
-        code_name: Key name to extract codes from alternative predictions.
-        n: Number of digits to which the codes should be considered equivalent for pruning.
-        score_name: Key name to extract score from alternative predictions.
-        threshold: Score threshold for pruning alternative candidates.
-
-    Returns:
-        List of extracted and pruned alternative sic code strings.
-    """
-    if isinstance(alt_candidates, str):
-        return get_clean_n_digit_codes(parse_numerical_code(alt_candidates), n)
-
-    if not isinstance(alt_candidates, Iterable):
-        logger.warning(
-            "Expected a list of dicts for alt_candidates, got %s", type(alt_candidates)
-        )
-        return {}
-
-    cleaned: dict[str, float] = {}
-    for item in alt_candidates:
-        codes = get_clean_n_digit_one_code(f"{item.get(code_name, '')}", n)
-        score = item.get(score_name, 0)
-        for code in codes:
-            if code in cleaned:
-                cleaned[code] = max(cleaned[code], score)
-            else:
-                cleaned[code] = score
-
-    pruned = {code for code, score in cleaned.items() if score >= threshold}
-    if len(pruned) == 1:
-        return pruned
-
-    return set(cleaned)
-
-
-def get_codability_level(codes: set[str]) -> str:
-    """Determine the codability level of the given SIC codes.
-
-    Args:
-        codes: A set of SIC code strings.
+        codes: A set of SIC or SOC code strings.
+        code_type: A string indicating the type of code ('SIC' or 'SOC') to determine w
+            hich codability levels to use.
 
     Returns:
         A string representing the codability level: 'uncodable', 'section',
@@ -323,9 +358,13 @@ def get_codability_level(codes: set[str]) -> str:
     if not codes:
         return "Uncodable"
 
-    for digits, label in CODABILITY_LEVELS:
+    levels = (
+        SOC_CODABILITY_LEVELS if code_type.lower() == "soc" else SIC_CODABILITY_LEVELS
+    )
+
+    for digits, label in levels:
         if digits >= 0:
-            codes, _ = get_clean_n_digit_codes(codes, digits)
+            codes, _ = get_clean_n_digit_codes(codes, digits, code_type=code_type)
             if len(codes) == 1:
                 return label
 
@@ -333,7 +372,7 @@ def get_codability_level(codes: set[str]) -> str:
 
 
 def asses_codability_gain(
-    row: pd.Series, initial_level_col: str, final_level_col: str
+    row: pd.Series, initial_level_col: str, final_level_col: str, code_type: str
 ) -> int | None:
     """Assess if there was a codability gain between initial and final levels.
 
@@ -341,11 +380,17 @@ def asses_codability_gain(
         row: A pandas Series representing a row in the DataFrame.
         initial_level_col: Column name for the initial codability level.
         final_level_col: Column name for the final codability level.
+        code_type: A string indicating the type of code ('SIC' or 'SOC') to determine
+            which codability levels to use.
 
     Returns:
         True if there was a codability gain, False otherwise.
     """
-    level_to_num = {label: num for num, label in CODABILITY_LEVELS}
+    levels = (
+        SOC_CODABILITY_LEVELS if code_type.lower() == "soc" else SIC_CODABILITY_LEVELS
+    )
+
+    level_to_num = {label: num for num, label in levels}
     left = level_to_num.get(row[initial_level_col], None)
     right = level_to_num.get(row[final_level_col], None)
     if left is None or right is None:

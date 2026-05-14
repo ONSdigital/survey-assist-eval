@@ -15,8 +15,8 @@ import pandas as pd
 import plotly.graph_objects as go
 from dotenv import load_dotenv
 
+from survey_assist_eval.data_cleaning.code_standard import get_codability_level
 from survey_assist_eval.data_cleaning.prep_data import prep_model_codes
-from survey_assist_eval.data_cleaning.sic_codes import get_codability_level
 
 # %%
 logger = logging.getLogger(__name__)
@@ -67,8 +67,12 @@ combined_df = initial_codes.merge(final_codes, on="unique_id", how="inner")
 
 left_col = "SA Initial Codes"
 right_col = "SA Final Codes"  # "clerical_codes"
-combined_df[left_col] = combined_df["sa_initial_codes"].apply(get_codability_level)
-combined_df[right_col] = combined_df["sa_final_codes"].apply(get_codability_level)
+combined_df[left_col] = combined_df["sa_initial_codes"].apply(
+    lambda x: get_codability_level(x, code_type="SIC")
+)
+combined_df[right_col] = combined_df["sa_final_codes"].apply(
+    lambda x: get_codability_level(x, code_type="SIC")
+)
 
 sankey_df = combined_df.groupby([left_col, right_col]).size().reset_index()
 

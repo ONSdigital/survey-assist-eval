@@ -16,7 +16,7 @@ import plotly.express as px
 from dotenv import load_dotenv
 from industrial_classification_utils.sayt import SAYTSuggester
 
-from survey_assist_eval.data_cleaning.sic_codes import get_clean_n_digit_codes
+from survey_assist_eval.data_cleaning.code_standard import get_clean_n_digit_codes
 
 # pylint: disable=R0801
 
@@ -46,7 +46,7 @@ test_df = test_df[["correct_sic_code", "full_entry"]]
 # %%
 # check the codes are well formed
 clean_codes = test_df["correct_sic_code"].apply(
-    lambda x: x if pd.isna(x) else get_clean_n_digit_codes(x, n=5)[0]
+    lambda x: x if pd.isna(x) else get_clean_n_digit_codes(x, n=5, code_type="SIC")[0]
 )
 msk = test_df["correct_sic_code"] != clean_codes.map(
     lambda x: x if pd.isna(x) else next(iter(x))

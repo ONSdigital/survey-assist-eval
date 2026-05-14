@@ -17,8 +17,8 @@ from dotenv import load_dotenv
 from scipy.stats import binomtest
 
 from notebooks.november_test.helper_load_data import combine_small_groups
-from survey_assist_eval.data_cleaning.sic_codes import (
-    CODABILITY_LEVELS,
+from survey_assist_eval.data_cleaning.code_standard import (
+    SIC_CODABILITY_LEVELS,
     get_clean_n_digit_codes,
     parse_numerical_code,
 )
@@ -86,18 +86,26 @@ for col in set_cols:
 # and convert closed q codes to set for consistency
 combined_df["sa_final_codes_closed_q"] = combined_df[
     "survey_assist_closed_question_response_code"
-].apply(lambda x: get_clean_n_digit_codes(parse_numerical_code(x), n=5)[0])
+].apply(
+    lambda x: get_clean_n_digit_codes(parse_numerical_code(x), n=5, code_type="SIC")[0]
+)
 
 
 # %%
 # update sic_section column based on final clerical codes
 def extract_sic_section(row):
     """Extract SIC section (0-digit) from a set of codes."""
-    cc_final = get_clean_n_digit_codes(row["cc_final_codes_open_q"], n=0)[0]
+    cc_final = get_clean_n_digit_codes(
+        row["cc_final_codes_open_q"], n=0, code_type="SIC"
+    )[0]
     if len(cc_final) == 1:
         return next(iter(cc_final))
-    sa_closed = get_clean_n_digit_codes(row["sa_final_codes_closed_q"], n=0)[0]
-    sa_open = get_clean_n_digit_codes(row["sa_final_codes_open_q"], n=0)[0]
+    sa_closed = get_clean_n_digit_codes(
+        row["sa_final_codes_closed_q"], n=0, code_type="SIC"
+    )[0]
+    sa_open = get_clean_n_digit_codes(
+        row["sa_final_codes_open_q"], n=0, code_type="SIC"
+    )[0]
     if (len(sa_closed.intersection(cc_final)) == 1) | (
         len(sa_closed.intersection(sa_open)) == 1
     ):
@@ -105,8 +113,12 @@ def extract_sic_section(row):
     if len(sa_open.intersection(cc_final)) == 1:
         return next(iter(sa_open.intersection(cc_final)))
 
-    cc_initial = get_clean_n_digit_codes(row["cc_initial_codes"], n=0)[0]
-    sa_initial = get_clean_n_digit_codes(row["sa_initial_codes"], n=0)[0]
+    cc_initial = get_clean_n_digit_codes(row["cc_initial_codes"], n=0, code_type="SIC")[
+        0
+    ]
+    sa_initial = get_clean_n_digit_codes(row["sa_initial_codes"], n=0, code_type="SIC")[
+        0
+    ]
     # find most frequent section among all codes
     codes = (
         list(cc_final)
@@ -158,7 +170,7 @@ def create_codability_by_section_figure(
     Returns:
         A Plotly Figure object representing the codability by SIC sections.
     """
-    labels_considered_coded = [y for x, y in CODABILITY_LEVELS if x >= num_digits]
+    labels_considered_coded = [y for x, y in SIC_CODABILITY_LEVELS if x >= num_digits]
     x_axis_title = (
         f"Proportion of Responses Codable Unambiguously to {num_digits}-digits"
     )
