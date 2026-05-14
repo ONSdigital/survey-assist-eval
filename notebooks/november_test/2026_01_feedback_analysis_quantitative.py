@@ -22,7 +22,7 @@ from matplotlib.gridspec import GridSpec
 from scipy.stats import kruskal, mannwhitneyu
 from scipy.stats import t as stats_t  # type: ignore[attr-defined]
 
-from survey_assist_eval.data_cleaning.sic_codes import (
+from survey_assist_eval.data_cleaning.code_standard import (
     get_clean_n_digit_codes,
 )
 
@@ -60,11 +60,17 @@ eval_df = load_data(folder)
 # update sic_section column based on final clerical codes
 def extract_sic_section(row):
     """Extract SIC section (0-digit) from a set of codes."""
-    cc_final = get_clean_n_digit_codes(row["cc_final_codes_open_q"], n=0)[0]
+    cc_final = get_clean_n_digit_codes(
+        row["cc_final_codes_open_q"], n=0, code_type="SIC"
+    )[0]
     if len(cc_final) == 1:
         return next(iter(cc_final))
-    sa_closed = get_clean_n_digit_codes(row["sa_final_codes_closed_q"], n=0)[0]
-    sa_open = get_clean_n_digit_codes(row["sa_final_codes_open_q"], n=0)[0]
+    sa_closed = get_clean_n_digit_codes(
+        row["sa_final_codes_closed_q"], n=0, code_type="SIC"
+    )[0]
+    sa_open = get_clean_n_digit_codes(
+        row["sa_final_codes_open_q"], n=0, code_type="SIC"
+    )[0]
     if (len(sa_closed.intersection(cc_final)) == 1) | (
         len(sa_closed.intersection(sa_open)) == 1
     ):
@@ -72,8 +78,12 @@ def extract_sic_section(row):
     if len(sa_open.intersection(cc_final)) == 1:
         return next(iter(sa_open.intersection(cc_final)))
 
-    cc_initial = get_clean_n_digit_codes(row["cc_initial_codes"], n=0)[0]
-    sa_initial = get_clean_n_digit_codes(row["sa_initial_codes"], n=0)[0]
+    cc_initial = get_clean_n_digit_codes(row["cc_initial_codes"], n=0, code_type="SIC")[
+        0
+    ]
+    sa_initial = get_clean_n_digit_codes(row["sa_initial_codes"], n=0, code_type="SIC")[
+        0
+    ]
     # find most frequent section among all codes
     codes = (
         list(cc_final)

@@ -53,7 +53,7 @@ for stage, col_names in stage_cols.items():
         for col in col_names:
             print(f"Processing {stage} codes to {DIGITS} digits for column {col}...")
             group_df[f"{col}_to_{DIGITS}digits"] = group_df[col].apply(
-                lambda x, n=DIGITS: get_clean_n_digit_codes(x, n=n)[0]
+                lambda x, n=DIGITS: get_clean_n_digit_codes(x, n=n, code_type="SIC")[0]
             )
         for gr in group_df["SIC Section"].unique():
             msk = group_df["SIC Section"] == gr

@@ -50,7 +50,7 @@ for stage, col_names in stage_cols.items():
         for col in col_names:
             print(f"Processing {stage} codes to {DIGITS} digits for column {col}...")
             combined_df[f"{col}_to_{DIGITS}digits"] = combined_df[col].apply(
-                lambda x, n=DIGITS: get_clean_n_digit_codes(x, n=n)[0]
+                lambda x, n=DIGITS: get_clean_n_digit_codes(x, n=n, code_type="SIC")[0]
             )
         eval_metrics[(DIGITS, stage, "sa_cc")] = calc_simple_metrics(
             combined_df,

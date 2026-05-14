@@ -54,12 +54,11 @@ def clean_text(text: str) -> str:
     Returns:
         str: The cleaned string.
     """
-    if isinstance(text, float):
+    if not isinstance(text, str) or text == "-9":
         text = ""
     text = text.replace("\n", " ")
     text = regex_sub(r"\s+", " ", text)
-    text = text.lower()
-    text = text.capitalize()
+    text = text.lower().strip().capitalize()
     return text
 
 

@@ -55,7 +55,7 @@ msk = combined_df["cc_initial_codes"].map(len) == 0
 combined_df["cc_initial_codes_add_section"] = combined_df["cc_initial_codes"]
 combined_df.loc[msk, "cc_initial_codes_add_section"] = combined_df.loc[
     msk, "sic_section"
-].apply(lambda x: get_clean_n_digit_codes(x, n=5)[0])
+].apply(lambda x: get_clean_n_digit_codes(x, n=5, code_type="SIC")[0])
 
 combined_df["cc_initial_codes"] = combined_df["cc_initial_codes_add_section"]
 
@@ -70,7 +70,7 @@ if "cims_initial_codes" in combined_df.columns:
 for col in set().union(*stage_cols.values()):
     for digits in DIGIT_LEVELS:
         combined_df[f"{col}_to_{digits}digits"] = combined_df[col].apply(
-            lambda x, n=digits: get_clean_n_digit_codes(x, n=n)[0]
+            lambda x, n=digits: get_clean_n_digit_codes(x, n=n, code_type="SIC")[0]
         )
 
 # %% create groups by SIC sections

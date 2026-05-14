@@ -8,7 +8,7 @@ EVALUATION_BUCKET_NAME (without gs:// and trailing /).
 Disabled check for too long lines (f strings) and variables names (uppercase for constants)
 """
 
-# pylint: disable=C0301,C0103
+# pylint: disable=C0301,C0103,R0801
 
 # %%
 import os
@@ -16,13 +16,13 @@ import os
 import pandas as pd
 from dotenv import load_dotenv
 
+from survey_assist_eval.data_cleaning.code_standard import (
+    get_clean_n_digit_codes,
+    parse_numerical_code,
+)
 from survey_assist_eval.data_cleaning.prep_data import (
     prep_clerical_codes,
     prep_model_codes,
-)
-from survey_assist_eval.data_cleaning.sic_codes import (
-    get_clean_n_digit_codes,
-    parse_numerical_code,
 )
 
 # %%
@@ -101,7 +101,7 @@ knowledge_base_file = (
 )
 kb_df = pd.read_csv(knowledge_base_file)
 kb_df["sa_initial_codes"] = kb_df["label"].apply(
-    lambda x: get_clean_n_digit_codes(parse_numerical_code(x), n=5)[0]
+    lambda x: get_clean_n_digit_codes(parse_numerical_code(x), n=5, code_type="SIC")[0]
 )
 
 # %%

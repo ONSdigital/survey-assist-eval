@@ -54,7 +54,13 @@ for i, col in enumerate(columns_to_compare):
     print(f"Processing section distribution for column {col}...")
     df_section[col] = (
         combined_df[col]
-        .map(lambda x: get_clean_n_digit_codes(x, n=0)[0] if pd.notna(x) else {})
+        .map(
+            lambda x: (
+                get_clean_n_digit_codes(x, n=0, code_type="SIC")[0]
+                if pd.notna(x)
+                else {}
+            )
+        )
         .map(lambda x: next(iter(x)) if len(x) == 1 else None)
         .dropna()
         .to_frame(name="sic_section")

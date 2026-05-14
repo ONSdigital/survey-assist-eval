@@ -26,7 +26,7 @@ from scipy.stats import (
     ttest_ind,
 )
 
-from survey_assist_eval.data_cleaning.sic_codes import get_clean_n_digit_codes
+from survey_assist_eval.data_cleaning.code_standard import get_clean_n_digit_codes
 
 # %%
 load_dotenv()
@@ -86,7 +86,7 @@ def possible_sections(response_row: pd.Series, code_digits: int = 0):
         k += 1
 
     unique_section_list_by_row = list(
-        get_clean_n_digit_codes(row_codes, n=code_digits)[0]
+        get_clean_n_digit_codes(row_codes, n=code_digits, code_type="SIC")[0]
     )
 
     return unique_section_list_by_row, codes

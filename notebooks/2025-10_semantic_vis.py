@@ -15,11 +15,11 @@ import pandas as pd
 import plotly.express as px
 from dotenv import load_dotenv
 
+from survey_assist_eval.data_cleaning.code_standard import get_clean_n_digit_one_code
 from survey_assist_eval.data_cleaning.prep_data import (
     prep_clerical_codes,
     prep_model_codes,
 )
-from survey_assist_eval.data_cleaning.sic_codes import get_clean_n_digit_one_code
 from survey_assist_eval.evaluation.metrics import (
     calc_simple_metrics,
 )
@@ -46,9 +46,9 @@ if output_folder:
 
 # %%
 # load clerical data
-clerical_it2_file = f"{bucket_prefix}/original_datasets/DSC_Rep_Sample_IT2.csv"
+clerical_it2_file = f"{bucket_prefix}/original_datasets/sic_2k/DSC_Rep_Sample_IT2.csv"
 clerical_it2_4plus_file = (
-    f"{bucket_prefix}/original_datasets/Codes_for_4_plus_DSC_Rep_Sample_IT2.csv"
+    f"{bucket_prefix}/original_datasets/sic_2k/Codes_for_4_plus_DSC_Rep_Sample_IT2.csv"
 )
 cc_it2_df = pd.read_csv(clerical_it2_file)
 cc_it2_4plus_df = pd.read_csv(clerical_it2_4plus_file)
@@ -248,7 +248,9 @@ for DIGITS in [5, 0]:
             "semantic_search_results"
         ].apply(
             lambda x, digits=DIGITS: (
-                get_clean_n_digit_one_code(x[0]["code"], digits) if len(x) > 0 else None
+                get_clean_n_digit_one_code(x[0]["code"], digits, code_type="SIC")
+                if len(x) > 0
+                else None
             )
         )
         combined_dataframe_sem["top_in_cc"] = combined_dataframe_sem.apply(
