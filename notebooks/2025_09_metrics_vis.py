@@ -45,13 +45,13 @@ if output_folder:
 
 # %%
 # load clerical data
-clerical_it1_file = f"{bucket_prefix}/original_datasets/DSC_Rep_Sample.csv"
+clerical_it1_file = f"{bucket_prefix}/original_datasets/sic_2k/DSC_Rep_Sample.csv"
 clerical_it1_4plus_file = (
-    f"{bucket_prefix}/original_datasets/Codes_for_4_plus_DSC_Rep_Sample.csv"
+    f"{bucket_prefix}/original_datasets/sic_2k/Codes_for_4_plus_DSC_Rep_Sample.csv"
 )
-clerical_it2_file = f"{bucket_prefix}/original_datasets/DSC_Rep_Sample_IT2.csv"
+clerical_it2_file = f"{bucket_prefix}/original_datasets/sic_2k/DSC_Rep_Sample_IT2.csv"
 clerical_it2_4plus_file = (
-    f"{bucket_prefix}/original_datasets/Codes_for_4_plus_DSC_Rep_Sample_IT2.csv"
+    f"{bucket_prefix}/original_datasets/sic_2k/Codes_for_4_plus_DSC_Rep_Sample_IT2.csv"
 )
 cc_it1_df = pd.read_csv(clerical_it1_file)
 cc_it1_4plus_df = pd.read_csv(clerical_it1_4plus_file)
