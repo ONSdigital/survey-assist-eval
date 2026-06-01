@@ -53,13 +53,13 @@ if [ "$pipeline_choice" -eq "1" ]; then
 
 else
     echo "RUNNING: STAGE 2 (two-prompt initial classification)";
-    # "$SCRIPT_DIR"/stage_2_add_unambiguously_codable_status.py -r -n "STG2" -i "$output_folder""/STG1.parquet" -m "$output_folder""/STG1_metadata.json" -o "$output_folder"
+    "$SCRIPT_DIR"/stage_2_add_unambiguously_codable_status.py -r -n "STG2" -i "$output_folder""/STG1.parquet" -m "$output_folder""/STG1_metadata.json" -o "$output_folder"
 
     echo "RUNNING: STAGE 3 (two-prompt open questions)";
-    # "$SCRIPT_DIR"/stage_3_add_open_questions.py -r -n "STG3" -i "$output_folder""/STG2.parquet" -m "$output_folder""/STG2_metadata.json" -o "$output_folder"
+    "$SCRIPT_DIR"/stage_3_add_open_questions.py -r -n "STG3" -i "$output_folder""/STG2.parquet" -m "$output_folder""/STG2_metadata.json" -o "$output_folder"
 
     echo "RUNNING: STAGE 4 (synthetic responses)";
-    # "$SCRIPT_DIR"/stage_4_add_synthetic_responses.py -n "STG4" -i "$output_folder""/STG3.parquet" -m "$output_folder""/STG3_metadata.json" -o "$output_folder"
+    "$SCRIPT_DIR"/stage_4_add_synthetic_responses.py -n "STG4" -i "$output_folder""/STG3.parquet" -m "$output_folder""/STG3_metadata.json" -o "$output_folder"
 fi
 
 echo "RUNNING: STAGE 5 (merge follow-up information)"
