@@ -19,6 +19,7 @@ def _get_default_metadata() -> dict:
         "llm_model_name": "gemini-2.5-flash",
         "llm_model_location": "europe-west2",
         "llm_candidates_limit": 10,
+        "soc_code_digits": 4,
         "sic_code_digits": 5,
         "sic_index_file": (
             "industrial_classification_utils.data.sic_index",
