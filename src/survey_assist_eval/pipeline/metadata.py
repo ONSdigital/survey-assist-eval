@@ -8,15 +8,9 @@ from typing import Any
 from dotenv import load_dotenv
 
 load_dotenv()
-os.getenv("EVALUATION_BUCKET_NAME", "")
-SIC_EMBED_SOURCE_FILE = (
-    f"gs://{os.getenv('EVALUATION_BUCKET_NAME')}"
-    + "/sic_knowledgebase/sic_extended_index_for_classifai.csv"
-)
-# TO DO: Replace with official clean version of the data (for now I removed NAs)
-SOC_EMBED_SOURCE_FILE = (
-    f"gs://{os.getenv('EVALUATION_BUCKET_NAME')}/soc_knowledgebase/soc_kb_2cols.csv"
-)
+eval_bucket = os.getenv("EVALUATION_BUCKET_NAME", "")
+SIC_EMBED_SOURCE_FILE = f"gs://{eval_bucket}/sic_knowledgebase/sic_kb_for_classifai.csv"
+SOC_EMBED_SOURCE_FILE = f"gs://{eval_bucket}/soc_knowledgebase/soc_kb_for_classifai.csv"
 
 
 def _get_default_metadata() -> dict:
