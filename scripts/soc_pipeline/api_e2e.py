@@ -19,7 +19,7 @@ from survey_assist_eval.pipeline.api import ApiEvaluator, ApiEvaluatorConfig
 
 load_dotenv()
 GCP_PROJECT_ID = os.getenv("PROJECT_ID")
-API_GW_URL = os.getenv("API_GATEWAY")
+API_GW_URL = f"https://{os.getenv('API_GATEWAY')}"
 API_GW_SA_EMAIL = os.getenv("SA_EMAIL")
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 
