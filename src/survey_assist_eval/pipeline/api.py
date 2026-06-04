@@ -21,31 +21,23 @@ HTTP_STATUS_NOT_FOUND = 404
 class ApiEvaluatorConfig:
     """Configuration for the API Evaluator Class.
 
-    Parameters
-    ----------
-    gcp_project_id : str
-        The GCP project ID where the API is hosted.
-    api_gw_url : str
-        The URL of the API Gateway.
-    api_gw_sa_email : str
-        The service account email to use for authenticating with the API.
-    classify_type : Literal["sic", "soc"]
-        The type of classification to perform. Must be either "sic" or "soc".
-    classify_semaphore_limit : int, optional
-        The maximum number of concurrent classify API calls to make. Default is
-        2.
-    lookup_semaphore_limit : int, optional
-        The maximum number of concurrent lookup API calls to make. Default is
-        5.
-    log_level : str, optional
-        The logging level to use. Must be one of "DEBUG", "INFO", "WARNING",
-        "ERROR", or "CRITICAL". Default is "INFO".
+    Args:
+        gcp_project_id: The GCP project ID where the API is hosted.
+        api_gw_url: The URL of the API Gateway.
+        api_gw_sa_email: The service account email to use for authenticating
+            with the API.
+        classify_type: The type of classification to perform. Must be either
+            "sic" or "soc".
+        classify_semaphore_limit: The maximum number of concurrent classify
+            API calls to make. Defaults to 2.
+        lookup_semaphore_limit: The maximum number of concurrent lookup API
+            calls to make. Defaults to 5.
+        log_level: The logging level to use. Must be one of "DEBUG", "INFO",
+            "WARNING", "ERROR", or "CRITICAL". Defaults to "INFO".
 
     Raises:
-    ------
-    ValueError
-        - If an invalid classify_type and/or log_level is provided.
-        - If any *_semaphore_limit argument is less than 1.
+        ValueError: If an invalid classify_type and/or log_level is provided,
+            or if any *_semaphore_limit argument is less than 1.
     """
 
     gcp_project_id: str
@@ -85,15 +77,11 @@ class ApiEvaluatorConfig:
 class ApiEvaluator:
     """Evalutate the Survey Assist API classification performance.
 
-    Parameters
-    ----------
-    config : ApiEvaluatorConfig
-        The configuration for the API Evaluator.
+    Args:
+        config: The configuration for the API Evaluator.
 
     Raises:
-    ------
-    ValueError
-        Invalid classify_type and/or log_level is provided.
+        ValueError: If an invalid classify_type and/or log_level is provided.
     """
 
     _API_BASE_ENDPOINT: ClassVar[str] = "/v1/survey-assist"
@@ -139,10 +127,8 @@ class ApiEvaluator:
         """Construct the classify payload.
 
         Raises:
-        ------
-        KeyError
-            Params must include "job_title", "job_description" and
-            "org_description" keys.
+            KeyError: Params must include "job_title", "job_description" and
+                "org_description" keys.
         """
         return {
             "llm": "gemini",
@@ -160,10 +146,8 @@ class ApiEvaluator:
         classify_type is "sic", uses the "org_description" field.
 
         Raises:
-        ------
-        KeyError
-            If params does not include "job_description" and "org_description"
-            keys.
+            KeyError: If params does not include "job_description" and
+                "org_description" keys.
         """
         description = (
             "job_description"
@@ -276,18 +260,13 @@ class ApiEvaluator:
     ) -> list[dict | None]:
         """Call an API endpoint asynchonously.
 
-        Parameters
-        ----------
-        endpoint : Literal["classify", "lookup"]
-            The endpoint to make the call to.
-        data : list[dict[str, str]]
-            A list of dictionaries, whose key-value pairs represent the params
-            to pass to the endpoint.
+        Args:
+            endpoint: The endpoint to make the call to.
+            data: A list of dictionaries, whose key-value pairs represent the
+                params to pass to the endpoint.
 
         Returns:
-        -------
-        list[dict | None]
-            The API responses.
+            A list of API responses.
         """
         async with aiohttp.ClientSession() as session:
             tasks = [
@@ -303,17 +282,12 @@ class ApiEvaluator:
     ) -> list[dict | None]:
         """Batch call an API endpoint synchronously.
 
-        Parameters
-        ----------
-        endpoint : Literal["classify", "lookup"]
-            The endpoint to make the call to.
-        data : list[dict[str, str]]
-            A list of dictionaries, whose key-value pairs represent the params
-            to pass to the endpoint.
+        Args:
+            endpoint: The endpoint to make the call to.
+            data: A list of dictionaries, whose key-value pairs represent the
+                params to pass to the endpoint.
 
         Returns:
-        -------
-        list[dict | None]
-            The API responses.
+            A list of API responses.
         """
         return asyncio.run(self.call_api_endpoint_async(endpoint, data))
