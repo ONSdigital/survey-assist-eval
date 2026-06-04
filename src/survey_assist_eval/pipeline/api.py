@@ -86,7 +86,6 @@ class ApiEvaluator:
 
     _API_BASE_ENDPOINT: ClassVar[str] = "/v1/survey-assist"
     _CLASSIFY_ENDPOINT: ClassVar[str] = "/classify"
-    _CLASSIFY_SEMAPHORE_LIMIT: ClassVar[int] = 2
     _VALID_CLASSIFY_TYPES: ClassVar[list[str]] = ["sic", "soc"]
 
     def __init__(self, config: ApiEvaluatorConfig) -> None:
