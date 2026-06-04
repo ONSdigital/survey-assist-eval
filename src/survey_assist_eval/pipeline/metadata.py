@@ -1,8 +1,16 @@
 """Module for common metadata settings."""
 
+import os
 from argparse import Namespace
 from datetime import UTC, datetime
 from typing import Any
+
+from dotenv import load_dotenv
+
+load_dotenv()
+eval_bucket = os.getenv("EVALUATION_BUCKET_NAME", "")
+SIC_EMBED_SOURCE_FILE = f"gs://{eval_bucket}/sic_knowledgebase/sic_kb_for_classifai.csv"
+SOC_EMBED_SOURCE_FILE = f"gs://{eval_bucket}/soc_knowledgebase/soc_kb_for_classifai.csv"
 
 
 def _get_default_metadata() -> dict:
@@ -21,6 +29,7 @@ def _get_default_metadata() -> dict:
         "llm_candidates_limit": 10,
         "soc_code_digits": 4,
         "sic_code_digits": 5,
+        "sic_embed_source_file": SIC_EMBED_SOURCE_FILE,
         "sic_index_file": (
             "industrial_classification_utils.data.sic_index",
             # "extended_SIC_index.xlsx",
@@ -30,6 +39,7 @@ def _get_default_metadata() -> dict:
             "industrial_classification_utils.data.sic_index",
             "publisheduksicsummaryofstructureworksheet.xlsx",
         ),
+        "soc_embed_source_file": SOC_EMBED_SOURCE_FILE,
         "soc_index_file": (
             "occupational_classification_utils.data.soc_index",
             "soc2020volume2thecodingindexexcel16102024.xlsx",

@@ -15,7 +15,7 @@ from re import sub as regex_sub
 
 import numpy as np
 import pandas as pd
-from occupational_classification_utils.embed.embedding import EmbeddingHandler
+from industrial_classification_utils.embed.embedding import EmbeddingHandler
 from tqdm import tqdm
 
 from survey_assist_eval.pipeline.shared_components import (
@@ -90,12 +90,7 @@ def _make_embedding_handler(in_metadata: dict) -> EmbeddingHandler:
         embedding_model_name=in_metadata["embedding_model_name"],
         db_dir=in_metadata["embedding_db_dir"],
         k_matches=in_metadata["embedding_k_matches"],
-    )
-
-    new_embedding_handler.embed_index(
-        from_empty=True,
-        soc_index_file=tuple(in_metadata["soc_index_file"]),
-        soc_structure_file=tuple(in_metadata["soc_structure_file"]),
+        index_source_file=in_metadata["soc_embed_source_file"],
     )
 
     return new_embedding_handler
@@ -127,14 +122,7 @@ def _get_semantic_search_results(
         search_terms,
     )
 
-    reduced_results = [
-        {
-            "title": r.get("title", ""),
-            "code": r.get("code", ""),
-            "distance": float(r.get("distance", 0.0)),
-        }
-        for r in results
-    ]
+    reduced_results = [r.model_dump() for r in results.results]
     return reduced_results
 
 
@@ -144,9 +132,6 @@ if __name__ == "__main__":
     df, metadata, start_batch_id = set_up_initial_state(args)
 
     embedding_handler = _make_embedding_handler(metadata)
-    print(
-        f"Vector store ready (in-process): {embedding_handler._index_size} entries"  # pylint: disable=protected-access
-    )
 
     # Clean the Survey Response columns:
     df[JOB_DESCRIPTION_COL] = df[JOB_DESCRIPTION_COL].apply(clean_text)
