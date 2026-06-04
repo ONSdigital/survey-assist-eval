@@ -163,26 +163,18 @@ class ApiEvaluator:
     ) -> dict | None:
         """Call the specified API endpoint with the given parameters.
 
-        Parameters
-        ----------
-        endpoint : Literal["classify", "lookup"]
-            The API endpoint to call.
-        session : aiohttp.ClientSession
-            The aiohttp session to use for making the API call.
-        params : dict
-            The parameters to include in the API request. Must include keys
-            "job_title", "job_description" and "org_description" for the
-            "classify" endpoint.
+        Args:
+            endpoint: The API endpoint to call.
+            session: The aiohttp session to use for making the API call.
+            params: The parameters to include in the API request. Must include
+                keys "job_title", "job_description" and "org_description" for
+                the "classify" and "lookup" endpoints.
 
         Returns:
-        -------
-        dict | None
             The JSON response from the API call, or None if the call failed.
 
         Raises:
-        ------
-        ValueError
-            If an invalid endpoint is specified.
+            ValueError: If an invalid endpoint is specified.
         """
         request_kwargs: dict[str, Any] = {}
         match endpoint:
