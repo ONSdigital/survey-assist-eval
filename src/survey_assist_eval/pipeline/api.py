@@ -13,6 +13,9 @@ from survey_assist_utils.api_token.jwt_utils import check_and_refresh_token
 from survey_assist_utils.logging import get_logger
 from survey_assist_utils.logging.logging_utils import VALID_LOG_LEVELS
 
+HTTP_STATUS_OK = 200
+HTTP_STATUS_NOT_FOUND = 404
+
 
 @dataclass(slots=True)
 class ApiEvaluatorConfig:
@@ -31,6 +34,8 @@ class ApiEvaluatorConfig:
     classify_semaphore_limit : int, optional
         The maximum number of concurrent classify API calls to make. Default is
         2.
+    lookup_semaphore_limit : int, optional
+        The maximum number of concurrent lookup API calls to make. Default is 2.
     log_level : str, optional
         The logging level to use. Must be one of "DEBUG", "INFO", "WARNING",
         "ERROR", or "CRITICAL". Default is "INFO".
@@ -39,7 +44,7 @@ class ApiEvaluatorConfig:
     ------
     ValueError
         - If an invalid classify_type and/or log_level is provided.
-        - If classify_semaphore_limit is less than 1.
+        - If any *_semaphore_limit argument is less than 1.
     """
 
     gcp_project_id: str
@@ -47,6 +52,7 @@ class ApiEvaluatorConfig:
     api_gw_sa_email: str
     classify_type: str
     classify_semaphore_limit: int = 2
+    lookup_semaphore_limit: int = 5
     log_level: str = "INFO"
 
     def __post_init__(self) -> None:
@@ -64,8 +70,15 @@ class ApiEvaluatorConfig:
                 f"Valid log levels are: {VALID_LOG_LEVELS}"
             )
 
-        if self.classify_semaphore_limit < 1:
-            raise ValueError("classify_semaphore_limit must be at least 1.")
+        # ensure semaphore limits are at least 1
+        for attr_name in (
+            "classify_semaphore_limit", "lookup_semaphore_limit"
+        ):
+            attr_value = getattr(self, attr_name)
+            if attr_value < 1:
+                raise ValueError(
+                    f"{attr_name} must be at least 1. Got {attr_value}."
+                )
 
 
 class ApiEvaluator:
@@ -90,8 +103,9 @@ class ApiEvaluator:
     def __init__(self, config: ApiEvaluatorConfig) -> None:
         # setup and pass through inputs
         self._gcp_project_id = config.gcp_project_id
-        self._api_gw_url = config.api_gw_url
-        self._api_gw_sa_email = config.api_gw_sa_email
+        self._api: dict[str, Any] = {}
+        self._api["gw_url"] = config.api_gw_url
+        self._api["gw_sa_email"] = config.api_gw_sa_email
         self._classify_type = config.classify_type
         self._logger = get_logger(__name__, level=config.log_level)
         self._classify: dict[str, Any] = {}
@@ -99,15 +113,24 @@ class ApiEvaluator:
             config.classify_semaphore_limit
         )
         self._classify["endpoint"] = (
-            self._api_gw_url
+            self._api["gw_url"]
             + self._API_BASE_ENDPOINT
             + self._CLASSIFY_ENDPOINT
+        )
+        self._lookup: dict[str, Any] = {}
+        self._lookup["semaphore"] = asyncio.Semaphore(
+            config.lookup_semaphore_limit
+        )
+        self._lookup["endpoint"] = (
+            self._api["gw_url"]
+            + self._API_BASE_ENDPOINT
+            + f"/{self._classify_type}-lookup"
         )
 
         # generate initial JWT token and lock
         self._jwt: dict[str, Any] = {}
         self._jwt["start_time"], self._jwt["token"] = check_and_refresh_token(
-            0, "", self._api_gw_url, self._api_gw_sa_email
+            0, "", self._api["gw_url"], self._api["gw_sa_email"]
         )
         self._jwt["lock"] = asyncio.Lock()
 
@@ -128,9 +151,28 @@ class ApiEvaluator:
             "org_description": params["org_description"],
         }
 
+    def _build_lookup_payload(self, params: dict) -> dict:
+        """Construct the lookup payload.
+
+        Assigns the "description" field based on the classify_type. If
+        classify_type is "soc", uses the "job_description" field. If
+        classify_type is "sic", uses the "org_description" field.
+
+        Raises:
+        ------
+        KeyError
+            If params does not include "job_description" and "org_description"
+            keys.
+        """
+        description = (
+            "job_description"
+            if self._classify_type == "soc" else "org_description"
+        )
+        return {"description": params[description]}
+
     async def _call_api_endpoint(
         self,
-        endpoint: Literal["classify"],
+        endpoint: Literal["classify", "lookup"],
         session: aiohttp.ClientSession,
         params: dict,
     ) -> dict | None:
@@ -138,7 +180,7 @@ class ApiEvaluator:
 
         Parameters
         ----------
-        endpoint : Literal["classify"]
+        endpoint : Literal["classify", "lookup"]
             The API endpoint to call.
         session : aiohttp.ClientSession
             The aiohttp session to use for making the API call.
@@ -164,12 +206,17 @@ class ApiEvaluator:
                 semaphore = self._classify["semaphore"]
                 session_method = session.post
                 request_kwargs["json"] = self._build_classify_payload(params)
+            case "lookup":
+                endpoint_url = self._lookup["endpoint"]
+                semaphore = self._lookup["semaphore"]
+                session_method = session.get
+                request_kwargs["params"] = self._build_lookup_payload(params)
             case _:
                 raise ValueError(f"Invalid endpoint: {endpoint}")
 
         async with semaphore:
             self._logger.debug(
-                f"Calling {endpoint} endpoint with job_title: "
+                f"Calling {endpoint_url} endpoint for job_title: "
                 f"{params.get('job_title', 'N/A')}"
             )
             # Ensure JWT is valid before call, using lock to prevent concurrent
@@ -179,8 +226,8 @@ class ApiEvaluator:
                     check_and_refresh_token(
                         self._jwt["start_time"],
                         self._jwt["token"],
-                        self._api_gw_url,
-                        self._api_gw_sa_email,
+                        self._api["gw_url"],
+                        self._api["gw_sa_email"],
                     )
                 )
             request_kwargs["headers"] = {
@@ -190,7 +237,18 @@ class ApiEvaluator:
                 endpoint_url,
                 **request_kwargs,
             ) as response:
-                if response.status != 200:  # noqa: PLR2004 (200 err code OK)
+                if response.status != HTTP_STATUS_OK:
+                    # handle expected 404 for lookup endpoint as "not found"
+                    # rather than error
+                    if (
+                        response.status == HTTP_STATUS_NOT_FOUND
+                        and endpoint == "lookup"
+                    ):
+                        self._logger.debug(
+                            f"{endpoint} API call returned 404 indicating no "
+                            f"lookup match for {params.get('job_title')}"
+                        )
+                        return None
                     try:
                         error_payload = await response.json()
                         detail = error_payload.get("detail", [])
@@ -212,14 +270,14 @@ class ApiEvaluator:
 
     async def call_api_endpoint_async(
         self,
-        endpoint: Literal["classify"],
+        endpoint: Literal["classify", "lookup"],
         data: list[dict[str, str]],
     ) -> list[dict | None]:
         """Call an API endpoint asynchonously.
 
         Parameters
         ----------
-        endpoint : Literal["classify"]
+        endpoint : Literal["classify", "lookup"]
             The endpoint to make the call to.
         data : list[dict[str, str]]
             A list of dictionaries, whose key-value pairs represent the params
@@ -238,13 +296,15 @@ class ApiEvaluator:
             return await asyncio.gather(*tasks)
 
     def call_api_endpoint(
-        self, endpoint: Literal["classify"], data: list[dict[str, str]]
+        self,
+        endpoint: Literal["classify", "lookup"],
+        data: list[dict[str, str]]
     ) -> list[dict | None]:
         """Batch call an API endpoint synchronously.
 
         Parameters
         ----------
-        endpoint : Literal["classify"]
+        endpoint : Literal["classify", "lookup"]
             The endpoint to make the call to.
         data : list[dict[str, str]]
             A list of dictionaries, whose key-value pairs represent the params
