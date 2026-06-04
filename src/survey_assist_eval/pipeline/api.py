@@ -35,7 +35,8 @@ class ApiEvaluatorConfig:
         The maximum number of concurrent classify API calls to make. Default is
         2.
     lookup_semaphore_limit : int, optional
-        The maximum number of concurrent lookup API calls to make. Default is 2.
+        The maximum number of concurrent lookup API calls to make. Default is
+        5.
     log_level : str, optional
         The logging level to use. Must be one of "DEBUG", "INFO", "WARNING",
         "ERROR", or "CRITICAL". Default is "INFO".
