@@ -27,7 +27,6 @@ def _get_default_metadata() -> dict:
         "llm_model_name": "gemini-2.5-flash",
         "llm_model_location": "europe-west2",
         "llm_candidates_limit": 10,
-        "soc_code_digits": 4,
         "sic_code_digits": 5,
         "sic_embed_source_file": SIC_EMBED_SOURCE_FILE,
         "sic_index_file": (
@@ -39,6 +38,7 @@ def _get_default_metadata() -> dict:
             "industrial_classification_utils.data.sic_index",
             "publisheduksicsummaryofstructureworksheet.xlsx",
         ),
+        "soc_code_digits": 4,
         "soc_embed_source_file": SOC_EMBED_SOURCE_FILE,
         "soc_index_file": (
             "occupational_classification_utils.data.soc_index",
@@ -49,7 +49,6 @@ def _get_default_metadata() -> dict:
             "soc2020volume1structureanddescriptionofunitgroupsexcel16102024.xlsx",
         ),
         "batch_size": 100,
-        "batch_size_async": 10,
     }
 
 
@@ -67,7 +66,6 @@ def update_metadata_with_args_and_defaults(
     - Optionally sets/updates `original_dataset_name` from `parsed_args.input_file`
       (recommended only for stage 1).
     - Applies provided `defaults` only when metadata keys are missing.
-    - Optionally sets `batch_size_async` capped by `max_async_batch_size`.
 
     Args:
         parsed_args: The command-line arguments parsed by `parse_args()`.
@@ -108,11 +106,6 @@ def update_metadata_with_args_and_defaults(
             defaults["batch_size"]
             if parsed_args.batch_size is None
             else parsed_args.batch_size
-        )
-
-    if "batch_size_async" not in updated_metadata:
-        updated_metadata["batch_size_async"] = min(
-            updated_metadata["batch_size"], defaults["batch_size_async"]
         )
 
     for key in set(defaults.keys()).difference(updated_metadata.keys()):

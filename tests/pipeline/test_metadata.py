@@ -3,7 +3,6 @@
 These tests focus on the helper functions in `survey_assist_eval.pipeline.metadata`.
 """
 
-# ruff: noqa: PLR2004
 # pylint: disable=protected-access,missing-function-docstring
 
 from argparse import Namespace
@@ -23,21 +22,6 @@ def _args(
         batch_size=batch_size,
         second_run=second_run,
     )
-
-
-@pytest.mark.utils
-def test_update_metadata_preserves_existing_batch_size_async(tmp_path: Path):
-    args = Namespace(
-        output_shortname="STG2",
-        input_file=str(tmp_path / "in.csv"),
-        batch_size=None,
-        second_run=False,
-    )
-    in_metadata = {"batch_size": 7, "batch_size_async": 3}
-
-    out = update_metadata_with_args_and_defaults(args, in_metadata)
-    assert out["batch_size"] == 7
-    assert out["batch_size_async"] == 3
 
 
 @pytest.mark.utils
@@ -150,33 +134,6 @@ def test_update_metadata_sets_batch_size_from_args_when_missing(tmp_path: Path):
 
     out = update_metadata_with_args_and_defaults(args, {})
     assert out["batch_size"] == 12
-
-
-@pytest.mark.utils
-@pytest.mark.parametrize(
-    ("in_metadata", "args_batch_size", "expected_batch_size", "expected_async"),
-    [
-        ({"batch_size": 5}, None, 5, 5),
-        ({}, 100, 100, 10),
-    ],
-)
-def test_update_metadata_sets_batch_size_async_to_min_of_batch_and_default_when_missing(
-    tmp_path: Path,
-    in_metadata: dict,
-    args_batch_size: int | None,
-    expected_batch_size: int,
-    expected_async: int,
-):
-    args = _args(
-        output_shortname="STG2",
-        input_file=str(tmp_path / "in.csv"),
-        batch_size=args_batch_size,
-        second_run=False,
-    )
-
-    out = update_metadata_with_args_and_defaults(args, in_metadata)
-    assert out["batch_size"] == expected_batch_size
-    assert out["batch_size_async"] == expected_async
 
 
 @pytest.mark.utils

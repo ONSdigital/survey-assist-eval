@@ -30,7 +30,7 @@ from survey_assist_eval.pipeline.shared_components import (
 # Constants:
 CODE_DIGITS = 5
 CANDIDATES_LIMIT = 10
-MAX_ASYNC_BATCH_SIZE = 10
+MAX_CONCURRENT_TASKS = 10
 
 MERGED_INDUSTRY_DESC_COL = "merged_industry_desc"
 JOB_TITLE_COL = "soc2020_job_title"
@@ -59,10 +59,11 @@ async def get_rag_response_batch_async(
         the output columns (`unambiguously_codable`, `initial_code`,
         `alt_soc_candidates`, `followup_question`).
     """
-    tasks = []
-    for _, row in batch.iterrows():
-        task = asyncio.create_task(
-            c_llm.sa_rag_soc_code(
+    semaphore = asyncio.Semaphore(MAX_CONCURRENT_TASKS)
+
+    async def _run_row(row: pd.Series):
+        async with semaphore:
+            return await c_llm.sa_rag_soc_code(
                 job_title=row[JOB_TITLE_COL],
                 job_description=row[JOB_DESCRIPTION_COL],
                 industry_descr=row[MERGED_INDUSTRY_DESC_COL],
@@ -71,8 +72,9 @@ async def get_rag_response_batch_async(
                 candidates_limit=CANDIDATES_LIMIT,
                 short_list=row[SEMANTIC_SEARCH_COL],
             )
-        )
-        tasks.append(task)
+
+    # Create tasks for each row; semaphore enforces max concurrent calls.
+    tasks = [asyncio.create_task(_run_row(row)) for _, row in batch.iterrows()]
 
     responses = await asyncio.gather(*tasks)
 
@@ -119,9 +121,9 @@ async def main_async(
             np.split(
                 df,
                 np.arange(
-                    start_batch_id * metadata["batch_size_async"],
+                    start_batch_id * metadata["batch_size"],
                     len(df),
-                    metadata["batch_size_async"],
+                    metadata["batch_size"],
                 ),
             )
         )
