@@ -18,8 +18,9 @@ HTTP_STATUS_OK = 200
 HTTP_STATUS_NOT_FOUND = 404
 
 
+# ignore pylint as parameters are required to configure API evaluation
 @dataclass(slots=True)
-class ApiEvaluatorConfig:
+class ApiEvaluatorConfig:  # pylint: disable=too-many-instance-attributes
     """Configuration for the API Evaluator Class.
 
     Args:
@@ -29,6 +30,14 @@ class ApiEvaluatorConfig:
             with the API.
         classify_type: The type of classification to perform. Must be either
             "sic" or "soc".
+        firestore_db_id: The Firestore database ID to use for storing
+            evaluation results.
+        firestore_collection_id: The Firestore collection ID to use for storing
+            evaluation results.
+        job_id: The unique identifier for the evaluation job, used for
+            uniquely identifying results in Firestore.
+        environment: The environment in which the evaluation is being run, e.g.
+            "sandbox", "dev", "preprod", "prod" etc.
         classify_semaphore_limit: The maximum number of concurrent classify
             API calls to make. Defaults to 2.
         lookup_semaphore_limit: The maximum number of concurrent lookup API
@@ -45,6 +54,10 @@ class ApiEvaluatorConfig:
     api_gw_url: str
     api_gw_sa_email: str
     classify_type: str
+    firestore_db_id: str
+    firestore_collection_id: str
+    job_id: str
+    environment: str
     classify_semaphore_limit: int = 2
     lookup_semaphore_limit: int = 5
     log_level: str = "INFO"
@@ -94,6 +107,10 @@ class ApiEvaluator:
         # setup and pass through inputs
         self._gcp: dict[str, Any] = {}
         self._gcp["project_id"] = config.gcp_project_id
+        self._gcp["firestore_db_id"] = config.firestore_db_id
+        self._gcp["firestore_collection_id"] = config.firestore_collection_id
+        self._gcp["environment"] = config.environment
+        self._gcp["job_id"] = config.job_id
         self._api: dict[str, Any] = {}
         self._api["gw_url"] = config.api_gw_url
         self._api["gw_sa_email"] = config.api_gw_sa_email
