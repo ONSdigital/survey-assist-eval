@@ -15,7 +15,10 @@ from typing import Literal
 from dotenv import load_dotenv
 from survey_assist_utils.logging import get_logger
 
-from survey_assist_eval.pipeline.api import ApiEvaluator, ApiEvaluatorConfig
+from survey_assist_eval.pipeline.api.core import (
+    ApiEvaluator,
+    ApiEvaluatorConfig,
+)
 
 load_dotenv()
 GCP_PROJECT_ID = os.getenv("PROJECT_ID")

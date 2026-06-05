@@ -1,4 +1,4 @@
-"""Survey Assist API Evaluator."""
+"""Core Survey Assist API Evaluator."""
 
 # turning off black for this file: set max line length to match PEP8 (79 chars)
 # for improved readability
