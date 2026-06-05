@@ -38,13 +38,13 @@ test_data = [
         ),
     },
     {
-        "job_title": "Primary school teacher",
+        "job_title": "Secondary school mathematics teacher",
         "job_description": (
-            "Teach a range of subjects to children aged 5-11, including"
-            "maths, English, science, and social studies."
+            "Teach mathematics to secondary school students, develop lesson "
+            "plans, and assessing student progress."
         ),
         "org_description": (
-            "A public primary school providing education to children in the"
+            "A public secondary school providing education to children in the"
             "local community."
         ),
     },
@@ -57,9 +57,9 @@ test_data = [
         "org_description": "Garden centre and plant care services.",
     },
     {  # flex soc vector store match (expect no 404)
-        "job_title": "CEO",
-        "job_description": "Chief executives and senior officials",
-        "org_description": "Overlord of a company."
+        "job_title": "Chief executives and senior officials",
+        "job_description": "Overlord of a company.",
+        "org_description": "Technology and consulting company."
     }
 ]
 
@@ -84,7 +84,7 @@ def main(classify_type: Literal["sic", "soc"]) -> None:
     # TODO: remove, used for early dev and debugging only
     if classify_type == "soc":
         logger.info(
-            f"Expected 404 from lookup (i.e. none): {lookup_responses[0]}"
+            f"Expected 404 from lookup (i.e. none): {lookup_responses[1]}"
         )
         logger.info(
             f"Expected non-404 (i.e. a response): {lookup_responses[3]}"

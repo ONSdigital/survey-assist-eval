@@ -140,19 +140,12 @@ class ApiEvaluator:
     def _build_lookup_payload(self, params: dict) -> dict:
         """Construct the lookup payload.
 
-        Assigns the "description" field based on the classify_type. If
-        classify_type is "soc", uses the "job_description" field. If
-        classify_type is "sic", uses the "org_description" field.
+        Assigns the "job_title" as the lookup description.
 
         Raises:
-            KeyError: If params does not include "job_description" and
-                "org_description" keys.
+            KeyError: If params does not include "job_title" key.
         """
-        description = (
-            "job_description"
-            if self._classify_type == "soc" else "org_description"
-        )
-        return {"description": params[description]}
+        return {"description": params["job_title"]}
 
     async def _call_api_endpoint(
         self,
