@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from typing import Any, ClassVar, Literal
 
 import aiohttp
+import requests
 from survey_assist_utils.api_token.jwt_utils import check_and_refresh_token
 from survey_assist_utils.logging import get_logger
 from survey_assist_utils.logging.logging_utils import VALID_LOG_LEVELS
@@ -86,6 +87,7 @@ class ApiEvaluator:
 
     _API_BASE_ENDPOINT: ClassVar[str] = "/v1/survey-assist"
     _CLASSIFY_ENDPOINT: ClassVar[str] = "/classify"
+    _CONFIG_ENDPOINT: ClassVar[str] = "/config"
     _VALID_CLASSIFY_TYPES: ClassVar[list[str]] = ["sic", "soc"]
 
     def __init__(self, config: ApiEvaluatorConfig) -> None:
@@ -275,3 +277,27 @@ class ApiEvaluator:
             A list of API responses.
         """
         return asyncio.run(self.call_api_endpoint_async(endpoint, data))
+
+    def get_api_config(self) -> dict:
+        """Get the current API configuration information."""
+        self._logger.debug("Retrieving API configuration...")
+        config_url = (
+            self._api["gw_url"]
+            + self._API_BASE_ENDPOINT
+            + self._CONFIG_ENDPOINT
+        )
+        self._jwt["start_time"], self._jwt["token"] = check_and_refresh_token(
+            self._jwt["start_time"],
+            self._jwt["token"],
+            self._api["gw_url"],
+            self._api["gw_sa_email"],
+        )
+        headers = {"Authorization": f"Bearer {self._jwt['token']}"}
+        response = requests.get(config_url, headers=headers, timeout=10)
+        response.raise_for_status()
+        self._logger.debug("API configuration retrieved successfully.")
+        config = response.json()
+        return {
+            "llm_model": config["llm_model"],
+            "embedding_model": config["embedding_model"],
+        }
