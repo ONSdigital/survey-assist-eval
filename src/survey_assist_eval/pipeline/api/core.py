@@ -92,7 +92,8 @@ class ApiEvaluator:
 
     def __init__(self, config: ApiEvaluatorConfig) -> None:
         # setup and pass through inputs
-        self._gcp_project_id = config.gcp_project_id
+        self._gcp: dict[str, Any] = {}
+        self._gcp["project_id"] = config.gcp_project_id
         self._api: dict[str, Any] = {}
         self._api["gw_url"] = config.api_gw_url
         self._api["gw_sa_email"] = config.api_gw_sa_email
