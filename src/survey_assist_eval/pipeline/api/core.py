@@ -5,6 +5,7 @@
 # fmt: off
 
 import asyncio
+import datetime
 from dataclasses import dataclass
 from typing import Any, ClassVar, Literal
 
@@ -319,3 +320,34 @@ class ApiEvaluator:
             "llm_model": config["llm_model"],
             "embedding_model": config["embedding_model"],
         }
+
+    # ignoring pylint as it thinks there are 6 args, but only 5 are passed in
+    def store_eval_results(  # pylint: disable=too-many-arguments,R0917
+        self,
+        start_time: datetime.datetime,
+        end_time: datetime.datetime,
+        duration_s: float,
+        api_config: dict,
+        metrics: dict,
+    ) -> None:
+        """Collect and store the results of an evaluation.
+
+        Args:
+            start_time: The start time of the evaluation.
+            end_time: The end time of the evaluation.
+            duration_s: The duration of the evaluation in seconds.
+            api_config: The API configuration used for the evaluation.
+            metrics: The evaluation metrics.
+        """
+        eval_results = {
+            "gcp_project_id": self._gcp["project_id"],
+            "environment": self._gcp["environment"],
+            "classify_type": self._classify_type,
+            "start_time": start_time,
+            "end_time": end_time,
+            "duration_s": duration_s,
+            "api_config": api_config,
+            "metrics": metrics,
+        }
+
+        self._logger.debug(f"Evaluation results: {eval_results}")
