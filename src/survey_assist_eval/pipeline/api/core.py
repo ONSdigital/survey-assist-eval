@@ -15,6 +15,8 @@ from survey_assist_utils.api_token.jwt_utils import check_and_refresh_token
 from survey_assist_utils.logging import get_logger
 from survey_assist_utils.logging.logging_utils import VALID_LOG_LEVELS
 
+from survey_assist_eval.pipeline.api.db import initialise_firestore
+
 HTTP_STATUS_OK = 200
 HTTP_STATUS_NOT_FOUND = 404
 
@@ -112,6 +114,13 @@ class ApiEvaluator:
         self._gcp["firestore_collection_id"] = config.firestore_collection_id
         self._gcp["environment"] = config.environment
         self._gcp["job_id"] = config.job_id
+        self._gcp["firestore_col_ref"] = initialise_firestore(
+            config.gcp_project_id,
+            config.firestore_db_id,
+            config.firestore_collection_id,
+            config.job_id,
+            config.log_level,
+        )
         self._api: dict[str, Any] = {}
         self._api["gw_url"] = config.api_gw_url
         self._api["gw_sa_email"] = config.api_gw_sa_email
