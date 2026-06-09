@@ -180,7 +180,11 @@ class ApiEvaluator:
         Raises:
             KeyError: If params does not include "job_title" key.
         """
-        return {"description": params["job_title"]}
+        description = (
+            "job_title"
+            if self._classify_type == "soc" else "org_description"
+        )
+        return {"description": params[description]}
 
     async def _call_api_endpoint(
         self,
