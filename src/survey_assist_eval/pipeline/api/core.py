@@ -214,11 +214,13 @@ class ApiEvaluator:
                 semaphore = self._classify["semaphore"]
                 session_method = session.post
                 request_kwargs["json"] = self._build_classify_payload(params)
+                request_kwargs["timeout"] = 30
             case "lookup":
                 endpoint_url = self._lookup["endpoint"]
                 semaphore = self._lookup["semaphore"]
                 session_method = session.get
                 request_kwargs["params"] = self._build_lookup_payload(params)
+                request_kwargs["timeout"] = 10
             case _:
                 raise ValueError(f"Invalid endpoint: {endpoint}")
 
