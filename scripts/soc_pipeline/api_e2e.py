@@ -9,21 +9,29 @@
 
 
 import argparse
+import datetime
 import os
 from typing import Literal
 
 from dotenv import load_dotenv
 from survey_assist_utils.logging import get_logger
 
-from survey_assist_eval.pipeline.api import ApiEvaluator, ApiEvaluatorConfig
+from survey_assist_eval.pipeline.api.core import (
+    ApiEvaluator,
+    ApiEvaluatorConfig,
+)
 
 load_dotenv()
 GCP_PROJECT_ID = os.getenv("PROJECT_ID")
 API_GW_URL = f"https://{os.getenv('API_GATEWAY')}"
 API_GW_SA_EMAIL = os.getenv("SA_EMAIL")
+FIRESTORE_DB_ID = os.getenv("API_EVAL_FIRESTORE_DB_ID")
+FIRESTORE_COLLECTION_ID = os.getenv("API_EVAL_FIRESTORE_COLLECTION_ID")
+ENVIRONMENT = os.getenv("API_EVAL_ENVIRONMENT")
+EXECUTION_ID = os.getenv("CLOUD_RUN_EXECUTION")
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 
-logger = get_logger(__name__, level=LOG_LEVEL)
+logger = get_logger("api_e2e", level=LOG_LEVEL)
 test_data = [
     {
         "job_title": "Data Scientist",
@@ -66,35 +74,77 @@ test_data = [
 
 def main(classify_type: Literal["sic", "soc"]) -> None:
     """Run end-to-end API evaluation pipeline."""
+    start_time = datetime.datetime.now(tz=datetime.UTC)
+
     # configure pipeline and evaluator
+    logger.info(
+        "Starting end-to-end API evaluation pipeline with classify type: "
+        f"{classify_type}..."
+    )
     api_evaluator_cfg = ApiEvaluatorConfig(
         gcp_project_id=GCP_PROJECT_ID,
         api_gw_url=API_GW_URL,
         api_gw_sa_email=API_GW_SA_EMAIL,
         classify_type=classify_type,
+        firestore_db_id=FIRESTORE_DB_ID,
+        firestore_collection_id=FIRESTORE_COLLECTION_ID,
+        execution_id=EXECUTION_ID,
+        environment=ENVIRONMENT,
         log_level=LOG_LEVEL,
     )
     api_evaluator = ApiEvaluator(api_evaluator_cfg)
 
-    # TODO: update with actual pipeline workflow, currently just mimicking
-    # lookup and classify stages for early stage dev only
+    # collect API config to record system under test as results metadata
+    logger.info("Collecting API configuration for evaluation metadata...")
+    api_config = api_evaluator.get_api_config()
+
+    # TODO: implement data collection and preparation steps once implemented
+    logger.info("Collecting and preparing input data...")
+
+    # TODO: add post-processing of lookup responses before classify
+    logger.info("Performing lookup calls to API...")
     lookup_responses = api_evaluator.call_api_endpoint("lookup", test_data)
+
+    # TODO: add post-processing of classify responses before metrics calc
+    logger.info("Performing classify calls to API...")
     classify_responses = api_evaluator.call_api_endpoint("classify", test_data)
 
     # TODO: remove, used for early dev and debugging only
     if classify_type == "soc":
-        logger.info(
+        logger.debug(
             f"Expected 404 from lookup (i.e. none): {lookup_responses[1]}"
         )
-        logger.info(
+        logger.debug(
             f"Expected non-404 (i.e. a response): {lookup_responses[3]}"
         )
-        logger.info(
+        logger.debug(
             f"Expected classifed: {classify_responses[0]}"
         )
-        logger.info(
+        logger.debug(
             f"Expected follow-up Q post classify: {classify_responses[2]}"
         )
+
+    # TODO: update with results of metrics calculation once implemented
+    logger.info("Calculating evaluation metrics...")
+    metrics = {}
+
+    # record for evaluation metadata purposes
+    end_time = datetime.datetime.now(tz=datetime.UTC)
+    duration = (end_time - start_time).total_seconds()
+    logger.info(f"API evaluation completed in {duration}s.")
+
+    # write evaluation results to firestore for future analysis
+    logger.info("Storing evaluation results in firestore...")
+    api_evaluator.store_eval_results(
+        start_time,
+        end_time,
+        duration,
+        api_config,
+        metrics,
+    )
+    logger.info("Evaluation results stored successfully.")
+
+    logger.info("End-to-end API evaluation pipeline completed.")
 
 
 if __name__ == "__main__":

@@ -19,6 +19,7 @@ pandas = "^2.3.3"
 pydantic = "^2.12.5"
 survey-assist-utils = { git = "https://github.com/ONSdigital/survey-assist-utils.git", tag = "v0.0.8" }
 toml = "^0.10.2"
+shortuuid = "^1.0.13"
 
 [tool.poetry.group.dev.dependencies]
 bandit = "^1.8.3"
