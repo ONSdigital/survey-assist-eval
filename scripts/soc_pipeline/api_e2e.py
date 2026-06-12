@@ -28,7 +28,7 @@ API_GW_SA_EMAIL = os.getenv("SA_EMAIL")
 FIRESTORE_DB_ID = os.getenv("API_EVAL_FIRESTORE_DB_ID")
 FIRESTORE_COLLECTION_ID = os.getenv("API_EVAL_FIRESTORE_COLLECTION_ID")
 ENVIRONMENT = os.getenv("API_EVAL_ENVIRONMENT")
-JOB_ID = os.getenv("CLOUD_RUN_EXECUTION")
+EXECUTION_ID = os.getenv("CLOUD_RUN_EXECUTION")
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 
 logger = get_logger("api_e2e", level=LOG_LEVEL)
@@ -88,7 +88,7 @@ def main(classify_type: Literal["sic", "soc"]) -> None:
         classify_type=classify_type,
         firestore_db_id=FIRESTORE_DB_ID,
         firestore_collection_id=FIRESTORE_COLLECTION_ID,
-        job_id=JOB_ID,
+        execution_id=EXECUTION_ID,
         environment=ENVIRONMENT,
         log_level=LOG_LEVEL,
     )

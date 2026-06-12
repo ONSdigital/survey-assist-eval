@@ -6,11 +6,12 @@
 
 import asyncio
 import datetime
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, ClassVar, Literal
 
 import aiohttp
 import requests
+import shortuuid
 from survey_assist_utils.api_token.jwt_utils import check_and_refresh_token
 from survey_assist_utils.logging import get_logger
 from survey_assist_utils.logging.logging_utils import VALID_LOG_LEVELS
@@ -29,6 +30,11 @@ HTTP_STATUS_NOT_FOUND = 404
 class ApiEvaluatorConfig:  # pylint: disable=too-many-instance-attributes
     """Configuration for the API Evaluator Class.
 
+    Also creates a UUID to uniquely identify the evaluation job. This is a
+    combination of a timestamp and random string, to ensure uniqueness while
+    also maintaining human readability for easier debugging and traceability in
+    Firestore.
+
     Args:
         gcp_project_id: The GCP project ID where the API is hosted.
         api_gw_url: The URL of the API Gateway.
@@ -40,8 +46,8 @@ class ApiEvaluatorConfig:  # pylint: disable=too-many-instance-attributes
             evaluation results.
         firestore_collection_id: The Firestore collection ID to use for storing
             evaluation results.
-        job_id: The unique identifier for the evaluation job, used for
-            uniquely identifying results in Firestore.
+        execution_id: A unique identifier for the evaluation job, typically
+            a UUID set by the caller. Can be None if not required.
         environment: The environment in which the evaluation is being run, e.g.
             "sandbox", "dev", "preprod", "prod" etc.
         classify_semaphore_limit: The maximum number of concurrent classify
@@ -62,11 +68,12 @@ class ApiEvaluatorConfig:  # pylint: disable=too-many-instance-attributes
     classify_type: str
     firestore_db_id: str
     firestore_collection_id: str
-    job_id: str
+    execution_id: str | None
     environment: str
     classify_semaphore_limit: int = 2
     lookup_semaphore_limit: int = 5
     log_level: str = "INFO"
+    _job_id: str = field(default="", init=False)
 
     def __post_init__(self) -> None:
         normalised = self.classify_type.lower()
@@ -93,6 +100,17 @@ class ApiEvaluatorConfig:  # pylint: disable=too-many-instance-attributes
                     f"{attr_name} must be at least 1. Got {attr_value}."
                 )
 
+        # create unique job ID for this evaluation run
+        self._job_id = self._create_job_id()
+
+    def _create_job_id(self) -> str:
+        """Create a unique job ID using a timestamp and random string."""
+        uuid = shortuuid.uuid(pad_length=16)
+        timestamp = datetime.datetime.now(tz=datetime.UTC).strftime(
+            "%Y%m%d%H%M%S"
+        )
+        return f"{uuid}-{timestamp}"
+
 
 class ApiEvaluator:
     """Evalutate the Survey Assist API classification performance.
@@ -116,7 +134,8 @@ class ApiEvaluator:
         self._gcp["firestore_db_id"] = config.firestore_db_id
         self._gcp["firestore_collection_id"] = config.firestore_collection_id
         self._gcp["environment"] = config.environment
-        self._gcp["job_id"] = config.job_id
+        self._gcp["execution_id"] = config.execution_id
+        self._gcp["job_id"] = config._job_id
         self._api: dict[str, Any] = {}
         self._api["gw_url"] = config.api_gw_url
         self._api["gw_sa_email"] = config.api_gw_sa_email
@@ -153,7 +172,7 @@ class ApiEvaluator:
             config.gcp_project_id,
             config.firestore_db_id,
             config.firestore_collection_id,
-            config.job_id,
+            config._job_id,
             config.log_level,
         )
 
@@ -362,6 +381,7 @@ class ApiEvaluator:
         eval_results = {
             "gcp_project_id": self._gcp["project_id"],
             "environment": self._gcp["environment"],
+            "execution_id": self._gcp["execution_id"],
             "classify_type": self._classify_type,
             "start_time": start_time,
             "end_time": end_time,
