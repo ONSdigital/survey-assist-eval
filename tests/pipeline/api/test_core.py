@@ -417,6 +417,22 @@ class TestApiEvaluator:
             "Expected all session calls to be made to the /lookup endpoint."
         )
 
+        # ensure correct input params were passed to the lookup endpoint
+        lookup_desc = call_api_mock[
+            "session"
+        ].get.call_args_list[0].kwargs.get("params").get("description")
+        if api_eval_config.classify_type == "sic":
+            assert api_evaluator_test_data[0][
+                "org_description"
+            ] in lookup_desc, (
+                "Expected 'org_description' to be in the params for SIC "
+                "evaluation."
+            )
+        else:
+            assert api_evaluator_test_data[0]["job_title"] in lookup_desc, (
+                "Expected 'job_title' to be in the params for SOC evaluation."
+            )
+
     @pytest.mark.parametrize("api_eval_config", ["sic", "soc"], indirect=True)
     def test_api_evaluator_call_api_endpoint_lookup_not_found(
         self,
