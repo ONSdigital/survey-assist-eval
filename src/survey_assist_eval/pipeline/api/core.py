@@ -198,7 +198,9 @@ class ApiEvaluator:
         Assigns the "job_title" as the lookup description.
 
         Raises:
-            KeyError: If params does not include "job_title" key.
+            KeyError: If params does not include "job_title" key when running
+                a SOC evaluation, or "org_description" key when running a SIC
+                evaluation.
         """
         description = (
             "job_title"
