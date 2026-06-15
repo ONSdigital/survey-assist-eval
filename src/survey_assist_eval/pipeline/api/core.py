@@ -103,9 +103,10 @@ class ApiEvaluatorConfig:  # pylint: disable=too-many-instance-attributes
         # create unique job ID for this evaluation run
         self._job_id = self._create_job_id()
 
-    def _create_job_id(self) -> str:
+    @staticmethod
+    def _create_job_id() -> str:
         """Create a unique job ID using a timestamp and random string."""
-        uuid = shortuuid.uuid(pad_length=16)
+        uuid = shortuuid.uuid()
         timestamp = datetime.datetime.now(tz=datetime.UTC).strftime(
             "%Y%m%d%H%M%S"
         )
