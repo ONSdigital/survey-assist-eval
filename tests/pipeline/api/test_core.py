@@ -182,6 +182,7 @@ def api_eval_call_api_lookup_mocks(lookup_not_found: bool = False):
             "response": mock_response,
         }
 
+
 @contextmanager
 def api_eval_call_api_classify_mocks(mock_api_error: bool = False):
     """Handler mocking external calls in call_api_endpoint for 'classify'."""
@@ -591,4 +592,39 @@ class TestApiEvaluator:
         ].post.call_args_list[0].kwargs.get("json").get("type")
         assert classify_type == api_eval_config.classify_type, (
             "Expected classify_type to be included in the request payload."
+        )
+
+    @pytest.mark.parametrize("api_eval_config", ["sic", "soc"], indirect=True)
+    def test_api_evaluator_call_api_endpoint_classify_api_error(
+        self,
+        api_eval_config: core_module.ApiEvaluatorConfig,
+        api_evaluator_test_data: list[dict[str, str]],
+    ) -> None:
+        """Test call_api_endpoint raises HTTPError for classify API error.
+
+        This simulates a scenario where the classify API returns a non-2XX
+        response and shows that the ApiEvaluator class correctly returns a
+        response without raising an exception.
+        """
+        with (
+            api_eval_init_mocks() as init_mock,
+            api_eval_call_api_classify_mocks(mock_api_error=True),
+        ):
+            ae = core_module.ApiEvaluator(api_eval_config)
+            response = ae.call_api_endpoint(
+                "classify", api_evaluator_test_data
+            )
+
+        num_jwt_calls = init_mock["get_jwt"].call_count
+        expected_jwt_calls = 1 + len(api_evaluator_test_data)
+        assert num_jwt_calls == expected_jwt_calls, (
+            f"Expected jwt check/refresh to be called {expected_jwt_calls}; "
+            f"num test data inputs + 1 for the init. Got {num_jwt_calls}."
+        )
+
+        # ensure correct and expected reponse are returned
+        num_test_data_inputs = len(api_evaluator_test_data)
+        assert response == [None] * num_test_data_inputs, (
+            "Expected call_api_endpoint to return None for each test data "
+            "input in the response when lookup match is not found."
         )
