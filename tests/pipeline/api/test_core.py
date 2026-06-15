@@ -138,12 +138,18 @@ def api_eval_get_api_config_mocks(
 
 
 @contextmanager
-def api_eval_call_api_lookup_mocks():
+def api_eval_call_api_lookup_mocks(lookup_not_found: bool = False):
     """Handler for mocking external calls in call_api_endpoint for 'lookup'."""
     with ExitStack() as stack:
         mock_response = MagicMock()
-        mock_response.status = 200
-        mock_response.json = AsyncMock(return_value={"result": "success"})
+        if lookup_not_found:
+            mock_response.status = 404
+            mock_response.json = AsyncMock(
+                return_value={"error": "not found"}
+            )
+        else:
+            mock_response.status = 200
+            mock_response.json = AsyncMock(return_value={"result": "success"})
 
         # construct mock aiohttp request, session, and client context managers
         # mimicing the pattern used in ApiEvaluator:
@@ -394,6 +400,51 @@ class TestApiEvaluator:
         assert response == [{"result": "success"}] * num_test_data_inputs, (
             "Expected call_api_endpoint to return a list of JSON responses "
             "from the mocked responses."
+        )
+        assert call_api_mock[
+            "session"
+        ].get.call_count == num_test_data_inputs, (
+            "Expected session.get to be called once for each test data input."
+        )
+        all_urls = [
+            call.args[0]
+            for call in call_api_mock["session"].get.call_args_list
+        ]
+        assert all(  # ensure sic/soc lookup endpoints were used
+            url.endswith(f"/{api_eval_config.classify_type}-lookup")
+            for url in all_urls
+        ), (
+            "Expected all session calls to be made to the /lookup endpoint."
+        )
+
+    @pytest.mark.parametrize("api_eval_config", ["sic", "soc"], indirect=True)
+    def test_api_evaluator_call_api_endpoint_lookup_not_found(
+        self,
+        api_eval_config: core_module.ApiEvaluatorConfig,
+        api_evaluator_test_data: list[dict[str, str]],
+    ) -> None:
+        """Test call_api_endpoint method for 'lookup' endpoint + not found."""
+        with (
+            api_eval_init_mocks() as init_mock,
+            api_eval_call_api_lookup_mocks(
+                lookup_not_found=True
+            ) as call_api_mock,
+        ):
+            ae = core_module.ApiEvaluator(api_eval_config)
+            response = ae.call_api_endpoint("lookup", api_evaluator_test_data)
+
+        num_jwt_calls = init_mock["get_jwt"].call_count
+        expected_jwt_calls = 1 + len(api_evaluator_test_data)
+        assert num_jwt_calls == expected_jwt_calls, (
+            f"Expected jwt check/refresh to be called {expected_jwt_calls}; "
+            f"num test data inputs + 1 for the init. Got {num_jwt_calls}."
+        )
+
+        # ensure correct and expected reponse are returned
+        num_test_data_inputs = len(api_evaluator_test_data)
+        assert response == [None] * num_test_data_inputs, (
+            "Expected call_api_endpoint to return None for each test data "
+            "input in the response when lookup match is not found."
         )
         assert call_api_mock[
             "session"
