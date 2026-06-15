@@ -477,3 +477,23 @@ class TestApiEvaluator:
         ), (
             "Expected all session calls to be made to the /lookup endpoint."
         )
+
+    @pytest.mark.parametrize("api_eval_config", ["sic", "soc"], indirect=True)
+    def test_api_evaluator_call_api_endpoint_missing_params(
+        self,
+        api_eval_config: core_module.ApiEvaluatorConfig,
+        api_evaluator_test_data: list[dict[str, str]]
+    ) -> None:
+        """Test call_api_endpoint raises KeyError for missing input params."""
+        with api_eval_init_mocks(), api_eval_call_api_lookup_mocks():
+            ae = core_module.ApiEvaluator(api_eval_config)
+            test_data = api_evaluator_test_data.copy()
+            if api_eval_config.classify_type == "sic":
+                key = "org_description"
+                test_data[0].pop(key, None)
+            else:
+                key = "job_title"
+                test_data[0].pop(key, None)
+
+            with pytest.raises(KeyError, match=key):
+                ae.call_api_endpoint("lookup", test_data)
