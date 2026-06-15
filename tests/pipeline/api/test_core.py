@@ -2,7 +2,7 @@
 
 import datetime
 from contextlib import ExitStack, contextmanager
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from requests.exceptions import HTTPError
@@ -44,6 +44,25 @@ def api_eval_config(
     config = default_api_eval_config.copy()
     config["classify_type"] = classify_type
     return core_module.ApiEvaluatorConfig(**config)
+
+
+@pytest.fixture
+def api_evaluator_test_data() -> list[dict[str, str]]:
+    """Fixture for test data to be used in API evaluation."""
+    return [
+        {
+            "job_title": "Data Scientist",
+            "job_description": (
+                "Use machine learning, statistical analysis, and data"
+                "visualisation to extract insights from data and inform "
+                "business decisions."
+            ),
+            "org_description": (
+                "A technology company specialising in e-commerce and cloud"
+                "computing services."
+            ),
+        }
+    ]
 
 
 @contextmanager
@@ -114,6 +133,46 @@ def api_eval_get_api_config_mocks(
             )
         yield {
             "request_get": mock_request_get,
+            "response": mock_response,
+        }
+
+
+@contextmanager
+def api_eval_call_api_lookup_mocks():
+    """Handler for mocking external calls in call_api_endpoint for 'lookup'."""
+    with ExitStack() as stack:
+        mock_response = MagicMock()
+        mock_response.status = 200
+        mock_response.json = AsyncMock(return_value={"result": "success"})
+
+        # construct mock aiohttp request, session, and client context managers
+        # mimicing the pattern used in ApiEvaluator:
+        # async with aiohttp.ClientSession() as session:
+        #     async with session.get(url, ...) as response:
+        #         data = await response.json()
+        # __aenter__ and __aexit__ are used to mock the context manager
+        # behavior of both the ClientSession and the session.get() call.
+        # expected mock value on enter is required.
+        # None on exit is OK as no exception handling required.
+        mock_request_cm = AsyncMock()  # context manager for session.get() call
+        mock_request_cm.__aenter__.return_value = mock_response
+        mock_request_cm.__aexit__.return_value = None
+        mock_session = MagicMock()  # cm for aiohttp client session
+        mock_session.get.return_value = mock_request_cm
+        mock_client_session_cm = AsyncMock()
+        mock_client_session_cm.__aenter__.return_value = mock_session
+        mock_client_session_cm.__aexit__.return_value = None
+
+        mock_client_session = stack.enter_context(
+            patch(
+                "survey_assist_eval.pipeline.api.core.aiohttp.ClientSession",
+                return_value=mock_client_session_cm,
+            )
+        )
+
+        yield {
+            "client": mock_client_session,
+            "session": mock_session,
             "response": mock_response,
         }
 
@@ -297,7 +356,7 @@ class TestApiEvaluator:
         """
         with (
             api_eval_init_mocks() as init_mock,
-            api_eval_get_api_config_mocks(non_2XX_response=True),
+            api_eval_get_api_config_mocks(non_2xx_response=True),
         ):
             ae = core_module.ApiEvaluator(api_eval_config)
             with pytest.raises(HTTPError, match="Internal Server Error"):
@@ -307,4 +366,47 @@ class TestApiEvaluator:
         assert num_jwt_calls == 2, (
             "Expected jwt check/refresh to be called twice; once during init "
             f"and once during get_api_config. Got {num_jwt_calls}."
+        )
+
+    @pytest.mark.parametrize("api_eval_config", ["sic", "soc"], indirect=True)
+    def test_api_evaluator_call_api_endpoint_lookup_success(
+        self,
+        api_eval_config: core_module.ApiEvaluatorConfig,
+        api_evaluator_test_data: list[dict[str, str]],
+    ) -> None:
+        """Test call_api_endpoint method for 'lookup' endpoint."""
+        with (
+            api_eval_init_mocks() as init_mock,
+            api_eval_call_api_lookup_mocks() as call_api_mock,
+        ):
+            ae = core_module.ApiEvaluator(api_eval_config)
+            response = ae.call_api_endpoint("lookup", api_evaluator_test_data)
+
+        num_jwt_calls = init_mock["get_jwt"].call_count
+        expected_jwt_calls = 1 + len(api_evaluator_test_data)
+        assert num_jwt_calls == expected_jwt_calls, (
+            f"Expected jwt check/refresh to be called {expected_jwt_calls}; "
+            f"num test data inputs + 1 for the init. Got {num_jwt_calls}."
+        )
+
+        # ensure correct and expected reponse are returned
+        num_test_data_inputs = len(api_evaluator_test_data)
+        assert response == [{"result": "success"}] * num_test_data_inputs, (
+            "Expected call_api_endpoint to return a list of JSON responses "
+            "from the mocked responses."
+        )
+        assert call_api_mock[
+            "session"
+        ].get.call_count == num_test_data_inputs, (
+            "Expected session.get to be called once for each test data input."
+        )
+        all_urls = [
+            call.args[0]
+            for call in call_api_mock["session"].get.call_args_list
+        ]
+        assert all(  # ensure sic/soc lookup endpoints were used
+            url.endswith(f"/{api_eval_config.classify_type}-lookup")
+            for url in all_urls
+        ), (
+            "Expected all session calls to be made to the /lookup endpoint."
         )
