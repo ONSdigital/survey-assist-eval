@@ -56,6 +56,29 @@ def firestore_init_mocks(exists: bool = True):
         }
 
 
+@contextmanager
+def firestore_eval_results_mocks():
+    """Initialise and handle mocks for firestore evaluation results."""
+    with ExitStack() as stack:
+        mock_logger = MagicMock()
+        mock_job_doc = MagicMock()
+        mock_job_doc.get.return_value = SimpleNamespace(exists=True)
+        mock_job_doc.set.return_value = None
+
+        mock_get_logger = stack.enter_context(
+            patch(
+                "survey_assist_eval.pipeline.api.db.get_logger",
+                return_value=mock_logger,
+            )
+        )
+
+        yield {
+            "logger": mock_logger,
+            "job_doc": mock_job_doc,
+            "get_logger": mock_get_logger,
+        }
+
+
 class TestInitialiseFirestore:
     """Unit tests for the initialise_firestore function."""
     def test_initialise_firestore_success(self):
@@ -115,3 +138,26 @@ class TestInitialiseFirestore:
             "test_job"
         )
         mock["logger"].error.assert_called_once()
+
+
+# keeping a single test within class to prioritise consistent naming/structure
+# pylint: disable=too-few-public-methods
+class TestEvalResultsToFirestore:
+    """Unit tests for the eval_results_to_firestore function."""
+    def test_eval_results_to_firestore(self):
+        """Ensure results are written to firestore successfully."""
+        with firestore_eval_results_mocks() as mock:
+            db_module.eval_results_to_firestore(
+                job_doc=mock["job_doc"],
+                job_id="test_job",
+                results={"test": "value"},
+                log_level="DEBUG",
+            )
+
+        mock["get_logger"].assert_called_once_with(
+            db_module.__name__, level="DEBUG"
+        )
+        # protected member required here for test - ok for this usecase only
+        mock["job_doc"].set.assert_called_once_with(
+            {"test": "value"}, retry=db_module._retry  # pylint: disable=W0212
+        )
