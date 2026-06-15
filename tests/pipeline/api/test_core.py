@@ -182,6 +182,51 @@ def api_eval_call_api_lookup_mocks(lookup_not_found: bool = False):
             "response": mock_response,
         }
 
+@contextmanager
+def api_eval_call_api_classify_mocks(mock_api_error: bool = False):
+    """Handler mocking external calls in call_api_endpoint for 'classify'."""
+    with ExitStack() as stack:
+        mock_response = MagicMock()
+        if mock_api_error:
+            mock_response.status = 500
+            mock_response.json = AsyncMock(
+                return_value={"details": [{"msg": "Internal Server Error"}]}
+            )
+        else:
+            mock_response.status = 200
+            mock_response.json = AsyncMock(return_value={"result": "success"})
+
+        # construct mock aiohttp request, session, and client context managers
+        # mimicing the pattern used in ApiEvaluator:
+        # async with aiohttp.ClientSession() as session:
+        #     async with session.post(url, ...) as response:
+        #         data = await response.json()
+        # __aenter__ and __aexit__ are used to mock the context manager
+        # behavior of both the ClientSession and the session.post() call.
+        # expected mock value on enter is required.
+        # None on exit is OK as no exception handling required.
+        mock_request_cm = AsyncMock()  # context manager for session.post()
+        mock_request_cm.__aenter__.return_value = mock_response
+        mock_request_cm.__aexit__.return_value = None
+        mock_session = MagicMock()  # cm for aiohttp client session
+        mock_session.post.return_value = mock_request_cm
+        mock_client_session_cm = AsyncMock()
+        mock_client_session_cm.__aenter__.return_value = mock_session
+        mock_client_session_cm.__aexit__.return_value = None
+
+        mock_client_session = stack.enter_context(
+            patch(
+                "survey_assist_eval.pipeline.api.core.aiohttp.ClientSession",
+                return_value=mock_client_session_cm,
+            )
+        )
+
+        yield {
+            "client": mock_client_session,
+            "session": mock_session,
+            "response": mock_response,
+        }
+
 
 class TestApiEvaluatorConfig:
     """Unit tests for ApiEvaluatorConfig dataclass."""
@@ -497,3 +542,53 @@ class TestApiEvaluator:
 
             with pytest.raises(KeyError, match=key):
                 ae.call_api_endpoint("lookup", test_data)
+
+    @pytest.mark.parametrize("api_eval_config", ["sic", "soc"], indirect=True)
+    def test_api_evaluator_call_api_endpoint_classify_success(
+        self,
+        api_eval_config: core_module.ApiEvaluatorConfig,
+        api_evaluator_test_data: list[dict[str, str]],
+    ) -> None:
+        """Test call_api_endpoint method for 'classify' endpoint."""
+        with (
+            api_eval_init_mocks() as init_mock,
+            api_eval_call_api_classify_mocks() as call_api_mock,
+        ):
+            ae = core_module.ApiEvaluator(api_eval_config)
+            response = ae.call_api_endpoint(
+                "classify", api_evaluator_test_data
+            )
+
+        num_jwt_calls = init_mock["get_jwt"].call_count
+        expected_jwt_calls = 1 + len(api_evaluator_test_data)
+        assert num_jwt_calls == expected_jwt_calls, (
+            f"Expected jwt check/refresh to be called {expected_jwt_calls}; "
+            f"num test data inputs + 1 for the init. Got {num_jwt_calls}."
+        )
+
+        # ensure correct and expected reponse are returned
+        num_test_data_inputs = len(api_evaluator_test_data)
+        assert response == [{"result": "success"}] * num_test_data_inputs, (
+            "Expected call_api_endpoint to return a list of JSON responses "
+            "from the mocked responses."
+        )
+        assert call_api_mock[
+            "session"
+        ].post.call_count == num_test_data_inputs, (
+            "Expected session.post to be called once for each test data input."
+        )
+        all_urls = [
+            call.args[0]
+            for call in call_api_mock["session"].post.call_args_list
+        ]
+        assert all(url.endswith("/classify") for url in all_urls), (
+            "Expected all session calls to be made to the /classify endpoint."
+        )
+
+        # ensure classify_type appears in the request payload
+        classify_type = call_api_mock[
+            "session"
+        ].post.call_args_list[0].kwargs.get("json").get("type")
+        assert classify_type == api_eval_config.classify_type, (
+            "Expected classify_type to be included in the request payload."
+        )
