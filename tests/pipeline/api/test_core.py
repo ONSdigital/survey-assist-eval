@@ -2,7 +2,7 @@
 
 import datetime
 from contextlib import ExitStack, contextmanager
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import ANY, AsyncMock, MagicMock, patch
 
 import pytest
 from requests.exceptions import HTTPError
@@ -197,15 +197,8 @@ def api_eval_call_api_classify_mocks(mock_api_error: bool = False):
             mock_response.status = 200
             mock_response.json = AsyncMock(return_value={"result": "success"})
 
-        # construct mock aiohttp request, session, and client context managers
-        # mimicing the pattern used in ApiEvaluator:
-        # async with aiohttp.ClientSession() as session:
-        #     async with session.post(url, ...) as response:
-        #         data = await response.json()
-        # __aenter__ and __aexit__ are used to mock the context manager
-        # behavior of both the ClientSession and the session.post() call.
-        # expected mock value on enter is required.
-        # None on exit is OK as no exception handling required.
+        # see comment in api_eval_call_api_lookup_mocks for explanation of
+        # the mocking
         mock_request_cm = AsyncMock()  # context manager for session.post()
         mock_request_cm.__aenter__.return_value = mock_response
         mock_request_cm.__aexit__.return_value = None
@@ -227,6 +220,20 @@ def api_eval_call_api_classify_mocks(mock_api_error: bool = False):
             "session": mock_session,
             "response": mock_response,
         }
+
+
+@contextmanager
+def api_eval_store_eval_results_mocks():
+    """Handler for mocking external calls in store_eval_results."""
+    with ExitStack() as stack:
+        mock_results_to_firestore = stack.enter_context(
+            patch(
+                "survey_assist_eval.pipeline.api.core."
+                "eval_results_to_firestore",
+                return_value=None,
+            )
+        )
+        yield {"results_to_firestore": mock_results_to_firestore}
 
 
 class TestApiEvaluatorConfig:
@@ -659,3 +666,42 @@ class TestApiEvaluator:
                 ae.call_api_endpoint(
                     "invalid_endpoint", api_evaluator_test_data
                 )
+
+    @pytest.mark.parametrize("api_eval_config", ["sic", "soc"], indirect=True)
+    def test_api_evaluator_store_eval_results(
+        self,
+        api_eval_config: core_module.ApiEvaluatorConfig,
+    ) -> None:
+        """Test store_eval_results method stores results to Firestore."""
+        # test setup parameters
+        start_time = datetime.datetime.now(tz=datetime.UTC)
+        end_time = start_time + datetime.timedelta(seconds=5)
+        duration_s = (end_time - start_time).total_seconds()
+        api_config = {
+            "llm_model": "test-llm-model",
+            "embedding_model": "test-embedding-model",
+        }
+        metrics = {}
+
+        with (
+            api_eval_init_mocks() as init_mock,
+            api_eval_store_eval_results_mocks() as store_results_mock,
+        ):
+            ae = core_module.ApiEvaluator(api_eval_config)
+            ae.store_eval_results(
+                start_time,
+                end_time,
+                duration_s,
+                api_config,
+                metrics,
+            )
+
+        # verify eval_results_to firestore call
+        store_results_mock["results_to_firestore"].assert_called_once_with(
+            init_mock["job_doc"],
+            api_eval_config._job_id,  # pylint: disable=W0212
+            ANY,
+            init_mock["logger"].level,
+        )
+        called_args = store_results_mock["results_to_firestore"].call_args.args
+        assert isinstance(called_args[2], dict)
