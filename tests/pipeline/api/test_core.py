@@ -81,6 +81,27 @@ def api_eval_init_mocks():
         }
 
 
+@contextmanager
+def api_eval_get_api_config_mocks():
+    """Handler for mocking external calls in get_api_config."""
+    with ExitStack() as stack:
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "llm_model": "test-llm-model",
+            "embedding_model": "test-embedding-model",
+        }
+        mock_request_get = stack.enter_context(
+            patch(
+                "survey_assist_eval.pipeline.api.core.requests.get",
+                return_value=mock_response,
+            )
+        )
+        yield {
+            "request_get": mock_request_get,
+            "response": mock_response,
+        }
+
+
 class TestApiEvaluatorConfig:
     """Unit tests for ApiEvaluatorConfig dataclass."""
 
@@ -208,6 +229,19 @@ class TestApiEvaluator:
         self, api_eval_config: core_module.ApiEvaluatorConfig
     ) -> None:
         """Test get_api_config method returns successfully."""
-        # temp call so silenve pylint
-        with api_eval_init_mocks():
-            core_module.ApiEvaluator(api_eval_config)
+        with (
+            api_eval_init_mocks() as init_mock,
+            api_eval_get_api_config_mocks() as get_config_mock
+        ):
+            ae = core_module.ApiEvaluator(api_eval_config)
+            api_config = ae.get_api_config()
+
+        assert api_config == get_config_mock["response"].json(), (
+            "Expected get_api_config to return the JSON from the mocked "
+            "response."
+        )
+        num_jwt_calls = init_mock["get_jwt"].call_count
+        assert num_jwt_calls == 2, (
+            "Expected jwt check/refresh to be called twice; once during init "
+            f"and once during get_api_config. Got {num_jwt_calls}."
+        )
