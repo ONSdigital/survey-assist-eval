@@ -479,7 +479,7 @@ class TestApiEvaluator:
         )
 
     @pytest.mark.parametrize("api_eval_config", ["sic", "soc"], indirect=True)
-    def test_api_evaluator_call_api_endpoint_missing_params(
+    def test_api_evaluator_call_api_endpoint_lookup_missing_params(
         self,
         api_eval_config: core_module.ApiEvaluatorConfig,
         api_evaluator_test_data: list[dict[str, str]]
