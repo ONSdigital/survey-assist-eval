@@ -5,6 +5,7 @@ from contextlib import ExitStack, contextmanager
 from unittest.mock import MagicMock, patch
 
 import pytest
+from requests.exceptions import HTTPError
 
 from survey_assist_eval.pipeline.api import core as core_module
 
@@ -82,20 +83,35 @@ def api_eval_init_mocks():
 
 
 @contextmanager
-def api_eval_get_api_config_mocks():
+def api_eval_get_api_config_mocks(
+    non_2xx_response: bool = False,
+    missing_key: bool = False,
+):
     """Handler for mocking external calls in get_api_config."""
-    with ExitStack() as stack:
-        mock_response = MagicMock()
-        mock_response.json.return_value = {
+    if missing_key:
+        mock_json_response = {
+            "llm_model": "test-llm-model",
+            # "embedding_model" key is intentionally omitted for this test
+        }
+    else:
+        mock_json_response = {
             "llm_model": "test-llm-model",
             "embedding_model": "test-embedding-model",
         }
+    with ExitStack() as stack:
+        mock_response = MagicMock()
+        mock_response.json.return_value = mock_json_response
         mock_request_get = stack.enter_context(
             patch(
                 "survey_assist_eval.pipeline.api.core.requests.get",
                 return_value=mock_response,
             )
         )
+        if non_2xx_response:
+            mock_response.status_code = 500
+            mock_response.raise_for_status.side_effect = HTTPError(
+                "Internal Server Error"
+            )
         yield {
             "request_get": mock_request_get,
             "response": mock_response,
@@ -240,6 +256,53 @@ class TestApiEvaluator:
             "Expected get_api_config to return the JSON from the mocked "
             "response."
         )
+        num_jwt_calls = init_mock["get_jwt"].call_count
+        assert num_jwt_calls == 2, (
+            "Expected jwt check/refresh to be called twice; once during init "
+            f"and once during get_api_config. Got {num_jwt_calls}."
+        )
+
+    @pytest.mark.parametrize("api_eval_config", ["sic", "soc"], indirect=True)
+    def test_api_evaluator_get_api_config_missing_key(
+        self, api_eval_config: core_module.ApiEvaluatorConfig
+    ) -> None:
+        """Test get_api_config raises KeyError when a key is missing.
+
+        This simulates a scenario where the API does not return a required
+        configuration paramter and demonstrates that the ApiEvaluator class
+        correctly raises a KeyError.
+        """
+        with (
+            api_eval_init_mocks() as init_mock,
+            api_eval_get_api_config_mocks(missing_key=True),
+        ):
+            ae = core_module.ApiEvaluator(api_eval_config)
+            with pytest.raises(KeyError, match="embedding_model"):
+                ae.get_api_config()
+
+        num_jwt_calls = init_mock["get_jwt"].call_count
+        assert num_jwt_calls == 2, (
+            "Expected jwt check/refresh to be called twice; once during init "
+            f"and once during get_api_config. Got {num_jwt_calls}."
+        )
+
+    @pytest.mark.parametrize("api_eval_config", ["sic", "soc"], indirect=True)
+    def test_api_evaluator_get_api_config_non_2xx_response(
+        self, api_eval_config: core_module.ApiEvaluatorConfig
+    ) -> None:
+        """Test get_api_config raises HTTPError for non-2XX responses.
+
+        This simulates a scenario where the API returns a non-2XX response and
+        demonstrates that the ApiEvaluator class correctly raises an HTTPError.
+        """
+        with (
+            api_eval_init_mocks() as init_mock,
+            api_eval_get_api_config_mocks(non_2XX_response=True),
+        ):
+            ae = core_module.ApiEvaluator(api_eval_config)
+            with pytest.raises(HTTPError, match="Internal Server Error"):
+                ae.get_api_config()
+
         num_jwt_calls = init_mock["get_jwt"].call_count
         assert num_jwt_calls == 2, (
             "Expected jwt check/refresh to be called twice; once during init "
