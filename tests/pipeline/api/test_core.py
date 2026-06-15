@@ -1,10 +1,12 @@
 """Unit tests for ApiEvaluator core functionality."""
 
 import datetime
+from contextlib import ExitStack, contextmanager
+from unittest.mock import MagicMock, patch
 
 import pytest
 
-from survey_assist_eval.pipeline.api import core as db_module
+from survey_assist_eval.pipeline.api import core as core_module
 
 # turning off black for this file: set max line length to match PEP8 (79 chars)
 # for improved readability
@@ -31,6 +33,54 @@ def default_api_eval_config() -> dict:
     }
 
 
+@pytest.fixture
+def api_eval_config(
+    request: pytest.FixtureRequest,
+    default_api_eval_config: dict
+) -> core_module.ApiEvaluatorConfig:
+    """Fixture for ApiEvaluatorConfig with specified classify_type."""
+    classify_type = request.param
+    config = default_api_eval_config.copy()
+    config["classify_type"] = classify_type
+    return core_module.ApiEvaluatorConfig(**config)
+
+
+@contextmanager
+def api_eval_init_mocks():
+    """Handler for mocking ApiEvaluator init and method calls."""
+    with ExitStack() as stack:
+        mock_logger = MagicMock()
+        mock_job_doc = MagicMock()
+
+        # mock JWT retrieval and validation to bypass auth in tests
+        mock_get_jwt = stack.enter_context(
+            patch(
+                "survey_assist_eval.pipeline.api.core.check_and_refresh_token",
+                return_value=(1234, "test_jwt"),
+            )
+        )
+        mock_initialise_firestore = stack.enter_context(
+            patch(
+                "survey_assist_eval.pipeline.api.core.initialise_firestore",
+                return_value=mock_job_doc,
+            )
+        )
+        mock_get_logger = stack.enter_context(
+            patch(
+                "survey_assist_eval.pipeline.api.core.get_logger",
+                return_value=mock_logger,
+            )
+        )
+
+        yield {
+            "logger": mock_logger,
+            "job_doc": mock_job_doc,
+            "get_jwt": mock_get_jwt,
+            "initialise_firestore": mock_initialise_firestore,
+            "get_logger": mock_get_logger,
+        }
+
+
 class TestApiEvaluatorConfig:
     """Unit tests for ApiEvaluatorConfig dataclass."""
 
@@ -43,7 +93,7 @@ class TestApiEvaluatorConfig:
         """Integration test for ApiEvaluatorConfig."""
         config = default_api_eval_config.copy()
         config["classify_type"] = classify_type
-        aeconfig = db_module.ApiEvaluatorConfig(**config)
+        aeconfig = core_module.ApiEvaluatorConfig(**config)
 
         # assert all values are correctly assigned in the dataclass
         for key, value in config.items():
@@ -74,7 +124,7 @@ class TestApiEvaluatorConfig:
             ValueError,
             match="Invalid classify type: invalid_type. Valid classify types",
         ):
-            db_module.ApiEvaluatorConfig(**config)
+            core_module.ApiEvaluatorConfig(**config)
 
     @pytest.mark.parametrize(
         "semaphore_limit, limit", [("classify", 0), ("lookup", -1)]
@@ -92,7 +142,7 @@ class TestApiEvaluatorConfig:
             ValueError,
             match=f"{full_semaphore_limit} must be at least 1. Got {limit}",
         ):
-            db_module.ApiEvaluatorConfig(**config)
+            core_module.ApiEvaluatorConfig(**config)
 
     def test_api_evaluator_config_invalid_log_level(
         self, default_api_eval_config: dict
@@ -106,13 +156,13 @@ class TestApiEvaluatorConfig:
             ValueError,
             match="Invalid log level: INVALID. Valid log levels are",
         ):
-            db_module.ApiEvaluatorConfig(**config)
+            core_module.ApiEvaluatorConfig(**config)
 
     # ignoring pyline to unit test the private method _create_job_id
     # pylint: disable=W0212
     def test_api_evaluator_config__create_job_id(self) -> None:
         """Ensure created job IDs are of the expected format."""
-        job_id = db_module.ApiEvaluatorConfig._create_job_id()
+        job_id = core_module.ApiEvaluatorConfig._create_job_id()
         uuid, timestamp = job_id.split("-")
         # base57-encoded UUIDs are always 22 chars
         assert len(uuid) == 22, (
@@ -125,3 +175,39 @@ class TestApiEvaluatorConfig:
                 f"Timestamp part of job_id '{timestamp}' is not in the "
                 "expected format YYYYMMDDHHMMSS."
             )
+
+
+class TestApiEvaluator:
+    """Unit tests for ApiEvaluator class."""
+
+    # need to access private attributes for testing purposes
+    # pylint: disable=W0212
+    @pytest.mark.parametrize("api_eval_config", ["sic", "soc"], indirect=True)
+    def test_api_evaluator_initialisation(
+        self, api_eval_config: core_module.ApiEvaluatorConfig
+    ) -> None:
+        """Ensure ApiEvaluator initialises with correct config and job doc."""
+        with api_eval_init_mocks() as init_mock:
+            ae = core_module.ApiEvaluator(api_eval_config)
+
+        init_mock["get_jwt"].assert_called_once()
+        init_mock["initialise_firestore"].assert_called_once_with(
+            api_eval_config.gcp_project_id,
+            api_eval_config.firestore_db_id,
+            api_eval_config.firestore_collection_id,
+            api_eval_config._job_id,
+            api_eval_config.log_level,
+        )
+        assert ae._gcp["firestore_doc"] == init_mock["job_doc"], (
+            "Expected _job_doc to be the mock job_doc returned from "
+            "initialise_firestore."
+        )
+
+    @pytest.mark.parametrize("api_eval_config", ["sic", "soc"], indirect=True)
+    def test_api_evaluator_get_api_config_success(
+        self, api_eval_config: core_module.ApiEvaluatorConfig
+    ) -> None:
+        """Test get_api_config method returns successfully."""
+        # temp call so silenve pylint
+        with api_eval_init_mocks():
+            core_module.ApiEvaluator(api_eval_config)
