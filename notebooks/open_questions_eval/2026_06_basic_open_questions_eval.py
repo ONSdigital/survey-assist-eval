@@ -1,4 +1,4 @@
-"""A script to evaluate the open questions (Non-LLM)."""
+"""A script to evaluate the open questions."""
 
 # pylint: disable=C0103
 
@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 from src.survey_assist_eval.evaluation.open_questions_metrics import (
     count_chars_in_column,
     count_words_in_column,
+    filter_nonempty_object_column,
 )
 
 # %%
@@ -31,16 +32,12 @@ stg3_df = pd.read_parquet(stg3_file)
 
 # %%
 #
-stg3_df["followup_question_char_count"] = count_chars_in_column(
-    stg3_df, "followup_question"
+stg3_followup_df = filter_nonempty_object_column(df=stg3_df, column="followup_question")
+stg3_followup_df["followup_question_char_count"] = count_chars_in_column(
+    stg3_followup_df, "followup_question"
 )
-px.histogram(
-    stg3_df[stg3_df["followup_question_char_count"] > 0]["followup_question_char_count"]
-).show()
+px.histogram(stg3_followup_df["followup_question_char_count"]).show()
 
-stg3_df["followup_question_word_count"] = count_words_in_column(
-    stg3_df, "followup_question"
+stg3_followup_df["followup_question_word_count"] = count_words_in_column(
+    stg3_followup_df, "followup_question"
 )
-px.histogram(
-    stg3_df[stg3_df["followup_question_word_count"] > 0]["followup_question_word_count"]
-).show()
