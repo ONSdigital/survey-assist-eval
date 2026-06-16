@@ -1,11 +1,13 @@
 """A script to evaluate the open questions (Non-LLM)."""
 
-# %%
+# pylint: disable=C0103
 
-# pylint: disable=C0301
+# %%
+import os
 
 import pandas as pd
 import plotly.express as px
+from dotenv import load_dotenv
 
 from src.survey_assist_eval.evaluation.open_questions_metrics import (
     count_chars_in_column,
@@ -13,14 +15,19 @@ from src.survey_assist_eval.evaluation.open_questions_metrics import (
 )
 
 # %%
-BUCKET_NAME = "ons-survey-assist-dev-evaluation-data"
+load_dotenv()
+bucket_name = os.getenv("EVALUATION_BUCKET_NAME")
+if not bucket_name:
+    raise ValueError("EVALUATION_BUCKET_NAME environment variable not set")
 
-WORK_FOLDER = (
-    f"gs://{BUCKET_NAME}/evaluation-pipeline/two_prompt_pipeline/"
+print(f"Using bucket for data loading: {bucket_name}")
+
+stg3_folder = (
+    f"gs://{bucket_name}/evaluation-pipeline/two_prompt_pipeline/"
     "2026_03_tlfs_it11_gemini25_europe_west9/"
 )
-STG3_FILE = f"{WORK_FOLDER}STG3.parquet"
-stg3_df = pd.read_parquet(STG3_FILE)
+stg3_file = f"{stg3_folder}STG3.parquet"
+stg3_df = pd.read_parquet(stg3_file)
 
 # %%
 #
