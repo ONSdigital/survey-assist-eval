@@ -191,7 +191,7 @@ def api_eval_call_api_classify_mocks(mock_api_error: bool = False):
         if mock_api_error:
             mock_response.status = 500
             mock_response.json = AsyncMock(
-                return_value={"details": [{"msg": "Internal Server Error"}]}
+                return_value={"detail": [{"msg": "Internal Server Error"}]}
             )
         else:
             mock_response.status = 200
