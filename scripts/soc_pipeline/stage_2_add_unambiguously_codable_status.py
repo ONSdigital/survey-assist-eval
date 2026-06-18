@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # pylint: disable=duplicate-code, redefined-outer-name
 """This script analyzes a dataset to determine if each record is
-"unambiguously codable" for a Standard Industrial Classification (SIC) code.
+"unambiguously codable" for a Standard Occupational Classification (SOC) code.
 
 It reloads the output from the previous stage as a DataFrame object, uses a
 Large Language Model (LLM) to assess codability for each row, and adds new
-columns for the codability status, an initial SIC code (if one can be
-assigned), and a list of alternative SIC candidates. The results are then saved
+columns for the codability status, an initial SOC code (if one can be
+assigned), and a list of alternative SOC candidates. The results are then saved
 to CSV, parquet, and JSON metadata files in a user-specified output folder.
 
 The script requires a configured connection to a compatible LLM.
@@ -18,7 +18,7 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
-from industrial_classification_utils.llm.llm import ClassificationLLM
+from occupational_classification_utils.llm.llm import ClassificationLLM
 from tqdm import tqdm
 
 from survey_assist_eval.pipeline.shared_components import (
@@ -29,20 +29,21 @@ from survey_assist_eval.pipeline.shared_components import (
 
 #####################################################
 # Default values and constants:
+MERGED_INDUSTRY_DESC_COL = "merged_industry_desc"
 JOB_TITLE_COL = "soc2020_job_title"
 JOB_DESCRIPTION_COL = "soc2020_job_description"
-MERGED_INDUSTRY_DESC_COL = "merged_industry_desc"
+EDUCATION_COL = "level_of_education"
 
 OUTPUT_COLS_INITIAL = {
-    "sic_code_col": "initial_code",
+    "soc_code_col": "initial_code",
     "codable_col": "unambiguously_codable",
-    "alt_candidates_col": "alt_sic_candidates",
+    "alt_candidates_col": "alt_soc_candidates",
     "semantic_search_col": "semantic_search_results",
 }
 OUTPUT_COLS_FINAL = {
-    "sic_code_col": "final_code",
+    "soc_code_col": "final_code",
     "codable_col": "unambiguously_codable_final",
-    "alt_candidates_col": "alt_sic_candidates_final",
+    "alt_candidates_col": "alt_soc_candidates_final",
     "semantic_search_col": "second_semantic_search_results",
 }
 MAX_CONCURRENT_TASKS = 10
@@ -53,23 +54,24 @@ tqdm.pandas()
 
 
 # This new async function processes a whole batch of rows concurrently.
-async def get_unambiguous_sic_batch_async(
+async def get_unambiguous_soc_batch_async(
     batch: pd.DataFrame,
     semantic_search_col: str,
     c_llm: ClassificationLLM,
     candidates_limit: int,
     code_digits: int,
 ) -> list[dict[str, Any]]:
-    """Processes a batch of rows asynchronously to get unambiguous SIC codability."""
+    """Processes a batch of rows asynchronously to get unambiguous SOC codability."""
     semaphore = asyncio.Semaphore(MAX_CONCURRENT_TASKS)
 
     async def _run_row(row: pd.Series):
         async with semaphore:
-            return await c_llm.unambiguous_sic_code(
+            return await c_llm.unambiguous_soc_code(
                 industry_descr=row[MERGED_INDUSTRY_DESC_COL],
                 semantic_search_results=row[semantic_search_col],
                 job_title=row[JOB_TITLE_COL],
                 job_description=row[JOB_DESCRIPTION_COL],
+                # level_of_education=row.get(EDUCATION_COL, "unknown"),
                 candidates_limit=candidates_limit,
                 code_digits=code_digits,
             )
@@ -121,8 +123,8 @@ async def main_async(
 
     if col_names["codable_col"] not in df.columns:
         df[col_names["codable_col"]] = False
-    if col_names["sic_code_col"] not in df.columns:
-        df[col_names["sic_code_col"]] = ""
+    if col_names["soc_code_col"] not in df.columns:
+        df[col_names["soc_code_col"]] = ""
     if col_names["alt_candidates_col"] not in df.columns:
         df[col_names["alt_candidates_col"]] = [[] for _ in range(len(df))]
 
@@ -145,12 +147,12 @@ async def main_async(
         if batch_id == 0:
             pass
         else:
-            results = await get_unambiguous_sic_batch_async(
+            results = await get_unambiguous_soc_batch_async(
                 batch,
                 semantic_search_col=col_names["semantic_search_col"],
                 c_llm=c_llm,
                 candidates_limit=metadata["llm_candidates_limit"],
-                code_digits=metadata["sic_code_digits"],
+                code_digits=metadata["soc_code_digits"],
             )
 
             # Write results directly into output columns (no extractor helpers)
@@ -158,7 +160,7 @@ async def main_async(
                 [bool(r.get("unambiguously_codable", False)) for r in results],
                 index=batch.index,
             )
-            df.loc[batch.index, col_names["sic_code_col"]] = pd.Series(
+            df.loc[batch.index, col_names["soc_code_col"]] = pd.Series(
                 [str(r.get("code") or "") for r in results],
                 index=batch.index,
             )
@@ -198,7 +200,7 @@ if __name__ == "__main__":
 
     c_llm = ClassificationLLM(
         model_name=metadata["llm_model_name"],
-        model_location=metadata["llm_model_location"],
+        # model_location=metadata["llm_model_location"],
         verbose=False,
     )
     print("Classification LLM loaded.")
