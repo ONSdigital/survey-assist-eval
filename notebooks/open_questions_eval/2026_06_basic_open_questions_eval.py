@@ -9,9 +9,9 @@ import pandas as pd
 from dotenv import load_dotenv
 
 from src.survey_assist_eval.evaluation.open_questions_metrics import (
-    count_chars_in_column,
-    count_words_in_column,
+    add_text_stats_columns,
     filter_nonempty_object_column,
+    summarise_text_stats,
 )
 from src.survey_assist_eval.evaluation.plotting_helpers import (
     build_filterable_dashboard,
@@ -41,13 +41,25 @@ stg3_df = pd.read_parquet(stg3_file)
 
 # %%
 stg3_followup_df = filter_nonempty_object_column(df=stg3_df, column="followup_question")
-stg3_followup_df["followup_question_char_count"] = count_chars_in_column(
-    stg3_followup_df, "followup_question"
+
+stg3_followup_df = add_text_stats_columns(
+    df=stg3_followup_df,
+    text_column="followup_question",
+    result_prefix="followup_question_",
+    inplace=False,
 )
 
-stg3_followup_df["followup_question_word_count"] = count_words_in_column(
-    stg3_followup_df, "followup_question"
+stg3_followup_summary_stats = summarise_text_stats(
+    df=stg3_followup_df,
+    prefix="followup_question_",
+    word_threshold=15,
+    sentence_threshold=1,
+    long_sentence_threshold=20,
+    short_word_count_threshold=3,
 )
+
+print(stg3_followup_summary_stats)
+
 # %%
 filterable_plots = []
 followup_eval_cols = [

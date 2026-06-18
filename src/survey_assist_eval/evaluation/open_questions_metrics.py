@@ -1,10 +1,7 @@
 """Calculation of metrics for open questions."""
 
-import nltk
 import pandas as pd
-from nltk.corpus import cmudict
-
-nltk.download("cmudict")
+from textstat import textstat
 
 
 def filter_nonempty_object_column(df: pd.DataFrame, column: str) -> pd.DataFrame:
@@ -22,95 +19,129 @@ def filter_nonempty_object_column(df: pd.DataFrame, column: str) -> pd.DataFrame
     return df[mask].copy()
 
 
-def count_chars_in_column(
-    df: pd.DataFrame, column: str, result_col: str | None = None
+def get_text_stats(text: str) -> dict[str, int | float]:
+    """Return basic text stats for one string.
+
+    Args:
+        text: Text to analyze.
+
+    Returns:
+        A dict with word, sentence, syllable, character, letter and
+        average stats.
+
+    Note:
+        Sentence counts follow textstat behaviour, where sentences
+        with two words or fewer may not be counted.
+    """
+    return {
+        "word_count": textstat.lexicon_count(text, removepunct=True),
+        "sentence_count": textstat.sentence_count(text),
+        "syllable_count": textstat.syllable_count(text),
+        "character_count": textstat.char_count(text),
+        "letter_count": textstat.letter_count(text),
+        "mean_words_per_sentence": textstat.words_per_sentence(text),
+        "mean_syllables_per_word": textstat.avg_syllables_per_word(text),
+    }
+
+
+def add_text_stats_columns(
+    df: pd.DataFrame,
+    text_column: str,
+    result_prefix: str | None = None,
+    inplace: bool = False,
+) -> pd.DataFrame:
+    """Add text stats columns for a DataFrame text column.
+
+    Args:
+        df: DataFrame with text data.
+        text_column: Column containing text.
+        result_prefix: Prefix for new columns. Defaults to "{text_column}_".
+        inplace: If True, add columns in place and return the same DataFrame.
+
+    Returns:
+        DataFrame with added text stat columns.
+    """
+    stats_df = (
+        df[text_column].fillna("").astype(str).apply(get_text_stats).apply(pd.Series)
+    )
+
+    if result_prefix is None:
+        result_prefix = f"{text_column}_"
+
+    stats_df = stats_df.rename(columns=lambda col: f"{result_prefix}{col}")
+
+    if inplace:
+        df.loc[:, stats_df.columns] = stats_df
+        return df
+
+    return df.join(stats_df)
+
+
+def summarise_text_stats(  # noqa: PLR0913 pylint: disable=R0917, R0913
+    df: pd.DataFrame,
+    prefix: str | None = None,
+    text_column: str | None = None,
+    word_threshold: int = 25,
+    sentence_threshold: int = 2,
+    long_sentence_threshold: int = 20,
+    short_word_count_threshold: int = 2,
 ) -> pd.Series:
-    """Return per-row character counts for the given DataFrame column.
+    """Summarise text statistics for a DataFrame.
 
     Args:
-        df: DataFrame containing the target column.
-        column: Name of the column to count characters for.
-        result_col: Optional column name to write the counts back into the DataFrame.
+        df: DataFrame with text statistic columns already added.
+        prefix: Prefix for stat columns (required if stats already exist).
+        text_column: If provided, stats will be computed using
+            add_text_stats_columns.
+        word_threshold: Threshold for "long" text (word count).
+        sentence_threshold: Threshold for number of sentences.
+        long_sentence_threshold: Threshold for long sentences
+            (words per sentence).
+        short_word_count_threshold: Threshold for "blank or too short".
 
     Returns:
-        A Series of integer character counts for each row in the specified column.
+        A Series with summary statistics.
+
+    Notes:
+        - If text_column is provided, stats are computed internally.
+        - If not, prefix must be provided and columns must already exist.
     """
-    counts = df[column].fillna("").astype(str).str.len()
-    if result_col:
-        df[result_col] = counts
-    return counts
+    if text_column is not None:
+        if prefix is None:
+            prefix = f"{text_column}_"
+        df = add_text_stats_columns(
+            df.copy(),
+            text_column=text_column,
+            result_prefix=prefix,
+            inplace=False,
+        )
+    elif prefix is None:
+        raise ValueError("Provide either text_column or prefix.")
 
+    summary = {
+        "n_outputs": len(df),
+        "mean_word_count": df[f"{prefix}word_count"].mean(),
+        "median_word_count": df[f"{prefix}word_count"].median(),
+        "sd_word_count": df[f"{prefix}word_count"].std(),
+        "mean_sentence_count": df[f"{prefix}sentence_count"].mean(),
+        "mean_words_per_sentence": df[f"{prefix}mean_words_per_sentence"].mean(),
+        "mean_syllables_per_word": df[f"{prefix}mean_syllables_per_word"].mean(),
+        f"pct_over_{word_threshold}_words": (
+            df[f"{prefix}word_count"] > word_threshold
+        ).mean()
+        * 100,
+        f"pct_over_{sentence_threshold}_sentences": (
+            df[f"{prefix}sentence_count"] > sentence_threshold
+        ).mean()
+        * 100,
+        "pct_long_sentence": (
+            df[f"{prefix}mean_words_per_sentence"] > long_sentence_threshold
+        ).mean()
+        * 100,
+        "pct_blank_or_too_short": (
+            df[f"{prefix}word_count"] <= short_word_count_threshold
+        ).mean()
+        * 100,
+    }
 
-def count_words_in_column(
-    df: pd.DataFrame, column: str, result_col: str | None = None
-) -> pd.Series:
-    """Return per-row word counts for the given DataFrame column.
-
-    Args:
-        df: DataFrame containing the target column.
-        column: Name of the object column to count words for.
-        result_col: Optional column name to write the counts back into the DataFrame.
-
-    Returns:
-        A Series of integer word counts for each row in the specified column.
-    """
-    counts = df[column].fillna("").astype(str).str.split().str.len()
-    if result_col:
-        df[result_col] = counts
-    return counts
-
-
-def lookup_word(word: str, first: bool = False):
-    """Quick lookup helper for the NLTK CMU Pronouncing Dictionary.
-
-    Returns the pronunciations for `word` from the cached `cmu_dict`.
-    If ``first`` is True, returns only the first pronunciation (a list of
-    ARPAbet symbols). Returns ``None`` if the word is not found or input is empty.
-    """
-    if not word:
-        return None
-    key = word.lower().strip()
-    prons = cmudict.dict().get(key)
-    if not prons:
-        return None
-    return prons[0] if first else prons
-
-
-def count_syllables(word: str) -> int | None:
-    """Return syllable count for `word` using the CMU Pronouncing Dictionary.
-
-    This simple implementation uses the first pronunciation entry from
-    `cmu_dict[word]` (if present) and counts phonemes that include a
-    stress digit (the CMU convention for vowel phonemes, e.g. 'AH0', 'AE1').
-
-    Args:
-        word: The input word to count syllables for.
-
-    Returns:
-        The estimated syllable count as an int, or ``None`` if the word is
-        not found in the CMU dictionary or the input is empty.
-    """
-    if not word:
-        return None
-
-    prons = lookup_word(word=word, first=False)
-
-    if not prons:
-        return None
-
-    if len(prons) == 1:  # only one pronounciation
-        # use stress point digits to count syllables
-        syll_count = sum(1 for phoneme in prons[0] if phoneme[-1].isdigit())
-    else:
-        # multiple pronunciations, get all counts
-        syll_counts = [
-            sum(1 for phoneme in pron if phoneme[-1].isdigit()) for pron in prons
-        ]
-
-        if all(syll_count == syll_counts[0] for syll_count in syll_counts):
-            syll_count = syll_counts[0]
-        else:
-            # if multiple pronunciations have different syllable counts, return None
-            return None
-
-    return syll_count
+    return pd.Series(summary)
