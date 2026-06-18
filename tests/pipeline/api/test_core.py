@@ -35,6 +35,20 @@ def default_api_eval_config() -> dict:
     }
 
 
+@contextmanager
+def api_eval_config_mocks():
+    """Handler for mocking ApiEvaluatorConfig initialisation."""
+    with ExitStack() as stack:
+        stack.enter_context(
+            patch.object(
+                core_module.ApiEvaluatorConfig,
+                "_get_test_data_file_path",
+                return_value="gs://test-bucket/path/test_data.parquet",
+            )
+        )
+        yield
+
+
 @pytest.fixture
 def api_eval_config(
     request: pytest.FixtureRequest,
@@ -44,7 +58,9 @@ def api_eval_config(
     classify_type = request.param
     config = default_api_eval_config.copy()
     config["classify_type"] = classify_type
-    return core_module.ApiEvaluatorConfig(**config)
+
+    with api_eval_config_mocks():
+        return core_module.ApiEvaluatorConfig(**config)
 
 
 @pytest.fixture
@@ -249,7 +265,8 @@ class TestApiEvaluatorConfig:
         """Integration test for ApiEvaluatorConfig."""
         config = default_api_eval_config.copy()
         config["classify_type"] = classify_type
-        aeconfig = core_module.ApiEvaluatorConfig(**config)
+        with api_eval_config_mocks():
+            aeconfig = core_module.ApiEvaluatorConfig(**config)
 
         # assert all values are correctly assigned in the dataclass
         for key, value in config.items():
@@ -276,7 +293,7 @@ class TestApiEvaluatorConfig:
         config = default_api_eval_config.copy()
         config["classify_type"] = "invalid_type"
 
-        with pytest.raises(
+        with api_eval_config_mocks(), pytest.raises(
             ValueError,
             match="Invalid classify type: invalid_type. Valid classify types",
         ):
@@ -294,7 +311,7 @@ class TestApiEvaluatorConfig:
         full_semaphore_limit = f"{semaphore_limit}_semaphore_limit"
         config[full_semaphore_limit] = limit
 
-        with pytest.raises(
+        with api_eval_config_mocks(), pytest.raises(
             ValueError,
             match=f"{full_semaphore_limit} must be at least 1. Got {limit}",
         ):
@@ -308,7 +325,7 @@ class TestApiEvaluatorConfig:
         config["classify_type"] = "sic"  # valid classify type for this test
         config["log_level"] = "INVALID"
 
-        with pytest.raises(
+        with api_eval_config_mocks(), pytest.raises(
             ValueError,
             match="Invalid log level: INVALID. Valid log levels are",
         ):

@@ -12,6 +12,7 @@ from typing import Any, ClassVar, Literal
 import aiohttp
 import requests
 import shortuuid
+from google.cloud import storage
 from survey_assist_utils.api_token.jwt_utils import check_and_refresh_token
 from survey_assist_utils.logging import get_logger
 from survey_assist_utils.logging.logging_utils import VALID_LOG_LEVELS
@@ -23,8 +24,8 @@ from survey_assist_eval.pipeline.api.db import (
 
 HTTP_STATUS_OK = 200
 HTTP_STATUS_NOT_FOUND = 404
-SIC_TEST_FILE = "sic_2k_test_data.parquet"
-SOC_TEST_FILE = "soc_4k_test_data.parquet"
+SIC_TEST_FILE = "sic_2k/sic_2k_test_data.parquet"
+SOC_TEST_FILE = "soc_4k/soc_4k_test_data.parquet"
 
 
 # ignore pylint as parameters are required to configure API evaluation
@@ -80,6 +81,7 @@ class ApiEvaluatorConfig:  # pylint: disable=too-many-instance-attributes
     lookup_semaphore_limit: int = 5
     log_level: str = "INFO"
     _job_id: str = field(default="", init=False)
+    _test_data_file_path: str = field(default="", init=False)
 
     def __post_init__(self) -> None:
         normalised = self.classify_type.lower()
@@ -109,6 +111,10 @@ class ApiEvaluatorConfig:  # pylint: disable=too-many-instance-attributes
         # create unique job ID for this evaluation run
         self._job_id = self._create_job_id()
 
+        # build input test filepath based on classify type and ensure it
+        # exists before starting the evaluation
+        self._test_data_file_path = self._get_test_data_file_path()
+
     @staticmethod
     def _create_job_id() -> str:
         """Create a unique job ID using a timestamp and random string."""
@@ -117,6 +123,30 @@ class ApiEvaluatorConfig:  # pylint: disable=too-many-instance-attributes
             "%Y%m%d%H%M%S"
         )
         return f"{uuid}-{timestamp}"
+
+    def _get_test_data_file_path(self) -> str:
+        """Build the test data file path based on the classify type.
+
+        Also ensure the test data file exists before starting the evaluation.
+        """
+        test_file = (
+            SIC_TEST_FILE if self.classify_type == "sic" else SOC_TEST_FILE
+        )
+        test_data_file_path = f"{self.gcp_test_data_bucket_path}/{test_file}"
+
+        # check if test data file exists in GCP bucket
+        storage_client = storage.Client(project=self.gcp_project_id)
+        bucket_name, blob_path = test_data_file_path.replace(
+            "gs://", ""
+        ).split("/", 1)
+        bucket = storage_client.bucket(bucket_name)
+        blob = bucket.blob(blob_path)
+        if not blob.exists():
+            raise FileNotFoundError(
+                f"Test data file not found: {test_data_file_path}"
+            )
+
+        return test_data_file_path
 
 
 class ApiEvaluator:
