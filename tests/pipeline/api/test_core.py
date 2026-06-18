@@ -22,6 +22,7 @@ def default_api_eval_config() -> dict:
     """Fixture for default ApiEvaluatorConfig values."""
     return {
         "gcp_project_id": "test_project",
+        "gcp_test_data_bucket_path": "gs://test-bucket/path",
         "api_gw_url": "https://api-gw-url",
         "api_gw_sa_email": "api-gw-sa@email.com",
         "firestore_db_id": "test_db",

@@ -23,6 +23,8 @@ from survey_assist_eval.pipeline.api.db import (
 
 HTTP_STATUS_OK = 200
 HTTP_STATUS_NOT_FOUND = 404
+SIC_TEST_FILE = "sic_2k_test_data.parquet"
+SOC_TEST_FILE = "soc_4k_test_data.parquet"
 
 
 # ignore pylint as parameters are required to configure API evaluation
@@ -42,6 +44,9 @@ class ApiEvaluatorConfig:  # pylint: disable=too-many-instance-attributes
             with the API.
         classify_type: The type of classification to perform. Must be either
             "sic" or "soc".
+        gcp_test_data_bucket_path: The GCP bucket path where the test data is
+            stored. This is used to determine the location of the test data
+            files when performing the evaluation.
         firestore_db_id: The Firestore database ID to use for storing
             evaluation results.
         firestore_collection_id: The Firestore collection ID to use for storing
@@ -66,6 +71,7 @@ class ApiEvaluatorConfig:  # pylint: disable=too-many-instance-attributes
     api_gw_url: str
     api_gw_sa_email: str
     classify_type: str
+    gcp_test_data_bucket_path: str
     firestore_db_id: str
     firestore_collection_id: str
     execution_id: str | None

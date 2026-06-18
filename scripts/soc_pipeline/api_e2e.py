@@ -23,6 +23,7 @@ from survey_assist_eval.pipeline.api.core import (
 
 load_dotenv()
 GCP_PROJECT_ID = os.getenv("PROJECT_ID")
+GCP_TEST_DATA_BUCKET_PATH = os.getenv("EVALUATION_BUCKET_NAME")
 API_GW_URL = f"https://{os.getenv('API_GATEWAY')}"
 API_GW_SA_EMAIL = os.getenv("SA_EMAIL")
 FIRESTORE_DB_ID = os.getenv("API_EVAL_FIRESTORE_DB_ID")
@@ -83,6 +84,7 @@ def main(classify_type: Literal["sic", "soc"]) -> None:
     )
     api_evaluator_cfg = ApiEvaluatorConfig(
         gcp_project_id=GCP_PROJECT_ID,
+        gcp_test_data_bucket_path=GCP_TEST_DATA_BUCKET_PATH,
         api_gw_url=API_GW_URL,
         api_gw_sa_email=API_GW_SA_EMAIL,
         classify_type=classify_type,
