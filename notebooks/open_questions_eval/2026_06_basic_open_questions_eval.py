@@ -20,6 +20,11 @@ from src.survey_assist_eval.evaluation.plotting_helpers import (
 )
 
 # %%
+out_dir = "data/figures/open_questions_evals/"  # set as None to not save
+if out_dir:
+    os.makedirs(out_dir, exist_ok=True)
+
+# %%
 load_dotenv()
 bucket_name = os.getenv("EVALUATION_BUCKET_NAME")
 if not bucket_name:
@@ -44,18 +49,6 @@ stg3_followup_df["followup_question_word_count"] = count_words_in_column(
     stg3_followup_df, "followup_question"
 )
 # %%
-input_df = stg3_followup_df.copy()
-group_col = "sic_section"
-groups_order = None
-default_group = "All"
-figure_builder = build_histogram
-include_default_group = True
-kwargs = {
-    "x_col": "followup_question_word_count",
-    "nbins": 20,
-    "xtitle": "Follow-up Question Word Count",
-}
-
 filterable_plots = []
 followup_eval_cols = [
     col for col in stg3_followup_df.columns if "followup_question_" in col
@@ -73,18 +66,28 @@ for eval_col in followup_eval_cols:
         groups_order=None,
         include_default_group=True,
         x_col=eval_col,
-        nbins=20,
-        xtitle=x_col_title,
-        title=f"Follow-up Question{x_col_title} Distribution by SIC Section",
+        nbinsx=20,
+        layout={
+            "xtitle": x_col_title,
+            "title": f"Follow-up Question{x_col_title} Distribution by SIC Section",
+        },
         showlegend=True,
     )
 
     filterable_plots.append(fig)
 
-build_filterable_dashboard(
+simple_language_dashboard = build_filterable_dashboard(
     filterable_plots=filterable_plots,
     default_group="All",
+    include_default_group=True,
 )
 
+
+# %%
+
+if out_dir:
+    simple_language_dashboard.write_html(
+        f"{out_dir}/simple_langauge_eval_dashboard.html"
+    )
 
 # %%

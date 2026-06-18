@@ -1,105 +1,239 @@
+"""Plotting Helper Functions used in Notebooks."""
+
 from collections.abc import Callable
 from copy import deepcopy
+from typing import Any
 
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.express import colors
 from plotly.subplots import make_subplots
 
+# ruff: noqa: PLR0913
+# pylint: disable=R0914,R0917,R0913
 
-def build_histogram(  # noqa
+
+def build_histogram(
     df: pd.DataFrame,
     x_col: str,
-    nbins: int = 20,
-    name: str | None = None,
-    title: str | None = None,
-    xtitle: str | None = None,
-    ytitle: str = "Count",
-    color: str | None = None,
-    opacity: float = 0.75,
-    showlegend: bool = False,
-    template: str | None = None,
+    layout: dict[str, Any] | None = None,
+    **hist_kwargs,
 ) -> go.Figure:
     """Return a simple Plotly histogram figure.
 
     Args:
         df: The DataFrame containing the data to histogram.
         x_col: The column name in df to histogram.
-        nbins: Number of histogram bins for numeric data.
-        title: Optional figure title.
-        xtitle: Optional x-axis title.
-        ytitle: Optional y-axis title.
-        color: Optional bar color.
-        opacity: Histogram trace opacity.
-        showlegend: Whether to show the trace legend.
-        template: Optional Plotly layout template name.
+        layout: Dictionary of layout options (title, xtitle, ytitle, template).
+        **hist_kwargs: Additional go.Histogram kwargs (nbins, name, color, opacity, showlegend).
 
     Returns:
         A Plotly Figure containing a single histogram trace.
     """
+    layout = layout or {}
     x = df[x_col].dropna()
 
     figure = go.Figure(
         data=go.Histogram(
             x=x,
-            nbinsx=nbins,
-            name=name,
-            marker_color=color,
-            opacity=opacity,
-            showlegend=showlegend,
             autobinx=not pd.api.types.is_numeric_dtype(x),
+            **hist_kwargs,
         )
     )
     figure.update_layout(
-        title_text=title,
-        xaxis_title=xtitle or "",
-        yaxis_title=ytitle,
-        template=template,
+        title_text=layout.get("title"),
+        xaxis_title=layout.get("xtitle", ""),
+        yaxis_title=layout.get("ytitle", "Count"),
+        template=layout.get("template"),
         margin={"t": 60, "b": 60, "l": 60, "r": 60},
     )
     return figure
 
 
 def make_colour_map(
-    filter_values: list[str], color_palette: list[str] | None = None
+    category_values: list[str],
+    palette_name: str | None = None,
+    palette_values: list[str] | None = None,
 ) -> dict[str, str]:
-    """Create a color map for the given filter values.
+    """Uses a named palette (e.g. "ons") or a custom list of colours.
+    Custom colours take priority if provided.
 
     Args:
-        filter_values: List of unique filter values.
-        color_palette: Optional list of colors to use. If None, a default palette is used.
+        category_values: Ordered list of category labels.
+        palette_name: Name of predefined palette to use. If None, use default.
+        palette_values: Optional list of colours to override palette.
 
     Returns:
-        A dictionary mapping filter values to colors.
+        Dictionary mapping each category to a colour.
+
+    Raises:
+        ValueError: If there are not enough colours for the categories.
     """
-    if color_palette is None:
-        color_palette = colors.qualitative.Light24
+    if not category_values:
+        raise ValueError("category_values must contain at least one value.")
 
-    return dict(zip(filter_values, color_palette[: len(filter_values)], strict=False))
+    # Select colour palette
+    if palette_values is not None:
+        colours = palette_values
+    elif palette_name == "ons":
+        colours = [
+            "#206095",
+            "#A8BD3A",
+            "#871A5B",
+            "#F66068",
+            "#05341A",
+            "#27A0CC",
+            "#003C57",
+            "#22D0B6",
+            "#746CB1",
+        ]
+    elif palette_name == "ons_plus":
+        colours = [
+            "#206095",
+            "#A8BD3A",
+            "#871A5B",
+            "#F66068",
+            "#05341A",
+            "#27A0CC",
+            "#003C57",
+            "#22D0B6",
+            "#746CB1",
+            "#E69F00",
+            "#D55E00",
+            "#F0E442",
+            "#CC79A7",
+            "#4A4DD1",
+            "#009E73",
+            "#8C510A",
+            "#BF812D",
+            "#C51B7D",
+        ]
+    else:
+        colours = colors.qualitative.Light24
+
+    # Validate length
+    if len(colours) < len(category_values):
+        raise ValueError(
+            f"Palette has {len(colours)} colours but "
+            f"{len(category_values)} categories are required."
+        )
+
+    # Create mapping
+    return dict(zip(category_values, colours, strict=False))
 
 
-def build_filterable_plot(  # noqa
+def _apply_trace_colors(trace: Any, color: str | None) -> None:
+    """Apply a colour to a trace.
+
+    Sets the colour on marker and line attributes if they exist.
+    """
+    if getattr(trace, "marker", None) is not None:
+        trace.marker.color = color
+    if getattr(trace, "line", None) is not None:
+        trace.line.color = color
+
+
+def _get_group_colors(
+    group_names: list[str], default_group: str, palette: str = "ons_plus"
+) -> dict[str, str]:
+    """Create a colour map for groups.
+
+    Uses the selected palette and sets the default group colour to grey.
+    """
+    colors_map = make_colour_map(group_names, palette_name=palette)
+    if default_group in colors_map:
+        colors_map[default_group] = "#A09FA0"
+    return colors_map
+
+
+def _build_visibility_buttons(
+    group_labels: list[str],
+    default_group: str,
+    trace_register: dict[str, list[int]],
+    fig_data_len: int,
+    include_default_group: bool = False,
+) -> list[dict[str, Any]]:
+    """Create dropdown buttons to control trace visibility.
+
+    Builds a list of Plotly dropdown buttons that toggle groups of traces
+    based on their indices in `trace_register`.
+
+    Args:
+        group_labels: List of group names.
+        default_group: Group added to all selections when
+            `include_default_group` is True.
+        trace_register: Mapping of group names to trace indices.
+        fig_data_len: Total number of traces in the figure.
+        include_default_group: If True, include default group traces
+            in all group selections.
+
+    Returns:
+        List of dropdown button definitions for Plotly.
+    """
+    buttons = [
+        {
+            "label": "All",
+            "method": "update",
+            "args": [{"visible": [True] * fig_data_len}],
+        }
+    ]
+
+    visibility_groups = [False] * fig_data_len
+
+    if include_default_group:
+        for idx in trace_register[default_group]:
+            visibility_groups[idx] = True
+
+    for legend_name in group_labels:
+        if legend_name == "All":
+            continue
+        visibility = visibility_groups.copy()
+
+        for idx in trace_register[legend_name]:
+            visibility[idx] = True
+
+        buttons.append(
+            {
+                "label": str(legend_name),
+                "method": "update",
+                "args": [
+                    {"visible": visibility},
+                ],
+            }
+        )
+
+    return buttons
+
+
+def build_filterable_plot(
     input_df: pd.DataFrame,
     group_col: str,
-    default_group: str,
     figure_builder: Callable,
+    default_group: str = "All",
     groups_order: list[str] | None = None,
-    include_default_group: bool = False,
+    group_colour_map: dict[str, str] | None = None,
+    include_default_group: bool = True,
     **kwargs,
 ) -> go.Figure:
-    """Create a figure with an always-visible selector for grouping values.
+    """Create a filterable figure by grouping data and toggling traces.
+
+    Builds a figure for each group using `figure_builder` and combines the
+    traces into a single figure. A dropdown menu is added to show or hide
+    groups by updating trace visibility.
 
     Args:
-        input_df: The input DataFrame containing the data to plot.
-        group_col: The column name in input_df to group by.
-        default_group: The group value that should be visible by default.
-        figure_builder: A callable that takes a DataFrame and returns a Plotly Figure.
-        groups_order: Explicit display order for groups in the selector.
-        include_default_group: Whether to include the default group in all other groups' plots.
-        **kwargs: Additional keyword arguments to pass to the figure_builder.
+        input_df: Data to plot.
+        group_col: Column defining groups.
+        figure_builder: Function that creates a Plotly figure from a DataFrame.
+        default_group: Group selected by default.
+        groups_order: Optional order for groups in the dropdown.
+        group_colour_map: Optional mapping of group names to colours.
+        include_default_group: If True, include default_group in all plots.
+        **kwargs: Additional arguments passed to `figure_builder`.
 
     Returns:
-        A Plotly Figure containing one trace per group and a dropdown selector to choose visibility.
+        A Plotly figure with grouped traces and a dropdown selector to
+        control visibility.
     """
     group_labels = input_df[group_col].dropna().drop_duplicates().tolist()
     if not group_labels:
@@ -116,31 +250,39 @@ def build_filterable_plot(  # noqa
     else:
         ordered_groups = [
             default_group,
-            *sorted(
-                [
-                    group_label
-                    for group_label in group_labels
-                    if group_label != default_group
-                ]
-            ),
+            *[g for g in group_labels if g != default_group],
         ]
 
+    if group_colour_map is None:
+        group_colour_map = _get_group_colors(
+            ordered_groups, default_group, palette="ons_plus"
+        )
+    elif default_group not in group_colour_map:
+        group_colour_map.update(_get_group_colors([default_group], default_group))
+
     grouped_traces = []
+    trace_register: dict[str, list[int]] = {}
+    trace_idx = 0
+
     for group_label in ordered_groups:
-        kwargs["name"] = str(group_label)
+        group_kwargs = kwargs.copy()
+        group_kwargs["name"] = str(group_label)
+
         if include_default_group and default_group == group_label == "All":
-            default_kwargs = kwargs.copy()
-            default_kwargs["color"] = "lightgray"
-            group_fig = figure_builder(input_df, **default_kwargs)
+            group_fig = figure_builder(input_df, **group_kwargs)
         else:
             group_fig = figure_builder(
-                input_df[
-                    input_df[group_col].isin(
-                        [group_label, default_group if include_default_group else None]
-                    )
-                ],
-                **kwargs,
+                input_df[input_df[group_col].isin([group_label])],
+                **group_kwargs,
             )
+
+        for trace in group_fig.data:
+            _apply_trace_colors(trace, group_colour_map[group_label])
+            if trace.name not in trace_register:
+                trace_register[trace.name] = []
+            trace_register[trace.name].append(trace_idx)
+            trace_idx += 1
+
         grouped_traces.extend(group_fig.data)
 
     selector_fig = go.Figure(grouped_traces)
@@ -151,68 +293,40 @@ def build_filterable_plot(  # noqa
         legend_title=group_col,
     )
 
-    if include_default_group:
-        visible_all = [True] * len(grouped_traces)
-        buttons = [
-            {
-                "label": default_group,
-                "method": "update",
-                "args": [{"visible": visible_all}],
-            }
-        ]
-    else:
-        buttons = []
-
-    background_offset = 1 if include_default_group else 0
-    for trace_index, group_value in enumerate(group_labels):
-        visibility = [True] * background_offset + [False] * len(group_labels)
-        visibility[background_offset + trace_index] = True
-        buttons.append(
-            {
-                "label": str(group_value),
-                "method": "update",
-                "args": [
-                    {"visible": visibility},
-                ],
-            }
-        )
+    buttons = _build_visibility_buttons(
+        group_labels,
+        default_group,
+        trace_register,
+        len(grouped_traces),
+        include_default_group,
+    )
 
     selector_fig.update_layout(
-        updatemenus=[
-            {
-                "type": "buttons",
-                "buttons": buttons,
-                "direction": "down",
-                "showactive": True,
-                "active": 0,
-                "x": 1.3,
-                "xanchor": "left",
-                "y": 1.15,
-                "yanchor": "top",
-                "font": {"size": 10},
-                "pad": {"t": 5, "r": 5, "b": 5, "l": 5},
-            }
-        ]
+        updatemenus=[{"buttons": buttons, "direction": "down", "x": 1, "y": 1}]
     )
     return selector_fig
 
 
-def build_filterable_dashboard(  # noqa
+def build_filterable_dashboard(
     filterable_plots: list[go.Figure],
     default_group: str = "All",
+    group_colour_map: dict[str, str] | None = None,
+    include_default_group: bool = True,
 ) -> go.Figure:
-    """Build a dashboard of subplots with shared legend and y-axis.
+    """Combine filterable plots into a single dashboard with shared controls.
+
+    Creates a row of subplots and groups traces by name so they can be
+    shown or hidden together using a dropdown menu.
 
     Args:
-        filterable_plots: A list of Plotly Figure objects, each representing a
-            subplot in the dashboard.
-        default_group: The legend group name that should be visible by default.
-            If the group exists, its color is forced to light gray.
+        filterable_plots: List of Plotly figures to include.
+        default_group: Group selected by default.
+        group_colour_map: Optional mapping of group names to colours.
+        include_default_group: If True, include default_group in all plots.
 
     Returns:
-        A Plotly Figure containing a row of subplots with shared y-axis
-        settings, x-axis titles copied from each input figure, and dropdown
-        buttons to toggle visibility by legend group.
+        A Plotly figure with a dropdown selector controlling visibility
+        of grouped traces across all subplots.
     """
     n_plots = len(filterable_plots)
 
@@ -223,7 +337,7 @@ def build_filterable_dashboard(  # noqa
         shared_yaxes=True,
     )
 
-    legend_names = list(
+    group_labels = list(
         {
             trace.name
             for plot in filterable_plots
@@ -231,12 +345,15 @@ def build_filterable_dashboard(  # noqa
             if trace.name is not None
         }
     )
-    group_colors = make_colour_map(legend_names)
 
-    if default_group in legend_names:
-        group_colors[default_group] = "lightgray"
+    if group_colour_map is None:
+        group_colour_map = _get_group_colors(
+            group_labels, default_group, palette="ons_plus"
+        )
+    elif default_group not in group_colour_map:
+        group_colour_map.update(_get_group_colors([default_group], default_group))
 
-    trace_register = {}
+    trace_register: dict[str, list[int]] = {}
 
     trace_idx = 0
 
@@ -251,11 +368,8 @@ def build_filterable_dashboard(  # noqa
             trace_register[trace.name].append(trace_idx)
             trace_idx += 1
 
-            color = group_colors.get(trace.name)
-            if getattr(trace, "marker", None) is not None:
-                trace.marker.color = color
-            if getattr(trace, "line", None) is not None:
-                trace.line.color = color
+            color = group_colour_map.get(trace.name)
+            _apply_trace_colors(trace, color)
 
         fig.add_traces(subplot_plot.data, rows=1, cols=subplot_col)
 
@@ -276,42 +390,16 @@ def build_filterable_dashboard(  # noqa
                 col=1,
             )
 
-    if default_group in legend_names:
-        visible_all = [True] * len(fig.data)
-        buttons = [
-            {
-                "label": default_group,
-                "method": "update",
-                "args": [{"visible": visible_all}],
-            }
-        ]
-        visibility_groups = [False] * len(fig.data)
-        for idx in trace_register[default_group]:
-            visibility_groups[idx] = True
-    else:
-        buttons = []
-        visibility_groups = [False] * len(fig.data)
-
-    for legend_name in legend_names:
-        if legend_name == default_group:
-            continue
-        visibility = visibility_groups.copy()
-
-        for idx in trace_register[legend_name]:
-            visibility[idx] = True
-
-        buttons.append(
-            {
-                "label": str(legend_name),
-                "method": "update",
-                "args": [
-                    {"visible": visibility},
-                ],
-            }
-        )
+    buttons = _build_visibility_buttons(
+        group_labels,
+        default_group,
+        trace_register,
+        len(fig.data),
+        include_default_group,
+    )
 
     fig.update_layout(
-        updatemenus=[{"buttons": buttons, "direction": "down", "x": 0, "y": 1.15}]
+        updatemenus=[{"buttons": buttons, "direction": "down", "x": 1, "y": 1}]
     )
 
     return fig
