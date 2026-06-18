@@ -49,6 +49,32 @@ def api_eval_config_mocks():
         yield
 
 
+@contextmanager
+def api_eval_config_gcs_exists_mocks(exists: bool = True):
+    """Handler for mocking GCS file existence check in ApiEvaluatorConfig."""
+    with ExitStack() as stack:
+        mock_storage_client = MagicMock()
+        mock_bucket = MagicMock()
+        mock_blob = MagicMock()
+
+        mock_storage_client.bucket.return_value = mock_bucket
+        mock_bucket.blob.return_value = mock_blob
+        mock_blob.exists.return_value = exists
+
+        mock_storage = stack.enter_context(
+            patch(
+                "survey_assist_eval.pipeline.api.core.storage.Client",
+                return_value=mock_storage_client,
+            )
+        )
+        yield {
+            "storage_client": mock_storage_client,
+            "bucket": mock_bucket,
+            "blob": mock_blob,
+            "mock_storage": mock_storage,
+        }
+
+
 @pytest.fixture
 def api_eval_config(
     request: pytest.FixtureRequest,
@@ -348,6 +374,40 @@ class TestApiEvaluatorConfig:
                 f"Timestamp part of job_id '{timestamp}' is not in the "
                 "expected format YYYYMMDDHHMMSS."
             )
+
+    # ignoring pylint to unit test the test file path explicity
+    # pylint: disable=W0212
+    @pytest.mark.parametrize("classify_type", ["sic", "soc"])
+    def test_api_evaluator_config__get_test_data_file_path(
+        self, classify_type: str, default_api_eval_config: dict
+    ) -> None:
+        """Ensure correct test data file path is returned for classify type."""
+        config = default_api_eval_config.copy()
+        config["classify_type"] = classify_type
+        with api_eval_config_gcs_exists_mocks() as gcs_mocks:
+            ae_config = core_module.ApiEvaluatorConfig(**config)
+        test_data_file = ae_config._test_data_file_path.split(
+            "/", maxsplit=1
+        )[-1]
+        assert classify_type in test_data_file, (
+            "Expected test data file path to contain classify_type "
+            f"'{classify_type}' but got '{test_data_file}'."
+        )
+        gcs_mocks["mock_storage"].assert_called_once()
+
+    @pytest.mark.parametrize("classify_type", ["sic", "soc"])
+    def test_api_evaluator_config__get_test_data_file_path_missing_file(
+        self, classify_type: str, default_api_eval_config: dict
+    ) -> None:
+        """Ensure FileNotFoundError is raised when test data file missing."""
+        config = default_api_eval_config.copy()
+        config["classify_type"] = classify_type
+        with (
+            api_eval_config_gcs_exists_mocks(exists=False) as gcs_mocks,
+            pytest.raises(FileNotFoundError, match="Test data file not found"),
+        ):
+            core_module.ApiEvaluatorConfig(**config)
+        gcs_mocks["mock_storage"].assert_called_once()
 
 
 class TestApiEvaluator:
