@@ -67,7 +67,7 @@ async def get_rag_response_batch_async(
                 job_title=row[JOB_TITLE_COL],
                 job_description=row[JOB_DESCRIPTION_COL],
                 industry_descr=row[MERGED_INDUSTRY_DESC_COL],
-                level_of_education=row.get(EDUCATION_COL, "unknown"),
+                # level_of_education=row.get(EDUCATION_COL, "unknown"),
                 code_digits=CODE_DIGITS,
                 candidates_limit=CANDIDATES_LIMIT,
                 short_list=row[SEMANTIC_SEARCH_COL],

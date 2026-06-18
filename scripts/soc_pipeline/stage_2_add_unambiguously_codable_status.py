@@ -71,7 +71,7 @@ async def get_unambiguous_soc_batch_async(
                 semantic_search_results=row[semantic_search_col],
                 job_title=row[JOB_TITLE_COL],
                 job_description=row[JOB_DESCRIPTION_COL],
-                level_of_education=row.get(EDUCATION_COL, "unknown"),
+                # level_of_education=row.get(EDUCATION_COL, "unknown"),
                 candidates_limit=candidates_limit,
                 code_digits=code_digits,
             )

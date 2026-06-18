@@ -57,7 +57,7 @@ async def get_open_question_batch_async(
                 industry_descr=row[MERGED_INDUSTRY_DESC_COL],
                 job_title=row[JOB_TITLE_COL],
                 job_description=row[JOB_DESCRIPTION_COL],
-                level_of_education=row.get(EDUCATION_COL, "unknown"),
+                # level_of_education=row.get(EDUCATION_COL, "unknown"),
                 llm_output=row[CANDIDATE_SOC_COL],  # type: ignore
             )
 
