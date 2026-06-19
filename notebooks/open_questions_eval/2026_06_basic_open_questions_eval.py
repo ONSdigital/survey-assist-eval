@@ -97,7 +97,7 @@ for label, df in stg_dfs_followup_dict.items():
         layout={
             "xtitle": x_col_title,
             "ytitle": "Proportion",
-            "title": f"{label.capitalize()} Follow-up Question {x_col_title}",
+            "title": f"{label.capitalize()} Follow-up Question {x_col_title} (Total n = {len(df)})",
         },
         showlegend=True,
         histnorm="probability",

@@ -42,7 +42,7 @@ def build_histogram(
     )
     figure.update_layout(
         title_text=layout.get("title"),
-        xaxis_title=layout.get(f"xtitle (n = {len(df)})", f"{x_col} (n = {len(df)})"),
+        xaxis_title=layout.get("xtitle", x_col),
         yaxis_title=layout.get("ytitle", None),
         template=layout.get("template"),
         margin={"t": 60, "b": 60, "l": 60, "r": 60},
