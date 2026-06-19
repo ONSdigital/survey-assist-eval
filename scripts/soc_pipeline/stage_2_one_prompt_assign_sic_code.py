@@ -13,7 +13,7 @@ See README_evaluation_pipeline.md for more details on how to run.
 
 import asyncio
 from argparse import Namespace
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
@@ -63,14 +63,16 @@ async def get_rag_response_batch_async(
 
     async def _run_row(row: pd.Series):
         async with semaphore:
-            return await c_llm.sa_rag_soc_code(
-                job_title=row[JOB_TITLE_COL],
-                job_description=row[JOB_DESCRIPTION_COL],
-                industry_descr=row[MERGED_INDUSTRY_DESC_COL],
-                # level_of_education=row.get(EDUCATION_COL, "unknown"),
+            return await c_llm.top_one_soc_code(
+                respondent_data={
+                    "Job title": row[JOB_TITLE_COL],
+                    "Job description": row[JOB_DESCRIPTION_COL],
+                    "Company main activity": row[MERGED_INDUSTRY_DESC_COL],
+                    "Level of education": row.get(EDUCATION_COL, "unknown"),
+                },
                 code_digits=CODE_DIGITS,
                 candidates_limit=CANDIDATES_LIMIT,
-                short_list=row[SEMANTIC_SEARCH_COL],
+                semantic_search_results=row.get(SEMANTIC_SEARCH_COL, []),
             )
 
     # Create tasks for each row; semaphore enforces max concurrent calls.
@@ -78,24 +80,15 @@ async def get_rag_response_batch_async(
 
     responses = await asyncio.gather(*tasks)
 
-    results: list[dict[str, Any]] = []
-    for resp, _, _ in responses:
-        results.append(
-            {
-                "initial_code": resp.soc_code or "",
-                "followup_question": resp.followup or "",
-                "unambiguously_codable": (resp.soc_code or "") != "",
-                "alt_soc_candidates": [
-                    {
-                        "code": i.soc_code,
-                        "likelihood": i.likelihood,
-                        "title": i.soc_descriptive,
-                    }
-                    for i in resp.soc_candidates
-                ],
-            }
-        )
-    return results
+    return [
+        {
+            "initial_code": resp.soc_code or "",
+            "code_title": resp.soc_descriptive or "",
+            "likelihood": resp.likelihood or 0.0,
+            "reasoning": resp.reasoning or "",
+        }
+        for resp in responses
+    ]
 
 
 async def main_async(
@@ -116,52 +109,35 @@ async def main_async(
     """
     print("Running RAG SOC allocation...")
 
-    for batch_id, batch in tqdm(
+    batch_size = metadata["batch_size"]
+    start_row = start_batch_id * batch_size
+
+    for completed_batches, batch_start in tqdm(
         enumerate(
-            np.split(
-                df,
-                np.arange(
-                    start_batch_id * metadata["batch_size"],
-                    len(df),
-                    metadata["batch_size"],
-                ),
-            )
+            range(start_row, len(df), batch_size),
+            start=(start_batch_id + 1),
         )
     ):
-        # A quirk of the np.split approach is that the first batch will contain all
-        # of the processed rows so far, so can be skipped
-        if batch_id == 0:
-            pass
-        else:
-            results = await get_rag_response_batch_async(batch, c_llm)
+        batch = cast(pd.DataFrame, df.iloc[batch_start : (batch_start + batch_size)])
+        results = await get_rag_response_batch_async(batch, c_llm)
 
-            # Write results directly into output columns (no extra apply helpers)
-            df.loc[batch.index, "unambiguously_codable"] = pd.Series(
-                [r["unambiguously_codable"] for r in results],
-                index=batch.index,
-            )
-            df.loc[batch.index, "initial_code"] = pd.Series(
-                [r["initial_code"] for r in results],
-                index=batch.index,
-            )
-            df.loc[batch.index, "alt_soc_candidates"] = pd.Series(
-                [r["alt_soc_candidates"] for r in results],
-                index=batch.index,
-                dtype="object",
-            )
-            df.loc[batch.index, "followup_question"] = pd.Series(
-                [r["followup_question"] for r in results],
+        # Write results directly into output columns (no extra apply helpers)
+        for col in ["initial_code", "code_title", "likelihood", "reasoning"]:
+            if col not in df.columns:
+                df[col] = np.nan  # create column if it doesn't exist
+            df.loc[batch.index, col] = pd.Series(
+                [r[col] for r in results],
                 index=batch.index,
             )
 
-            persist_results(
-                df=df,
-                metadata=metadata,
-                output_folder=args.output_folder,
-                output_shortname=args.output_shortname,
-                is_final=False,
-                completed_batches=(batch_id + start_batch_id),
-            )
+        persist_results(
+            df=df,
+            metadata=metadata,
+            output_folder=args.output_folder,
+            output_shortname=args.output_shortname,
+            is_final=False,
+            completed_batches=completed_batches,
+        )
 
     print("RAG SOC allocation is complete")
     print("persisting results...")
@@ -178,15 +154,6 @@ async def main_async(
 if __name__ == "__main__":
     args = parse_args("STG2")
     df, metadata, start_batch_id = set_up_initial_state(args)
-
-    if "unambiguously_codable" not in df.columns:
-        df["unambiguously_codable"] = False
-    if "initial_code" not in df.columns:
-        df["initial_code"] = ""
-    if "alt_soc_candidates" not in df.columns:
-        df["alt_soc_candidates"] = np.empty((len(df), 0)).tolist()
-    if "followup_question" not in df.columns:
-        df["followup_question"] = ""
 
     uni_chat = ClassificationLLM(
         model_name=metadata["llm_model_name"],

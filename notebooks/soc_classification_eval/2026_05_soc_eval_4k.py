@@ -23,18 +23,17 @@ bucket_name = os.getenv("EVALUATION_BUCKET_NAME")
 if not bucket_name:
     raise ValueError("EVALUATION_BUCKET_NAME environment variable not set")
 print(f"Using bucket for data loading: {bucket_name}")
-
-work_folder = "data/pipeline/soc_4k"
-os.makedirs(work_folder, exist_ok=True)
 output_folder = f"gs://{bucket_name}/evaluation-pipeline/soc_4k/two_prompt_v1"  # %%
 input_data_file = (
     f"gs://{bucket_name}/evaluation-pipeline/original_datasets/soc_4k/"
     + "soc_4k_test_data.parquet"
 )
 
-
 # %%
 # call evaluation pipeline if needed
+work_folder = "data/pipeline/soc_4k"
+os.makedirs(work_folder, exist_ok=True)
+
 if not os.path.exists(f"{output_folder}/STG4.parquet"):  # this doesn't work with GCS
     print("Running evaluation pipeline...")
     os.system(
@@ -47,7 +46,6 @@ else:
 
 # %%
 df = pd.read_parquet(f"{output_folder}/STG4.parquet")
-# df = pd.read_parquet(f"{work_folder}/STG2.parquet")
 print(df.head())
 
 # %%
@@ -74,3 +72,43 @@ metrics_summary = calc_simple_metrics(
     final_model_col=None,
 )
 print(metrics_summary.report_metrics())
+
+
+# %% ================================
+# test new prompt that returns just top match and likelihood, and reasoning
+work_folder = "data/pipeline/soc_4k_top_one"
+os.makedirs(work_folder, exist_ok=True)
+
+print("Running evaluation pipeline...")
+os.system(
+    f"./scripts/soc_pipeline/run_full_pipeline.sh -p 1 -i {input_data_file} -o {work_folder}"
+)
+
+# %%
+input_data_file = f"{work_folder}/STG2.parquet"
+df = pd.read_parquet(input_data_file)
+
+# subset when working with intermediate outputs
+df_sub = df[df.reasoning.notna()]
+
+df_sub["match"] = df_sub.soc2020_code == df_sub.initial_code
+print(f"Total rows: {len(df_sub)}")
+print("-" * 20)
+for lh in [0.6, 0.8, 0.9]:
+    print(f"Likelihood: {lh}")
+    print(f"Codability: {(df_sub.likelihood >= lh).mean():.2%}")
+    print(f"Accuracy: {(df_sub[df_sub.likelihood >= lh].match).mean():.2%}")
+    print("-" * 20)
+
+# %%
+df_sub["distance"] = df_sub.apply(
+    lambda row: row["semantic_search_results"][0]["distance"], axis=1
+)
+df_sub["sem_match"] = df_sub.apply(
+    lambda row: row["semantic_search_results"][0]["code"] == row["soc2020_code"], axis=1
+)
+for dd in [0.35, 0.25, 0.15, 0.1, 0.05]:
+    print(f"Semantic Distance: {dd}")
+    print(f"Codability: {(df_sub.distance <= dd).mean():.2%}")
+    print(f"Accuracy: {(df_sub[df_sub.distance <= dd].sem_match).mean():.2%}")
+    print("-" * 20)
