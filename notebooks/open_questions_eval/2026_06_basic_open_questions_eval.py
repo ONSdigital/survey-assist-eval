@@ -6,6 +6,7 @@
 import os
 
 import pandas as pd
+import plotly.graph_objects as go
 from dotenv import load_dotenv
 
 from src.survey_assist_eval.evaluation.open_questions_metrics import (
@@ -17,6 +18,7 @@ from src.survey_assist_eval.evaluation.plotting_helpers import (
     build_filterable_dashboard,
     build_filterable_plot,
     build_histogram,
+    get_trace_colour_map,
 )
 
 # %%
@@ -31,6 +33,8 @@ MAX_WORD_COUNT_THRESHOLD = 15
 MAX_NUM_SENTENCE_THRESHOLD = 1
 MAX_WORD_COUNT_PER_SENTENCE_THRESHOLD = 20
 MIN_WORD_COUNT_THRESHOLD = 3
+
+PLOT_TEXT_STAT = "word_count"
 
 # %%
 out_dir = "data/figures/open_questions_evals/"  # set as None to not save
@@ -60,7 +64,7 @@ for label, df in stg_dfs_dict.items():
         text_column="followup_question",
     )
 
-comparison = compare_text_stats(
+stg_text_stat_comparison = compare_text_stats(
     stg_dfs_followup_dict,
     prefix="followup_question_",
     word_threshold=MAX_WORD_COUNT_THRESHOLD,
@@ -69,44 +73,48 @@ comparison = compare_text_stats(
     short_word_count_threshold=MIN_WORD_COUNT_THRESHOLD,
 )
 
-print(comparison)
+print(stg_text_stat_comparison)
 
 # %%
-stg3_followup_df = stg_dfs_dict["west9"]
 filterable_plots = []
-followup_eval_cols = [
-    col for col in stg3_followup_df.columns if "followup_question_" in col
-]
-for eval_col in followup_eval_cols:
+
+eval_col = f"followup_question_{PLOT_TEXT_STAT}"
+
+for label, df in stg_dfs_followup_dict.items():
     x_col_title = (
         eval_col.replace("followup_question_", "").replace("_", " ").capitalize()
     )
 
     fig = build_filterable_plot(
-        input_df=stg3_followup_df,
+        input_df=df,
         group_col="sic_section",
-        default_group="All",
+        reference_group="Total",
         figure_builder=build_histogram,
         groups_order=None,
-        include_default_group=True,
+        colour_palette=None,
         x_col=eval_col,
         nbinsx=20,
         layout={
             "xtitle": x_col_title,
-            "title": f"Follow-up Question{x_col_title} Distribution by SIC Section",
+            "ytitle": "Proportion",
+            "title": f"{label.capitalize()} Follow-up Question {x_col_title}",
         },
         showlegend=True,
+        histnorm="probability",
     )
 
     filterable_plots.append(fig)
+# %%
 
 simple_language_dashboard = build_filterable_dashboard(
     filterable_plots=filterable_plots,
-    default_group="All",
-    include_default_group=True,
+    reference_group="Total",
+    group_colour_map=get_trace_colour_map(  # use colour map from filterable_plots
+        go.Figure([trace for f in filterable_plots for trace in f.data])
+    ),
 )
 
-
+simple_language_dashboard.show()
 # %%
 
 if out_dir:
