@@ -8517,7 +8517,7 @@ resolved_reference = "92fb9a7a50d6b46cea0ed06fc0fd3082c8677828"
 
 [[package]]
 name = "sic-classification-utils"
-version = "0.1.14"
+version = "0.1.15"
 description = "Utility functions used for SIC classification"
 optional = false
 python-versions = ">=3.12,<4.0"
@@ -8545,8 +8545,8 @@ survey-assist-utils = {git = "https://github.com/ONSdigital/survey-assist-utils.
 [package.source]
 type = "git"
 url = "https://github.com/ONSdigital/sic-classification-utils.git"
-reference = "v0.1.14"
-resolved_reference = "7f8303fac666976440c3bea93f2203f029c5c148"
+reference = "v0.1.15"
+resolved_reference = "65e068dab062ddf8eda14e1cfa679c80f28cf60a"
 
 [[package]]
 name = "simplejson"
@@ -10171,4 +10171,4 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<4.0"
-content-hash = "83ef5a99d42b14818d5aceb48dcb8e80bfcb48f29b728d257e8ea6dc1d233dc4"
+content-hash = "4344499e1ee396444f9037610e8322a1d04611ccbdc0dd2085821216cf72e4a6"
