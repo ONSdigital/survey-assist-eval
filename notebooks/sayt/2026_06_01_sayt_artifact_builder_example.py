@@ -31,7 +31,9 @@ if not bucket_name:
     raise ValueError("EVALUATION_BUCKET_NAME environment variable not set")
 
 LOOKUP_FILE_NAME = f"gs://{bucket_name}/evaluation-pipeline/SAYT/Lookup_IT3_Final.csv"
-ARTIFACT_DIR = Path("data") / "sayt_artifacts" / "lookup_it3_final"
+ARTIFACT_DIR = (
+    Path(__file__).parent.parent.parent / "data" / "sayt_artifacts" / "lookup_it3_final"
+)
 RETRIEVERS = [
     PrefixRetrieverSpec(),
     NgramRetrieverSpec(),
@@ -44,9 +46,7 @@ print("Artifact output directory:", ARTIFACT_DIR.resolve())
 
 # %%
 sayt_df = pd.read_csv(LOOKUP_FILE_NAME, dtype=str)
-sayt_df["code"] = sayt_df["SIC07"].apply(
-    lambda x: x if (pd.notna(x) and len(x) == 5) else f"0{x}" if pd.notna(x) else x
-)
+sayt_df["code"] = sayt_df["SIC07"].apply(lambda x: x if len(x) == 5 else f"0{x}")
 sayt_df["display_text"] = sayt_df["SIC_lookup"] + ": " + sayt_df["code"]
 
 sayt_corpus = list(zip(sayt_df["SIC_lookup"], sayt_df["display_text"], strict=False))

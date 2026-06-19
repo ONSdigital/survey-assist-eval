@@ -10,9 +10,34 @@ import json
 from pathlib import Path
 
 from industrial_classification_utils.sayt import SAYTSuggester
+from industrial_classification_utils.sayt.core import _normalise
+
 
 # %%
-ARTIFACT_DIR = Path("data") / "sayt_artifacts" / "lookup_it3_final"
+def print_suggester_breakdown(
+    suggester_instance: SAYTSuggester, queries: list[str]
+) -> None:
+    """Print per-retriever and combined suggestions for the supplied queries."""
+    for q in queries:
+        q_norm = _normalise(q)
+        print("searching for:", q)
+        for (
+            configured
+        ) in suggester_instance._retrievers:  # pylint: disable=protected-access
+            print(
+                configured.name,
+                "->",
+                configured.retriever.suggest_with_scores(q_norm, 5),
+            )
+        print("combined", "->", suggester_instance.suggest_with_scores(q, 5))
+        print("combined_nice", "->", suggester_instance.suggest(q, 5))
+        print()
+
+
+# %%
+ARTIFACT_DIR = (
+    Path(__file__).parent.parent.parent / "data" / "sayt_artifacts" / "lookup_it3_final"
+)
 QUERIES = ["car", "cars", "waxi", "auto", "hea", "heal", "health"]
 
 print("Working directory:", Path.cwd().resolve())
@@ -33,10 +58,6 @@ print(json.dumps(manifest, indent=2))
 loaded_suggester = SAYTSuggester.from_artifact(ARTIFACT_DIR)
 
 # %%
-for query in QUERIES:
-    print("searching for:", query)
-    print("loaded", "->", loaded_suggester.suggest(query, 5))
-    print("loaded_scores", "->", loaded_suggester.suggest_with_scores(query, 5))
-    print()
+print_suggester_breakdown(loaded_suggester, QUERIES)
 
 # %%
