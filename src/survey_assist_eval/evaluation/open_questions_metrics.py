@@ -4,7 +4,79 @@ import re
 
 import numpy as np
 import pandas as pd
+from pydantic import BaseModel
 from textstat import textstat
+
+
+class OpenQuestionMetrics(BaseModel):
+    """Container for all open question evaluation metrics."""
+
+    n_count: int
+    median_word_count: float
+    sd_word_count: float
+    mean_sentence_count: float
+    mean_word_count_per_sentence: float
+    mean_of_mean_syllables_per_word: float
+    pct_over_word_threshold: float
+    pct_over_threshold_sentences: float
+    pct_with_long_sentence_over_threshold: float
+    pct_blank_or_too_short: float
+
+    def report_metrics(self):
+        """Pretty print the open questions evaluation metrics."""
+        lines = [
+            "\nOpen questions metrics:",
+            f" Number of open questions: {self.n_count:.0f}",
+            f" Median Word Count: {self.median_word_count:.2f}",
+            f" Standard Deviation of Word Count: {self.sd_word_count:.2f}",
+            f" Mean Sentence Count: {self.mean_sentence_count:.2f}",
+            f" Mean Word Count per Sentence: {self.mean_word_count_per_sentence:.2f}",
+            f" Mean of Mean Syllables per Word: {self.mean_of_mean_syllables_per_word:.2f}",
+            f" Percent Over Word Threshold Count: {self.pct_over_word_threshold:.2f}%",
+            f" Percent Over Setence Threshold Count: {self.pct_over_threshold_sentences:.2f}%",
+            f" Percent with Long Sentences: {self.pct_with_long_sentence_over_threshold:.2f}%",
+            f" Percent with Blank or Too Short Sentences: {self.pct_blank_or_too_short:.2f}%",
+        ]
+        return "\n".join(lines)
+
+
+def evaluate_open_question(  # noqa: PLR0913 pylint: disable = R0913, R0917
+    df,
+    text_column: str,
+    word_threshold: int = 25,
+    sentence_threshold: int = 2,
+    long_sentence_threshold: int = 20,
+    short_word_count_threshold: int = 2,
+) -> OpenQuestionMetrics:
+    """Evaluate open-ended question responses.
+
+    Args:
+        df: DataFrame containing the responses.
+        text_column: Column containing the text responses.
+        word_threshold: Threshold for "long" text (word count).
+        sentence_threshold: Threshold for number of sentences.
+        long_sentence_threshold: Threshold for long sentences.
+        short_word_count_threshold: Threshold for "blank or too short".
+
+    Returns:
+        A Series with summary statistics for the open-ended question.
+    """
+    df = filter_nonempty_object_column(df, column=text_column)
+
+    df = add_text_stats_columns(
+        df, text_column=text_column, result_prefix="eval_", inplace=True
+    )
+
+    metrics = summarise_text_stats(
+        df,
+        prefix="eval_",
+        word_threshold=word_threshold,
+        sentence_threshold=sentence_threshold,
+        long_sentence_threshold=long_sentence_threshold,
+        short_word_count_threshold=short_word_count_threshold,
+    )
+
+    return OpenQuestionMetrics(**metrics.to_dict())
 
 
 def filter_nonempty_object_column(df: pd.DataFrame, column: str) -> pd.DataFrame:
@@ -144,24 +216,24 @@ def summarise_text_stats(  # noqa: PLR0913 pylint: disable=R0917, R0913
         raise ValueError("Provide either text_column or prefix.")
 
     summary = {
-        "n_outputs": len(df),
+        "n_count": len(df),
         "mean_word_count": df[f"{prefix}word_count"].mean(),
         "median_word_count": df[f"{prefix}word_count"].median(),
         "sd_word_count": df[f"{prefix}word_count"].std(),
         "mean_sentence_count": df[f"{prefix}sentence_count"].mean(),
-        "mean_words_per_sentence": np.mean(df[f"{prefix}words_per_sentence"].sum()),
+        "mean_word_count_per_sentence": np.mean(
+            df[f"{prefix}words_per_sentence"].sum()
+        ),
         "mean_of_mean_syllables_per_word": df[
             f"{prefix}mean_syllables_per_word"
         ].mean(),
-        f"pct_over_{word_threshold}_words": (
-            df[f"{prefix}word_count"] > word_threshold
-        ).mean()
+        "pct_over_word_threshold": (df[f"{prefix}word_count"] > word_threshold).mean()
         * 100,
-        f"pct_over_{sentence_threshold}_sentences": (
+        "pct_over_threshold_sentences": (
             df[f"{prefix}sentence_count"] > sentence_threshold
         ).mean()
         * 100,
-        f"pct_with_long_sentence_over_{long_sentence_threshold}": (
+        "pct_with_long_sentence_over_threshold": (
             df[f"{prefix}words_per_sentence"].apply(max) > long_sentence_threshold
         ).mean()
         * 100,

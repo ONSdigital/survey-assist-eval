@@ -60,6 +60,7 @@ stg_dfs_dict = {
     for label, path in STG_FILES_TO_COMPARE.items()
 }
 
+
 # %%
 stg_dfs_followup_dict: dict[str, pd.DataFrame] = {}
 for label, df in stg_dfs_dict.items():
