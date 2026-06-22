@@ -33,6 +33,7 @@ OPEN_QUESTION_COL = "followup_question"
 ANSWER_TO_OPEN_QUESTION_COL = "followup_answer"
 CLOSED_QUESTION = ""
 ANSWER_TO_CLOSED_QUESTION = ""
+MAX_CONCURRENT_TASKS = 10
 
 #####################################################
 
@@ -44,10 +45,11 @@ async def get_final_sic_batch_async(
     batch: pd.DataFrame, c_llm: ClassificationLLM
 ) -> list[dict[str, Any]]:
     """Processes a batch of rows asynchronously to assign final SIC codes."""
-    tasks = []
-    for _, row in batch.iterrows():
-        task = asyncio.create_task(
-            c_llm.final_sic_code(
+    semaphore = asyncio.Semaphore(MAX_CONCURRENT_TASKS)
+
+    async def _run_row(row: pd.Series):
+        async with semaphore:
+            return await c_llm.final_sic_code(
                 industry_descr=row[MERGED_INDUSTRY_DESC_COL],
                 job_title=row[JOB_TITLE_COL],
                 job_description=row[JOB_DESCRIPTION_COL],
@@ -57,8 +59,9 @@ async def get_final_sic_batch_async(
                 # closed_question=CLOSED_QUESTION,
                 # answer_to_closed_question=ANSWER_TO_CLOSED_QUESTION,
             )
-        )
-        tasks.append(task)
+
+    # Create tasks for each row; semaphore enforces max concurrent calls.
+    tasks = [asyncio.create_task(_run_row(row)) for _, row in batch.iterrows()]
 
     responses = await asyncio.gather(*tasks)
 
@@ -137,9 +140,9 @@ async def main_async(df, metadata, start_batch_id, args, c_llm):
             np.split(
                 df,
                 np.arange(
-                    start_batch_id * metadata["batch_size_async"],
+                    start_batch_id * metadata["batch_size"],
                     len(df),
-                    metadata["batch_size_async"],
+                    metadata["batch_size"],
                 ),
             )
         )

@@ -3,7 +3,6 @@
 These tests focus on the helper functions in `survey_assist_eval.pipeline.shared_components`.
 """
 
-# ruff: noqa: PLR2004
 # pylint: disable=protected-access,missing-function-docstring
 
 from __future__ import annotations
@@ -99,7 +98,7 @@ def test_delete_folder_contents_gcs_path_calls_rm():
 @pytest.mark.utils
 def test_persist_results_intermediate_writes_json_and_parquet(tmp_path: Path):
     df = pd.DataFrame({"a": [1, 2], "b": ["x", "y"]})
-    metadata = {"batch_size": 25, "batch_size_async": 10}
+    metadata = {"batch_size": 25}
     out_dir = tmp_path / "out"
 
     with patch.object(pd.DataFrame, "to_parquet", autospec=True) as to_parquet:
@@ -120,7 +119,6 @@ def test_persist_results_intermediate_writes_json_and_parquet(tmp_path: Path):
     ckpt = json.loads(ckpt_path.read_text(encoding="utf8"))
     assert ckpt["completed_batches"] == 3
     assert ckpt["batch_size"] == 25
-    assert ckpt["batch_size_async"] == 10
 
     persisted_meta = json.loads(meta_path.read_text(encoding="utf8"))
     assert persisted_meta["batch_size"] == 25
@@ -134,7 +132,7 @@ def test_persist_results_intermediate_writes_json_and_parquet(tmp_path: Path):
 @pytest.mark.utils
 def test_persist_results_final_writes_outputs_and_deletes_intermediate(tmp_path: Path):
     df = pd.DataFrame({"a": [1]})
-    metadata = {"batch_size": 100, "batch_size_async": 10}
+    metadata = {"batch_size": 100}
     out_dir = tmp_path / "out"
     intermediate = out_dir / "intermediate_outputs"
     intermediate.mkdir(parents=True)
