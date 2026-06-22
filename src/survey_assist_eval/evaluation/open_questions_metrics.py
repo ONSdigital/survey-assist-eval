@@ -17,9 +17,9 @@ class OpenQuestionMetrics(BaseModel):
     mean_sentence_count: float
     mean_word_count_per_sentence: float
     mean_of_mean_syllables_per_word: float
-    pct_over_word_threshold: float
-    pct_over_threshold_sentences: float
-    pct_with_long_sentence_over_threshold: float
+    pct_over_word_count_threshold: float
+    pct_over_sentence_count_threshold: float
+    pct_with_long_sentence_over_word_count_threshold: float
     pct_blank_or_too_short: float
 
     def report_metrics(self):
@@ -32,9 +32,10 @@ class OpenQuestionMetrics(BaseModel):
             f" Mean Sentence Count: {self.mean_sentence_count:.2f}",
             f" Mean Word Count per Sentence: {self.mean_word_count_per_sentence:.2f}",
             f" Mean of Mean Syllables per Word: {self.mean_of_mean_syllables_per_word:.2f}",
-            f" Percent Over Word Threshold Count: {self.pct_over_word_threshold:.2f}%",
-            f" Percent Over Setence Threshold Count: {self.pct_over_threshold_sentences:.2f}%",
-            f" Percent with Long Sentences: {self.pct_with_long_sentence_over_threshold:.2f}%",
+            f" Percent Over Word Threshold Count: {self.pct_over_word_count_threshold:.2f}%",
+            f" Percent Over Setence Threshold Count: {self.pct_over_sentence_count_threshold:.2f}%",
+            f" Percent with Long Sentences: {
+                self.pct_with_long_sentence_over_word_count_threshold:.2f}%",
             f" Percent with Blank or Too Short Sentences: {self.pct_blank_or_too_short:.2f}%",
         ]
         return "\n".join(lines)
@@ -227,13 +228,15 @@ def summarise_text_stats(  # noqa: PLR0913 pylint: disable=R0917, R0913
         "mean_of_mean_syllables_per_word": df[
             f"{prefix}mean_syllables_per_word"
         ].mean(),
-        "pct_over_word_threshold": (df[f"{prefix}word_count"] > word_threshold).mean()
+        "pct_over_word_count_threshold": (
+            df[f"{prefix}word_count"] > word_threshold
+        ).mean()
         * 100,
-        "pct_over_threshold_sentences": (
+        "pct_over_sentence_count_threshold": (
             df[f"{prefix}sentence_count"] > sentence_threshold
         ).mean()
         * 100,
-        "pct_with_long_sentence_over_threshold": (
+        "pct_with_long_sentence_over_word_count_threshold": (
             df[f"{prefix}words_per_sentence"].apply(max) > long_sentence_threshold
         ).mean()
         * 100,

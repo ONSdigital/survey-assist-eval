@@ -135,18 +135,20 @@ def test_summarise_text_stats_computes_summary_using_text_column():
         df, prefix=None, text_column="answer", long_sentence_threshold=10
     )
 
-    assert summary["n_outputs"] == 3
+    assert summary["n_count"] == 3
     assert summary["mean_word_count"] == pytest.approx(6.666666666666667)
     assert summary["sd_word_count"] == pytest.approx(5.507570547286102)
     assert summary["median_word_count"] == 4
     assert summary["mean_sentence_count"] == pytest.approx(1.0)
-    assert summary["mean_words_per_sentence"] == pytest.approx(5)
+    assert summary["mean_word_count_per_sentence"] == pytest.approx(5)
     assert summary["mean_of_mean_syllables_per_word"] == pytest.approx(
         1.3269230769230769
     )
-    assert summary["pct_over_2_sentences"] == pytest.approx(0.0)
-    assert summary["pct_with_long_sentence_over_10"] == pytest.approx(1 / 3 * 100)
-    assert summary["pct_over_25_words"] == pytest.approx(0.0)
+    assert summary["pct_over_sentence_count_threshold"] == pytest.approx(0.0)
+    assert summary["pct_with_long_sentence_over_word_count_threshold"] == pytest.approx(
+        1 / 3 * 100
+    )
+    assert summary["pct_over_word_count_threshold"] == pytest.approx(0.0)
     assert summary["pct_blank_or_too_short"] == pytest.approx(0.0)
 
 
@@ -164,11 +166,13 @@ def test_summarise_text_stats_uses_existing_prefix_columns():
 
     summary = summarise_text_stats(df, prefix="answer_")
 
-    assert summary["n_outputs"] == 3
+    assert summary["n_count"] == 3
     assert summary["mean_word_count"] == pytest.approx(12.0)
-    assert summary["pct_over_25_words"] == pytest.approx(1 / 3 * 100)
-    assert summary["pct_over_2_sentences"] == pytest.approx(1 / 3 * 100)
-    assert summary["pct_with_long_sentence_over_20"] == pytest.approx(1 / 3 * 100)
+    assert summary["pct_over_word_count_threshold"] == pytest.approx(1 / 3 * 100)
+    assert summary["pct_over_sentence_count_threshold"] == pytest.approx(1 / 3 * 100)
+    assert summary["pct_with_long_sentence_over_word_count_threshold"] == pytest.approx(
+        1 / 3 * 100
+    )
 
 
 def test_summarise_text_stats_raises_when_no_prefix_or_text_column():
@@ -190,8 +194,8 @@ def test_compare_text_stats_dict_input_returns_dataframe():
 
     assert list(result.index) == ["group_a", "group_b"]
     assert "mean_word_count" in result.columns
-    assert result.loc["group_a", "n_outputs"] == 2
-    assert result.loc["group_b", "n_outputs"] == 2
+    assert result.loc["group_a", "n_count"] == 2
+    assert result.loc["group_b", "n_count"] == 2
 
 
 def test_compare_text_stats_preserves_labels_in_output():
