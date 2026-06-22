@@ -8,7 +8,7 @@ import os
 import pandas as pd
 from dotenv import load_dotenv
 
-from src.survey_assist_eval.evaluation.open_questions_metrics import (
+from survey_assist_eval.evaluation.open_questions_metrics import (
     evaluate_open_question,
 )
 

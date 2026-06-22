@@ -9,7 +9,7 @@ import pandas as pd
 import plotly.graph_objects as go
 from dotenv import load_dotenv
 
-from src.survey_assist_eval.evaluation.open_questions_metrics import (
+from survey_assist_eval.evaluation.open_questions_metrics import (
     add_text_stats_columns,
     compare_text_stats,
     filter_nonempty_object_column,
