@@ -6,150 +6,9 @@ from typing import Any
 
 import pandas as pd
 import plotly.graph_objects as go
-from plotly.express import colors
 from plotly.subplots import make_subplots
 
-# ruff: noqa: PLR0913
-# pylint: disable=R0914,R0917,R0913
-
-
-def build_histogram(
-    df: pd.DataFrame,
-    x_col: str,
-    layout: dict[str, Any] | None = None,
-    **hist_kwargs,
-) -> go.Figure:
-    """Return a simple Plotly histogram figure.
-
-    Args:
-        df: The DataFrame containing the data to histogram.
-        x_col: The column name in df to histogram.
-        layout: Dictionary of layout options (title, xtitle, ytitle, template).
-        **hist_kwargs: Additional go.Histogram kwargs (nbins, name, color, opacity, showlegend).
-
-    Returns:
-        A Plotly Figure containing a single histogram trace.
-    """
-    layout = layout or {}
-    x = df[x_col].dropna()
-
-    figure = go.Figure(
-        data=go.Histogram(
-            x=x,
-            autobinx=not pd.api.types.is_numeric_dtype(x),
-            **hist_kwargs,
-        )
-    )
-    figure.update_layout(
-        title_text=layout.get("title"),
-        xaxis_title=layout.get("xtitle", x_col),
-        yaxis_title=layout.get("ytitle", None),
-        template=layout.get("template"),
-        margin={"t": 60, "b": 60, "l": 60, "r": 60},
-    )
-    return figure
-
-
-def make_colour_map(
-    category_values: list[str],
-    palette_name: str | None = None,
-    palette_values: list[str] | None = None,
-) -> dict[str, str]:
-    """Uses a named palette (e.g. "ons") or a custom list of colours.
-    Custom colours take priority if provided.
-
-    Args:
-        category_values: Ordered list of category labels.
-        palette_name: Name of predefined palette to use. If None, use default.
-        palette_values: Optional list of colours to override palette.
-
-    Returns:
-        Dictionary mapping each category to a colour.
-
-    Raises:
-        ValueError: If there are not enough colours for the categories.
-    """
-    if not category_values:
-        raise ValueError("category_values must contain at least one value.")
-
-    # Select colour palette
-    if palette_values is not None:
-        colours = palette_values
-    elif palette_name == "ons":
-        colours = [
-            "#206095",
-            "#A8BD3A",
-            "#871A5B",
-            "#F66068",
-            "#05341A",
-            "#27A0CC",
-            "#003C57",
-            "#22D0B6",
-            "#746CB1",
-        ]
-    elif palette_name == "ons_plus":
-        colours = [
-            "#206095",
-            "#A8BD3A",
-            "#871A5B",
-            "#F66068",
-            "#05341A",
-            "#27A0CC",
-            "#003C57",
-            "#22D0B6",
-            "#746CB1",
-            "#E69F00",
-            "#D55E00",
-            "#F0E442",
-            "#CC79A7",
-            "#4A4DD1",
-            "#009E73",
-            "#8C510A",
-            "#BF812D",
-            "#C51B7D",
-        ]
-    else:
-        colours = colors.qualitative.Light24
-
-    # Validate length
-    if len(colours) < len(category_values):
-        raise ValueError(
-            f"Palette has {len(colours)} colours but "
-            f"{len(category_values)} categories are required."
-        )
-
-    # Create mapping
-    return dict(zip(category_values, colours, strict=False))
-
-
-def get_trace_colour_map(fig: go.Figure) -> dict[str, str]:
-    """Return a mapping of trace names to colours.
-
-    Extracts colours from each trace in the figure, checking marker
-    colour first and falling back to line colour if needed.
-
-    Only includes traces with a valid name and a single colour value.
-    """
-    colour_map: dict[str, str] = {}
-
-    for trace in fig.data:
-        if trace.name is None or trace.name in colour_map:
-            continue
-
-        colour = None
-
-        # Prefer marker colour if present
-        if getattr(trace, "marker", None) is not None:
-            colour = getattr(trace.marker, "color", None)
-
-        # Fallback to line colour (for line plots)
-        if colour is None and getattr(trace, "line", None) is not None:
-            colour = getattr(trace.line, "color", None)
-
-        if isinstance(colour, str):
-            colour_map[trace.name] = colour
-
-    return colour_map
+from survey_assist_eval.plotting.plotting_helpers import make_colour_map
 
 
 def _apply_trace_colors(trace: Any, color: str | None) -> None:
@@ -247,7 +106,7 @@ def _setup_colour_map(
     return group_colour_map
 
 
-def build_filterable_plot(
+def build_filterable_plot(  # noqa: PLR0913 pylint: disable = R0913, R0914, R0917
     input_df: pd.DataFrame,
     group_col: str,
     figure_builder: Callable,
@@ -255,7 +114,7 @@ def build_filterable_plot(
     groups_order: list[str] | None = None,
     group_colour_map: dict[str, str] | None = None,
     colour_palette: str | None = None,
-    **kwargs,
+    **figure_builder_kwargs,
 ) -> go.Figure:
     """Create a filterable figure by grouping data and toggling traces.
 
@@ -273,7 +132,7 @@ def build_filterable_plot(
         group_colour_map: Optional mapping of group names to colours.
         colour_palette: Name of predefined palette to use. Only
             used if group_colour_map is None.
-        **kwargs: Additional arguments passed to `figure_builder`.
+        **figure_builder_kwargs: Additional arguments passed to `figure_builder`.
 
     Returns:
         A Plotly figure with grouped traces and a dropdown selector to
@@ -309,7 +168,7 @@ def build_filterable_plot(
     trace_idx = 0
 
     for group_label in ordered_groups:
-        group_kwargs = kwargs.copy()
+        group_kwargs = figure_builder_kwargs.copy()
         group_kwargs["name"] = str(group_label)
 
         if group_label == "Total":

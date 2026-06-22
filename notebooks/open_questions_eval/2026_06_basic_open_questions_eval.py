@@ -14,11 +14,15 @@ from src.survey_assist_eval.evaluation.open_questions_metrics import (
     compare_text_stats,
     filter_nonempty_object_column,
 )
-from src.survey_assist_eval.evaluation.plotting_helpers import (
+from survey_assist_eval.plotting.filterable_plots import (
     build_filterable_dashboard,
     build_filterable_plot,
-    build_histogram,
+)
+from survey_assist_eval.plotting.plotting_helpers import (
     get_trace_colour_map,
+)
+from survey_assist_eval.plotting.standard_plots import (
+    build_histogram,
 )
 
 # %%
