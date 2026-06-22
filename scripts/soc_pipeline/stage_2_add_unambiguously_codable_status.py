@@ -32,6 +32,7 @@ from survey_assist_eval.pipeline.shared_components import (
 MERGED_INDUSTRY_DESC_COL = "merged_industry_desc"
 JOB_TITLE_COL = "soc2020_job_title"
 JOB_DESCRIPTION_COL = "soc2020_job_description"
+EDUCATION_COL = "level_of_education"
 
 OUTPUT_COLS_INITIAL = {
     "soc_code_col": "initial_code",
@@ -69,7 +70,7 @@ async def get_unambiguous_soc_batch_async(
                 semantic_search_results=row[semantic_search_col],
                 job_title=row[JOB_TITLE_COL],
                 job_description=row[JOB_DESCRIPTION_COL],
-                # level_of_education=row.get(EDUCATION_COL, "unknown"),
+                level_of_education=row.get(EDUCATION_COL, "unknown"),
                 candidates_limit=candidates_limit,
                 code_digits=code_digits,
             )
