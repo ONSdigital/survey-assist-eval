@@ -20,12 +20,13 @@ REQUIRED_COLUMNS = {
     "sic2007_employee": "employee",
     "clerical_codes": "clerical_codes",
 }
-INITIAL_TEST_COLUMNS = [
+TEST_INPUT_COLUMNS = [
     "id",
     "job_title",
     "job_description",
     "org_description",
-    "clerical_codes"
+    "clerical_codes",
+    "api_payload",
 ]
 
 
@@ -126,5 +127,15 @@ def get_and_prepare_test_data(
         lambda desc: desc.replace("-8", "") if isinstance(desc, str) else ""
     )
 
+    # contruct the API payload for each record
+    df["api_payload"] = df.apply(
+        lambda row: {
+            "job_title": row["job_title"],
+            "job_description": row["job_description"],
+            "org_description": row["org_description"],
+        },
+        axis=1,
+    )
+
     # return only the columns needed for API evaluation
-    return df[INITIAL_TEST_COLUMNS]
+    return df[TEST_INPUT_COLUMNS]

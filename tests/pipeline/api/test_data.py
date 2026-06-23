@@ -113,7 +113,7 @@ class TestGetAndPrepareTestData:
                 "dummy_path"
             )
         # Check that the DataFrame has the expected columns
-        expected_columns = data_module.INITIAL_TEST_COLUMNS
+        expected_columns = data_module.TEST_INPUT_COLUMNS
         assert set(result_df.columns) == set(expected_columns), (
             f"Expected columns: {expected_columns}, "
             f"but got: {set(result_df.columns)}"
