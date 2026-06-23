@@ -316,7 +316,8 @@ class ApiEvaluator:
                             f"{endpoint} API call returned 404 indicating no "
                             f"lookup match for {params.get('job_title')}"
                         )
-                        return None
+                        return None  # reserved for "not found" responses
+                    # handle API error response, attempting to pull details
                     try:
                         error_payload = await response.json()
                         detail = error_payload.get("detail", [])
@@ -333,7 +334,7 @@ class ApiEvaluator:
                         f"{response.status}. Message: "
                         f"{error_msg}"
                     )
-                    return None
+                    return {}  # empty dict indicates API failed
                 return await response.json()
 
     async def call_api_endpoint_async(
