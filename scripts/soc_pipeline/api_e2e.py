@@ -7,6 +7,8 @@
 # Allow todo comments without triggering errors (keep useful reminders)
 # pylint: disable=fixme
 
+# TODO: move main into ApiEvalutor class method when it's fully built.
+
 
 import argparse
 import datetime
@@ -20,6 +22,7 @@ from survey_assist_eval.pipeline.api.core import (
     ApiEvaluator,
     ApiEvaluatorConfig,
 )
+from survey_assist_eval.pipeline.api.data import get_and_prepare_test_data
 
 load_dotenv()
 GCP_PROJECT_ID = os.getenv("PROJECT_ID")
@@ -102,6 +105,12 @@ def main(classify_type: Literal["sic", "soc"]) -> None:
 
     # TODO: implement data collection and preparation steps once implemented
     logger.info("Collecting and preparing input data...")
+    # temp usage of internal parameter during developmend only, see top TODO
+    df = get_and_prepare_test_data(
+        api_evaluator_cfg._test_data_file_path,  # pylint: disable=w0212
+        api_evaluator_cfg.classify_type,
+    )
+    logger.info(f"Input data collected and prepared: {len(df)} records.")
 
     # TODO: add post-processing of lookup responses before classify
     logger.info("Performing lookup calls to API...")
