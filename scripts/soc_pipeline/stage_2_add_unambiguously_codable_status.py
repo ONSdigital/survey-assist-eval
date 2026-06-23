@@ -32,6 +32,7 @@ from survey_assist_eval.pipeline.shared_components import (
 MERGED_INDUSTRY_DESC_COL = "merged_industry_desc"
 JOB_TITLE_COL = "soc2020_job_title"
 JOB_DESCRIPTION_COL = "soc2020_job_description"
+EDUCATION_COL = "level_of_education"
 
 OUTPUT_COLS_INITIAL = {
     "soc_code_col": "initial_code",
@@ -45,6 +46,7 @@ OUTPUT_COLS_FINAL = {
     "alt_candidates_col": "alt_soc_candidates_final",
     "semantic_search_col": "second_semantic_search_results",
 }
+MAX_CONCURRENT_TASKS = 10
 #####################################################
 
 # Enable progress bar for semantic-search
@@ -60,11 +62,11 @@ async def get_unambiguous_soc_batch_async(
     code_digits: int,
 ) -> list[dict[str, Any]]:
     """Processes a batch of rows asynchronously to get unambiguous SOC codability."""
-    # 1. Create a task for each row in the batch
-    tasks = []
-    for _, row in batch.iterrows():
-        task = asyncio.create_task(
-            c_llm.unambiguous_soc_code(
+    semaphore = asyncio.Semaphore(MAX_CONCURRENT_TASKS)
+
+    async def _run_row(row: pd.Series):
+        async with semaphore:
+            return await c_llm.unambiguous_soc_code(
                 industry_descr=row[MERGED_INDUSTRY_DESC_COL],
                 semantic_search_results=row[semantic_search_col],
                 job_title=row[JOB_TITLE_COL],
@@ -73,8 +75,9 @@ async def get_unambiguous_soc_batch_async(
                 candidates_limit=candidates_limit,
                 code_digits=code_digits,
             )
-        )
-        tasks.append(task)
+
+    # 1. Create tasks for each row; semaphore enforces max concurrent calls.
+    tasks = [asyncio.create_task(_run_row(row)) for _, row in batch.iterrows()]
 
     # 2. Run all tasks concurrently
     responses = await asyncio.gather(*tasks)
@@ -132,9 +135,9 @@ async def main_async(
             np.split(
                 df,
                 np.arange(
-                    start_batch_id * metadata["batch_size_async"],
+                    start_batch_id * metadata["batch_size"],
                     len(df),
-                    metadata["batch_size_async"],
+                    metadata["batch_size"],
                 ),
             )
         )

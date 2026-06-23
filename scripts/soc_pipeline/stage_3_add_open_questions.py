@@ -25,10 +25,12 @@ from survey_assist_eval.pipeline.shared_components import (
 # Default values and constants:
 JOB_TITLE_COL = "soc2020_job_title"
 JOB_DESCRIPTION_COL = "soc2020_job_description"
+EDUCATION_COL = "level_of_education"
 MERGED_INDUSTRY_DESC_COL = "merged_industry_desc"
 
 CANDIDATE_SOC_COL = "alt_soc_candidates"
 OUTPUT_COL = "followup_question"
+MAX_CONCURRENT_TASKS = 10
 #####################################################
 
 # Enable progress bar for semantic-search
@@ -47,18 +49,20 @@ async def get_open_question_batch_async(
 
     Returns: question (str).
     """
-    tasks = []
-    for _, row in batch.iterrows():
-        task = asyncio.create_task(
-            c_llm.formulate_open_question(
+    semaphore = asyncio.Semaphore(MAX_CONCURRENT_TASKS)
+
+    async def _run_row(row: pd.Series):
+        async with semaphore:
+            return await c_llm.formulate_open_question(
                 industry_descr=row[MERGED_INDUSTRY_DESC_COL],
                 job_title=row[JOB_TITLE_COL],
                 job_description=row[JOB_DESCRIPTION_COL],
                 # level_of_education=row.get(EDUCATION_COL, "unknown"),
                 llm_output=row[CANDIDATE_SOC_COL],  # type: ignore
             )
-        )
-        tasks.append(task)
+
+    # Create tasks for each row; semaphore enforces max concurrent calls.
+    tasks = [asyncio.create_task(_run_row(row)) for _, row in batch.iterrows()]
 
     responses = await asyncio.gather(*tasks)
 
@@ -84,9 +88,9 @@ async def main_async(df, metadata, start_batch_id, args, c_llm):
             np.split(
                 df_uncodable,
                 np.arange(
-                    start_batch_id * metadata["batch_size_async"],
+                    start_batch_id * metadata["batch_size"],
                     len(df_uncodable),
-                    metadata["batch_size_async"],
+                    metadata["batch_size"],
                 ),
             )
         )

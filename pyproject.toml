@@ -19,6 +19,8 @@ pandas = "^2.3.3"
 pydantic = "^2.12.5"
 survey-assist-utils = { git = "https://github.com/ONSdigital/survey-assist-utils.git", tag = "v0.0.8" }
 toml = "^0.10.2"
+shortuuid = "^1.0.13"
+textstat = "^0.7.13"
 
 [tool.poetry.group.dev.dependencies]
 bandit = "^1.8.3"
@@ -43,7 +45,7 @@ python-dotenv = "^1.1.0"
 ruff = "^0.9.10"
 scikit-learn = "^1.8.0"
 scipy = "^1.16.3"
-sic-classification-utils = { git = "https://github.com/ONSdigital/sic-classification-utils.git", tag = "v0.1.13"}
+sic-classification-utils = { git = "https://github.com/ONSdigital/sic-classification-utils.git", tag = "v0.1.15"}
 soc-classification-utils = { git = "https://github.com/ONSdigital/soc-classification-utils.git", tag = "v0.1.4" }
 
 
