@@ -5,6 +5,7 @@
 # fmt: off
 
 import os
+import re
 
 import numpy as np
 import pandas as pd
@@ -24,8 +25,8 @@ REQUIRED_COLUMNS = {
 def _build_org_description(*parts: str) -> str:
     """Concatenate strings to build an organisation description.
 
-    Unknown (-9) values are removed from the concatenated string. If any input
-    part is not a string it is ignored.
+    Missing (-8) and Unknown (-9) values are removed from the concatenated
+    string. If any input part is not a string it is ignored.
 
     Args:
         *parts: Strings to concatenate into an organisation description.
@@ -33,8 +34,10 @@ def _build_org_description(*parts: str) -> str:
     Returns:
         str: Organisation description.
     """
+    pattern = re.compile(r"-[89]")  # replace handles missing/unknown vals
+    # pylint cant type infer varargs tuples correctly
     return "".join(
-        p.strip().replace("-9", "")  # replace handles the unknown values
+        pattern.sub("", p.strip())  # pytlint: disable=E1101
         for p in parts if isinstance(p, str)
     )
 
@@ -110,6 +113,10 @@ def get_and_prepare_test_data(
     # convert from list to set (correcting parquet serialisation)
     df["clerical_codes"] = df["clerical_codes"].apply(
         lambda codes: set(codes) if isinstance(codes, np.ndarray) else set()
+    )
+    # remove -8 values from job_description before passing to API
+    df["job_description"] = df["job_description"].apply(
+        lambda desc: desc.replace("-8", "") if isinstance(desc, str) else ""
     )
 
     # return only the columns needed for API evaluation
