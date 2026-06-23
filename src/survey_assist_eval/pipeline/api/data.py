@@ -20,6 +20,13 @@ REQUIRED_COLUMNS = {
     "sic2007_employee": "employee",
     "clerical_codes": "clerical_codes",
 }
+INITIAL_TEST_COLUMNS = [
+    "id",
+    "job_title",
+    "job_description",
+    "org_description",
+    "clerical_codes"
+]
 
 
 def _build_org_description(*parts: str) -> str:
@@ -73,8 +80,8 @@ def get_and_prepare_test_data(
         )
         try:
             random_sample = int(RANDOM_SAMPLE_SIZE)
-        except TypeError as e:
-            raise TypeError(
+        except ValueError as e:
+            raise ValueError(
                 f"Invalid API_EVAL_RANDOM_SAMPLE_SIZE: {RANDOM_SAMPLE_SIZE}. "
                 "Must be an integer"
             ) from e
@@ -120,12 +127,4 @@ def get_and_prepare_test_data(
     )
 
     # return only the columns needed for API evaluation
-    return df[
-        [
-            "id",
-            "job_title",
-            "job_description",
-            "org_description",
-            "clerical_codes"
-        ]
-    ]
+    return df[INITIAL_TEST_COLUMNS]
