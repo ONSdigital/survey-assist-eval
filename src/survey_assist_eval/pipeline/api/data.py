@@ -11,15 +11,7 @@ import pandas as pd
 from survey_assist_utils.logging import get_logger
 
 RANDOM_SEED = 42
-SOC_COLUMNS = {
-    "unique_id": "id",
-    "soc2020_job_title": "job_title",
-    "soc2020_job_description": "job_description",
-    "sic2007_self_employed": "self_employed",
-    "sic2007_employee": "employee",
-    "clerical_codes": "clerical_codes",
-}
-SIC_COLUMNS = {
+REQUIRED_COLUMNS = {
     "unique_id": "id",
     "soc2020_job_title": "job_title",
     "soc2020_job_description": "job_description",
@@ -48,14 +40,12 @@ def _build_org_description(*parts: str) -> str:
 
 
 def get_and_prepare_test_data(
-    filepath: str, classification_type: str, log_level: str = "INFO"
+    filepath: str, log_level: str = "INFO"
 ) -> pd.DataFrame:
     """Load and prepare test data for API evaluation.
 
     Args:
         filepath: Path to the test data file in parquet format.
-        classification_type: Type of classification for the evaluation, either
-            "sic" or "soc".
         log_level: Log level for logging within this function, must be one of
             "DEBUG", "INFO", "WARNING", "ERROR", or "CRITICAL".
 
@@ -66,8 +56,7 @@ def get_and_prepare_test_data(
 
     # read test data
     logger.debug(f"Loading test data from {filepath}...")
-    columns = SIC_COLUMNS if classification_type == "sic" else SOC_COLUMNS
-    df = pd.read_parquet(filepath, columns=list(columns.keys()))
+    df = pd.read_parquet(filepath, columns=list(REQUIRED_COLUMNS.keys()))
 
     # generate a random sample only if env vars are set
     # pylint is wrong, it should be capitalised as it's an env var
@@ -111,7 +100,7 @@ def get_and_prepare_test_data(
         )
 
     # perform common data preparation steps
-    df.rename(columns=columns, inplace=True)
+    df.rename(columns=REQUIRED_COLUMNS, inplace=True)
     df["org_description"] = df.apply(
         lambda row: _build_org_description(
             row["self_employed"], row["employee"]

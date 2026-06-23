@@ -108,7 +108,6 @@ def main(classify_type: Literal["sic", "soc"]) -> None:
     # temp usage of internal parameter during developmend only, see top TODO
     df = get_and_prepare_test_data(
         api_evaluator_cfg._test_data_file_path,  # pylint: disable=w0212
-        api_evaluator_cfg.classify_type,
     )
     logger.info(f"Input data collected and prepared: {len(df)} records.")
 
