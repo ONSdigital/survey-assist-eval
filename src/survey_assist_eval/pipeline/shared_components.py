@@ -182,7 +182,6 @@ def persist_results(  # noqa:PLR0913, pylint: disable=too-many-arguments
             {
                 "completed_batches": completed_batches,
                 "batch_size": metadata.get("batch_size"),
-                "batch_size_async": metadata.get("batch_size_async"),
             },
             f"{output_folder}/{output_shortname}_checkpoint_info.json",
         )

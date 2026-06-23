@@ -12,7 +12,7 @@ import asyncio
 
 import numpy as np
 import pandas as pd
-from industrial_classification_utils.llm.llm import ClassificationLLM
+from occupational_classification_utils.llm.llm import ClassificationLLM
 from tqdm import tqdm
 
 from survey_assist_eval.pipeline.shared_components import (
@@ -25,9 +25,10 @@ from survey_assist_eval.pipeline.shared_components import (
 # Default values and constants:
 JOB_TITLE_COL = "soc2020_job_title"
 JOB_DESCRIPTION_COL = "soc2020_job_description"
+EDUCATION_COL = "level_of_education"
 MERGED_INDUSTRY_DESC_COL = "merged_industry_desc"
 
-CANDIDATE_SIC_COL = "alt_sic_candidates"
+CANDIDATE_SOC_COL = "alt_soc_candidates"
 OUTPUT_COL = "followup_question"
 MAX_CONCURRENT_TASKS = 10
 #####################################################
@@ -56,7 +57,8 @@ async def get_open_question_batch_async(
                 industry_descr=row[MERGED_INDUSTRY_DESC_COL],
                 job_title=row[JOB_TITLE_COL],
                 job_description=row[JOB_DESCRIPTION_COL],
-                llm_output=row[CANDIDATE_SIC_COL],  # type: ignore
+                # level_of_education=row.get(EDUCATION_COL, "unknown"),
+                llm_output=row[CANDIDATE_SOC_COL],  # type: ignore
             )
 
     # Create tasks for each row; semaphore enforces max concurrent calls.
@@ -65,11 +67,11 @@ async def get_open_question_batch_async(
     responses = await asyncio.gather(*tasks)
 
     results = []
-    for sic_followup_object, _ in responses:
-        if sic_followup_object.followup is None:
+    for soc_followup_object, _ in responses:
+        if soc_followup_object.followup is None:
             results.append("")
         else:
-            results.append(sic_followup_object.followup)
+            results.append(soc_followup_object.followup)
     return results
 
 
@@ -130,7 +132,7 @@ if __name__ == "__main__":
 
     c_llm = ClassificationLLM(
         model_name=metadata["llm_model_name"],
-        model_location=metadata["llm_model_location"],
+        # model_location=metadata["llm_model_location"],
         verbose=False,
     )
     print("Classification LLM loaded.")

@@ -116,4 +116,3 @@ The metadata JSON stores shared configuration values plus per-stage checkpoint s
 | `soc_index_file` | `occupational_classification_utils.data.soc_index / soc2020volume2thecodingindexexcel16102024.xlsx` | SOC index lookup file |
 | `soc_structure_file` | `occupational_classification_utils.data.soc_index / soc2020volume1structureanddescriptionofunitgroupsexcel16102024.xlsx` | SOC structure lookup file |
 | `batch_size` | `100` | Checkpoint batch size |
-| `batch_size_async` | `10` | Async batch size for LLM stages |
