@@ -46,7 +46,7 @@ ruff = "^0.9.10"
 scikit-learn = "^1.8.0"
 scipy = "^1.16.3"
 sic-classification-utils = { git = "https://github.com/ONSdigital/sic-classification-utils.git", tag = "v0.1.14"}
-soc-classification-utils = { git = "https://github.com/ONSdigital/soc-classification-utils.git", tag = "v0.1.4" }
+soc-classification-utils = { git = "https://github.com/ONSdigital/soc-classification-utils.git", tag = "v0.1.5" }
 
 
 [tool.isort]
