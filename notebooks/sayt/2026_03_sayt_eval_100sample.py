@@ -14,7 +14,12 @@ import os
 import pandas as pd
 import plotly.express as px
 from dotenv import load_dotenv
-from industrial_classification_utils.sayt import SAYTSuggester
+from industrial_classification_utils.sayt import (
+    NgramRetrieverSpec,
+    PrefixRetrieverSpec,
+    SAYTSuggester,
+    SemanticRetrieverSpec,
+)
 
 from survey_assist_eval.data_cleaning.code_standard import get_clean_n_digit_codes
 
@@ -27,6 +32,17 @@ if not bucket_name:
     raise ValueError("EVALUATION_BUCKET_NAME environment variable not set")
 
 print(f"Using bucket for data loading: {bucket_name}")
+
+
+def build_lookup_suggester(
+    corpus: list[tuple[str, str]], *, semantic_weight: float | None
+) -> SAYTSuggester:
+    """Build a lookup suggester using the explicit retriever-spec API."""
+    retrievers = [PrefixRetrieverSpec(), NgramRetrieverSpec()]
+    if semantic_weight is not None:
+        retrievers.append(SemanticRetrieverSpec(weight=semantic_weight))
+    return SAYTSuggester(corpus, retrievers=retrievers)
+
 
 # %%
 test_df = pd.read_excel(
@@ -62,14 +78,10 @@ sayt_df["code"] = sayt_df["SIC07"].apply(lambda x: x if len(x) == 5 else f"0{x}"
 sayt_df["display_text"] = sayt_df["SIC_lookup"] + ": " + sayt_df["code"]
 
 sayt_corpus = list(zip(sayt_df["SIC_lookup"], sayt_df["display_text"], strict=False))
-sayt_suggester_without_sem = SAYTSuggester(sayt_corpus, semantic_enable=False)
-sayt_suggester_with_sem10 = SAYTSuggester(sayt_corpus, semantic_enable=True)
-sayt_suggester_with_sem05 = SAYTSuggester(
-    sayt_corpus, semantic_enable=True, semantic_weight=0.5
-)
-sayt_suggester_with_sem15 = SAYTSuggester(
-    sayt_corpus, semantic_enable=True, semantic_weight=1.5
-)
+sayt_suggester_without_sem = build_lookup_suggester(sayt_corpus, semantic_weight=None)
+sayt_suggester_with_sem10 = build_lookup_suggester(sayt_corpus, semantic_weight=1.0)
+sayt_suggester_with_sem05 = build_lookup_suggester(sayt_corpus, semantic_weight=0.5)
+sayt_suggester_with_sem15 = build_lookup_suggester(sayt_corpus, semantic_weight=1.5)
 
 
 # %%
