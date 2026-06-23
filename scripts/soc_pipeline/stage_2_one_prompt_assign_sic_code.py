@@ -83,8 +83,8 @@ async def get_rag_response_batch_async(
     return [
         {
             "initial_code": resp.soc_code or "",
-            "code_title": resp.soc_descriptive or "",
-            "likelihood": resp.likelihood or 0.0,
+            "code_title": resp.soc_title or "",
+            "likelihood": resp.likelihood_score or 0.0,
             "reasoning": resp.reasoning or "",
         }
         for resp in responses
