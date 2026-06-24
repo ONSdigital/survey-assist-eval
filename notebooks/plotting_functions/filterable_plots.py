@@ -8,7 +8,7 @@ import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-from survey_assist_eval.plotting.plotting_helpers import make_colour_map
+from notebooks.plotting_functions.plotting_helpers import make_colour_map
 
 
 def _apply_trace_colors(trace: Any, color: str | None) -> None:

@@ -2,10 +2,16 @@
 
 import re
 
+import nltk
 import numpy as np
 import pandas as pd
 from pydantic import BaseModel
 from textstat import textstat
+
+try:
+    nltk.data.find("corpora/words")
+except LookupError:
+    nltk.download("words")
 
 
 class OpenQuestionMetrics(BaseModel):

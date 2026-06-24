@@ -9,20 +9,20 @@ import pandas as pd
 import plotly.graph_objects as go
 from dotenv import load_dotenv
 
+from notebooks.plotting_functions.filterable_plots import (
+    build_filterable_dashboard,
+    build_filterable_plot,
+)
+from notebooks.plotting_functions.plotting_helpers import (
+    get_trace_colour_map,
+)
+from notebooks.plotting_functions.standard_plots import (
+    build_histogram,
+)
 from survey_assist_eval.evaluation.open_questions_metrics import (
     add_text_stats_columns,
     compare_text_stats,
     filter_nonempty_object_column,
-)
-from survey_assist_eval.plotting.filterable_plots import (
-    build_filterable_dashboard,
-    build_filterable_plot,
-)
-from survey_assist_eval.plotting.plotting_helpers import (
-    get_trace_colour_map,
-)
-from survey_assist_eval.plotting.standard_plots import (
-    build_histogram,
 )
 
 # %%
