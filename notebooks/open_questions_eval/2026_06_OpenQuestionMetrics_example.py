@@ -8,8 +8,8 @@ import os
 import pandas as pd
 from dotenv import load_dotenv
 
-from survey_assist_eval.evaluation.open_questions_metrics import (
-    evaluate_open_question,
+from survey_assist_eval.evaluation.open_questions.text_statistics_functions import (
+    compute_text_statistics,
 )
 
 # %%
@@ -35,7 +35,7 @@ stg_df = pd.read_parquet(f"{base_folder}{STG_FILE}")
 
 # %%
 
-metrics = evaluate_open_question(
+metrics = compute_text_statistics(
     stg_df,
     text_column="followup_question",
     word_threshold=MAX_WORD_COUNT_THRESHOLD,
