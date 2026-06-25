@@ -1,48 +1,45 @@
 """A script show an example of using OpenQuestionMetrics."""
 
 # pylint: disable=C0103
-
 # %%
 import os
 
 import pandas as pd
 from dotenv import load_dotenv
 
-from survey_assist_eval.evaluation.open_questions.text_statistics_functions import (
-    compute_text_statistics,
+from survey_assist_eval.evaluation.open_questions.open_questions_evaluation import (
+    evaluate_open_questions,
 )
 
 # %%
 EVALUATION_FOLDER = "/evaluation-pipeline/two_prompt_pipeline"
 STG_FILE = "2026_03_tlfs_it11_gemini25_europe_west9/STG3.parquet"
 
-
 # %%
+# Text statistics configuration
 MAX_WORD_COUNT_THRESHOLD = 15
 MAX_NUM_SENTENCE_THRESHOLD = 1
 MAX_WORD_COUNT_PER_SENTENCE_THRESHOLD = 20
 MIN_WORD_COUNT_THRESHOLD = 3
-
 # %%
 load_dotenv()
 bucket_name = os.getenv("EVALUATION_BUCKET_NAME")
 if not bucket_name:
     raise ValueError("EVALUATION_BUCKET_NAME environment variable not set")
-
 base_folder = f"gs://{bucket_name}{EVALUATION_FOLDER}/"
-
 stg_df = pd.read_parquet(f"{base_folder}{STG_FILE}")
-
 # %%
-
-metrics = compute_text_statistics(
+text_statistics_config = {
+    "word_threshold": MAX_WORD_COUNT_THRESHOLD,
+    "sentence_threshold": MAX_NUM_SENTENCE_THRESHOLD,
+    "long_sentence_threshold": MAX_WORD_COUNT_PER_SENTENCE_THRESHOLD,
+    "short_word_count_threshold": MIN_WORD_COUNT_THRESHOLD,
+}
+# %%
+open_question_metrics = evaluate_open_questions(
     stg_df,
     text_column="followup_question",
-    word_threshold=MAX_WORD_COUNT_THRESHOLD,
-    sentence_threshold=MAX_NUM_SENTENCE_THRESHOLD,
-    long_sentence_threshold=MAX_WORD_COUNT_PER_SENTENCE_THRESHOLD,
-    short_word_count_threshold=MIN_WORD_COUNT_THRESHOLD,
+    text_statistics_config=text_statistics_config,
 )
-
-metrics.report_metrics()
+print(open_question_metrics.report_metrics())
 # %%
