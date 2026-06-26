@@ -5,8 +5,38 @@ from survey_assist_eval.evaluation.open_questions.question_structure_functions i
     has_question_mark,
     has_interrogative_not_at_start,
     has_interrogative_start,
-    has_instruction_prompt_not_at_start
+    has_interrogative_anywhere,
+    has_instruction_prompt_anywhere,
+    has_instruction_prompt_start,
+    has_instruction_prompt_not_at_start,
+
 )
+
+
+INSTRUCTION_PROMPT_START_CASES = [
+    "Tell me what happened",
+    "Describe your role",
+    "Explain this clearly",
+    "Please describe your role",
+    "Please explain the process",
+    "Please tell me more",
+    "Please share the details",
+    "Share your feedback",
+    "Give details of the issue",
+]
+
+INSTRUCTION_PROMPT_NOT_AT_START_CASES = [
+    "Can you tell me what happened",
+    "Can you describe your role",
+    "I want you to explain this",
+    "Could you please describe your role",
+    "Can you please explain this process",
+    "I need you to please tell me more",
+    "Could you please share the details",
+    "Can you share your feedback",
+    "We need you to give details of this",
+]
+
 
 
 def test_has_question_mark_returns_true_when_present():
@@ -52,134 +82,204 @@ def test_has_question_mark_question_mark_with_spaces():
     assert has_question_mark(" ? ") is True
 
 
-def test_has_interrogative_not_at_start_returns_false_when_at_start():
-    """Returns False when WH-word is the first word."""
-    assert has_interrogative_not_at_start("What is this") is False
-    assert has_interrogative_not_at_start("Why does this happen") is False
+class TestInterrogatives:
+    """Tests for interrogative detection functions."""
+
+    INTERROGATIVE_ANYWHERE_TRUE_CASES = [
+        "What is this",
+        "Tell me why this happens",
+        "I want to know how it works",
+        "Explain when this occurred",
+        "Tell me where this is",
+        "I wonder who is responsible",
+        "Tell me whom this concerns",
+        "I wonder whose idea this was",
+        "Tell me which option is best",
+    ]
+
+    INTERROGATIVE_ANYWHERE_FALSE_CASES = [
+        "This is a normal sentence",
+        "Describe the process clearly",
+        "Whatever you decide is fine",
+        "The whole idea is simple",
+        "",
+        "   ",
+    ]
+
+    INTERROGATIVE_START_TRUE_CASES = [
+        # WH words
+        "What is this",
+        "Why does this happen",
+        "How does it work",
+        "When is this due",
+        "Where is this located",
+        "Who is responsible",
+        "Whom does this affect",
+        "Whose idea was this",
+        "Which option is best",
+
+        # auxiliary verbs
+        "Is this correct",
+        "Are we ready",
+        "Do you understand",
+        "Does this work",
+        "Did you check",
+        "Can we proceed",
+        "Could you explain",
+        "Would this help",
+        "Should we continue",
+        "Will this change",
+        "Have you checked",
+        "Has this been done",
+        "Had this occurred",
+    ]
+
+    INTERROGATIVE_NOT_AT_START_TRUE_CASES = [
+        "Tell me what this is",
+        "I wonder why that happens",
+        "Explain how this works",
+        "I need to know when this happened",
+        "Tell me where this is located",
+        "I want to know who is responsible",
+        "Tell me whom this concerns",
+        "I wonder whose idea this was",
+        "Tell me which option is best",
+    ]
+
+    ABSENT_INTERROGATIVE_CASES = [
+        # Plain neutral sentences
+        "This is a normal sentence",
+        "The system works as expected",
+        "We completed the analysis",
+        
+        # Instruction / statement (no WH, no auxiliary start)
+        "Describe the process clearly",
+        "Give an overview of the method",
+        "Share your feedback",
+        
+        # Partial match traps (important!)
+        "Whatever you decide is fine",
+        "The whole idea is simple",
+        "Someone handled this already",
+        
+        # Declarative sentences with verbs
+        "It works well in practice",
+        "He explained the results clearly",
+        
+        ]
 
 
-def test_has_interrogative_not_at_start_returns_true_when_in_middle():
-    """Returns True when WH-word appears later in the sentence."""
-    assert has_interrogative_not_at_start("Tell me what this is") is True
-    assert has_interrogative_not_at_start("I wonder why that happens") is True
+    EDGE_CASES = [
+        None,
+        123,
+        12.5,
+        True,
+        [],
+        {},
+        (),
+        "",
+        "   ",
+    ]
 
 
-def test_has_interrogative_not_at_start_case_insensitive():
-    """Detects WH-words regardless of casing."""
-    assert has_interrogative_not_at_start("Tell me WHAT this is") is True
-    assert has_interrogative_not_at_start("WHY is that") is False
+
+    # ===== ANYWHERE =====
+
+    @pytest.mark.parametrize("text", INTERROGATIVE_ANYWHERE_TRUE_CASES)
+    def test_has_interrogative_anywhere_true(self, text):
+        """Returns True when WH-word appears anywhere."""
+        assert has_interrogative_anywhere(text) is True
+        
+    
+    @pytest.mark.parametrize("text", INTERROGATIVE_ANYWHERE_FALSE_CASES)
+    def test_has_interrogative_anywhere_false(self, text):
+        """Returns False when no WH-word is present."""
+        assert has_interrogative_anywhere(text) is False
 
 
-def test_has_interrogative_not_at_start_with_leading_whitespace():
-    """Ignores leading whitespace when determining the first word."""
-    assert has_interrogative_not_at_start("   What is this") is False
-    assert has_interrogative_not_at_start("   Tell me what this is") is True
+    @pytest.mark.parametrize("text", ABSENT_INTERROGATIVE_CASES)
+    def test_has_interrogative_anywhere_false(self, text):
+        """Returns False when no interrogative signal is present."""
+        assert has_interrogative_anywhere(text) is False
+
+    @pytest.mark.parametrize("text", EDGE_CASES)
+    def test_has_interrogative_anywhere_EDGE_CASES(self, text):
+        """Returns False for all edge cases."""
+        assert has_interrogative_anywhere(text) is False
+
+    # ===== START =====
+
+    @pytest.mark.parametrize("text", INTERROGATIVE_START_TRUE_CASES)
+    def test_has_interrogative_start_returns_true(self, text):
+        """Returns True when text starts with interrogative or auxiliary."""
+        assert has_interrogative_start(text) is True
+
+    def test_has_interrogative_start_case_insensitive(self):
+        """Detects interrogatives regardless of casing."""
+        assert has_interrogative_start("WHAT is this") is True
+        assert has_interrogative_start("is this correct") is True
+
+    def test_has_interrogative_start_with_leading_whitespace(self):
+        """Ignores leading whitespace."""
+        assert has_interrogative_start("   What is this") is True
+
+    @pytest.mark.parametrize("text", INTERROGATIVE_NOT_AT_START_TRUE_CASES)
+    def test_has_interrogative_start_returns_false_for_middle(self, text):
+        """Returns False when interrogative appears later."""
+        assert has_interrogative_start(text) is False
+
+    def test_has_interrogative_start_punctuation(self):
+        """Handles punctuation correctly."""
+        assert has_interrogative_start("What? Really.") is True
+
+    @pytest.mark.parametrize("text", ABSENT_INTERROGATIVE_CASES)
+    def test_has_interrogative_start_false(self, text):
+        """Returns False when no interrogative signal is present."""
+        assert has_interrogative_start(text) is False
+
+    @pytest.mark.parametrize("text", EDGE_CASES)
+    def test_has_interrogative_start_EDGE_CASES(self, text):
+        """Returns False for all edge cases."""
+        assert has_interrogative_start(text) is False
+
+    # ===== NOT AT START =====
+
+    @pytest.mark.parametrize("text", INTERROGATIVE_NOT_AT_START_TRUE_CASES)
+    def test_has_interrogative_not_at_start_returns_true(self, text):
+        """Returns True when WH-word appears later in the sentence."""
+        assert has_interrogative_not_at_start(text) is True
+
+    @pytest.mark.parametrize("text", INTERROGATIVE_START_TRUE_CASES)
+    def test_has_interrogative_not_at_start_returns_false_for_start(self, text):
+        """Returns False when interrogative is at the start."""
+        assert has_interrogative_not_at_start(text) is False
+
+    def test_has_interrogative_not_at_start_case_insensitive(self):
+        """Detects WH-words regardless of casing."""
+        assert has_interrogative_not_at_start("Tell me WHAT this is") is True
+        assert has_interrogative_not_at_start("WHY is that") is False
+
+    def test_has_interrogative_not_at_start_with_leading_whitespace(self):
+        """Ignores leading whitespace."""
+        assert has_interrogative_not_at_start("   Tell me what this is") is True
+        assert has_interrogative_not_at_start("   What is this") is False
 
 
-def test_has_interrogative_not_at_start_returns_false_when_absent():
-    """Returns False when no WH-word is present."""
-    assert has_interrogative_not_at_start("This is a statement") is False
+    def test_has_interrogative_not_at_start_punctuation(self):
+        """Handles punctuation correctly."""
+        assert has_interrogative_not_at_start("Tell me, what is this?") is True
+        assert has_interrogative_not_at_start("What? Really.") is False
 
+    @pytest.mark.parametrize("text", ABSENT_INTERROGATIVE_CASES)
+    def test_has_interrogative_not_at_start_false(self, text):
+        """Returns False when no interrogative signal is present."""
+        assert has_interrogative_not_at_start(text) is False
 
-def test_has_interrogative_not_at_start_word_boundaries():
-    """Does not match partial words containing WH substrings."""
-    assert has_interrogative_not_at_start("This is whatever you want") is False
-    assert has_interrogative_not_at_start("The whole thing") is False
+    @pytest.mark.parametrize("text", EDGE_CASES)
+    def test_has_interrogative_not_at_start_EDGE_CASES(self, text):
+        """Returns False for all edge cases."""
+        assert has_interrogative_not_at_start(text) is False
 
-
-def test_has_interrogative_not_at_start_punctuation():
-    """Handles punctuation correctly around WH-words."""
-    assert has_interrogative_not_at_start("Tell me, what is this?") is True
-    assert has_interrogative_not_at_start("What? Really.") is False
-
-
-def test_has_interrogative_not_at_start_empty_string():
-    """Returns False for empty string input."""
-    assert has_interrogative_not_at_start("") is False
-
-
-def test_has_interrogative_not_at_start_none_input():
-    """Returns False when input is None."""
-    assert has_interrogative_not_at_start(None) is False
-
-
-def test_has_interrogative_not_at_start_non_string_input():
-    """Returns False when input is not a string."""
-    assert has_interrogative_not_at_start(123) is False
-
-
-def test_has_interrogative_not_at_start_whitespace_only():
-    """Returns False for whitespace-only input."""
-    assert has_interrogative_not_at_start("   ") is False
-
-
-def test_has_interrogative_start_returns_true_for_wh_words():
-    """Returns True when text starts with a WH-word."""
-    assert has_interrogative_start("What is this") is True
-    assert has_interrogative_start("Why does this happen") is True
-    assert has_interrogative_start("How does it work") is True
-
-
-def test_has_interrogative_start_returns_true_for_auxiliary_verbs():
-    """Returns True when text starts with an auxiliary verb."""
-    assert has_interrogative_start("Is this correct") is True
-    assert has_interrogative_start("Do you understand") is True
-    assert has_interrogative_start("Can we proceed") is True
-
-
-def test_has_interrogative_start_case_insensitive():
-    """Detects interrogatives regardless of casing."""
-    assert has_interrogative_start("WHAT is this") is True
-    assert has_interrogative_start("is this correct") is True
-
-
-def test_has_interrogative_start_with_leading_whitespace():
-    """Ignores leading whitespace when checking the start of text."""
-    assert has_interrogative_start("   What is this") is True
-    assert has_interrogative_start("   Do you agree") is True
-
-
-def test_has_interrogative_start_returns_false_when_not_at_start():
-    """Returns False when interrogative appears later in the text."""
-    assert has_interrogative_start("Tell me what this is") is False
-    assert has_interrogative_start("I wonder why that happens") is False
-
-
-def test_has_interrogative_start_returns_false_when_absent():
-    """Returns False when no interrogative or auxiliary verb is present."""
-    assert has_interrogative_start("This is a statement") is False
-
-
-def test_has_interrogative_start_word_boundaries():
-    """Does not match partial words containing interrogative substrings."""
-    assert has_interrogative_start("Whatever happens") is False
-    assert has_interrogative_start("The whole idea") is False
-
-
-def test_has_interrogative_start_with_punctuation():
-    """Handles punctuation correctly at the start of text."""
-    assert has_interrogative_start("What? Really.") is True
-    assert has_interrogative_start("Is this okay?") is True
-
-
-def test_has_interrogative_start_empty_string():
-    """Returns False for empty string input."""
-    assert has_interrogative_start("") is False
-
-
-def test_has_interrogative_start_none_input():
-    """Returns False when input is None."""
-    assert has_interrogative_start(None) is False
-
-
-def test_has_interrogative_start_non_string_input():
-    """Returns False when input is not a string."""
-    assert has_interrogative_start(123) is False
-
-
-def test_has_interrogative_start_whitespace_only():
-    """Returns False for whitespace-only input."""
-    assert has_interrogative_start("   ") is False
 
 
 def test_has_instruction_prompt_not_at_start_returns_false_when_at_start():
@@ -189,57 +289,154 @@ def test_has_instruction_prompt_not_at_start_returns_false_when_at_start():
     assert has_instruction_prompt_not_at_start("Please describe your role") is False
 
 
-def test_has_instruction_prompt_not_at_start_returns_true_when_in_middle():
-    """Returns True when instruction prompt appears later in the text."""
-    assert has_instruction_prompt_not_at_start("Can you tell me what happened") is True
-    assert has_instruction_prompt_not_at_start("I want you to explain this") is True
-    assert has_instruction_prompt_not_at_start("Could you please describe your role") is True
+class TestInstructionPrompts:
+    """Tests for instruction prompt detection functions."""
 
+    INSTRUCTION_ANYWHERE_TRUE_CASES = [
+        "Tell me what happened",
+        "Please describe your role",
+        "Explain the process",
+        "Can you share your feedback",
+        "I need you to give details of this",
+        "Please tell me more",
+        "Could you please explain this",
+    ]
 
-def test_has_instruction_prompt_not_at_start_case_insensitive():
-    """Detects instruction prompts regardless of casing."""
-    assert has_instruction_prompt_not_at_start("Can you TELL ME more") is True
-    assert has_instruction_prompt_not_at_start("PLEASE EXPLAIN this") is False
+    INSTRUCTION_START_TRUE_CASES = [
+        "Tell me what happened",
+        "Describe your role",
+        "Explain this clearly",
+        "Please describe your role",
+        "Please explain the process",
+        "Please tell me more",
+        "Please share your feedback",
+        "Share your feedback",
+        "Give details of the issue",
+    ]
 
+    INSTRUCTION_NOT_AT_START_TRUE_CASES = [
+        "Can you tell me what happened",
+        "I want you to explain this",
+        "Could you please describe your role",
+        "Can you please explain this process",
+        "I need you to please tell me more",
+        "Could you please share the details",
+        "We need you to give details of this",
+    ]
 
-def test_has_instruction_prompt_not_at_start_with_leading_whitespace():
-    """Ignores leading whitespace when determining the start."""
-    assert has_instruction_prompt_not_at_start("   Tell me more") is False
-    assert has_instruction_prompt_not_at_start("   Can you tell me more") is True
+    ABSENT_INSTRUCTION_CASES = [
+        # Neutral statements
+        "This is a normal sentence",
+        "The system works as expected",
+        "We completed the analysis",
 
+        # Interrogatives (but not instructions)
+        "What is this",
+        "Why does this happen",
+        "How does it work",
 
-def test_has_instruction_prompt_not_at_start_returns_false_when_absent():
-    """Returns False when no instruction prompt is present."""
-    assert has_instruction_prompt_not_at_start("This is a normal sentence") is False
+        # Partial match traps
+        "This is a shareholder report",
+        "Descriptive text only",
 
+        # Declarative sentences
+        "He explained the results clearly",
+        "It works well in practice",
+    ]
 
-def test_has_instruction_prompt_not_at_start_word_boundaries():
-    """Does not match partial words containing instruction substrings."""
-    assert has_instruction_prompt_not_at_start("This is a shareholder report") is False
-    assert has_instruction_prompt_not_at_start("Descriptive text only") is False
+    EDGE_CASES = [
+        None,
+        123,
+        12.5,
+        True,
+        [],
+        {},
+        (),
+        "",
+        "   ",
+    ]
 
+    # ===== ANYWHERE =====
 
-def test_has_instruction_prompt_not_at_start_with_punctuation():
-    """Handles punctuation correctly around instruction prompts."""
-    assert has_instruction_prompt_not_at_start("Can you, tell me what happened?") is True
-    assert has_instruction_prompt_not_at_start("Tell me, what happened?") is False
+    @pytest.mark.parametrize("text", INSTRUCTION_ANYWHERE_TRUE_CASES)
+    def test_has_instruction_prompt_anywhere_true(self, text):
+        """Returns True when instruction prompt appears anywhere."""
+        assert has_instruction_prompt_anywhere(text) is True
 
+    @pytest.mark.parametrize("text", ABSENT_INSTRUCTION_CASES)
+    def test_has_instruction_prompt_anywhere_false(self, text):
+        """Returns False when no instruction prompt is present."""
+        assert has_instruction_prompt_anywhere(text) is False
 
-def test_has_instruction_prompt_not_at_start_empty_string():
-    """Returns False for empty string input."""
-    assert has_instruction_prompt_not_at_start("") is False
+    @pytest.mark.parametrize("text", EDGE_CASES)
+    def test_has_instruction_prompt_anywhere_edge_cases(self, text):
+        """Returns False for edge cases."""
+        assert has_instruction_prompt_anywhere(text) is False
 
+    # ===== START =====
 
-def test_has_instruction_prompt_not_at_start_none_input():
-    """Returns False when input is None."""
-    assert has_instruction_prompt_not_at_start(None) is False
+    @pytest.mark.parametrize("text", INSTRUCTION_START_TRUE_CASES)
+    def test_has_instruction_prompt_start_true(self, text):
+        """Returns True when instruction prompt is at the start."""
+        assert has_instruction_prompt_start(text) is True
 
+    @pytest.mark.parametrize("text", INSTRUCTION_NOT_AT_START_TRUE_CASES)
+    def test_has_instruction_prompt_start_false_for_middle(self, text):
+        """Returns False when instruction appears later in text."""
+        assert has_instruction_prompt_start(text) is False
 
-def test_has_instruction_prompt_not_at_start_non_string_input():
-    """Returns False when input is not a string."""
-    assert has_instruction_prompt_not_at_start(123) is False
+    @pytest.mark.parametrize("text", ABSENT_INSTRUCTION_CASES)
+    def test_has_instruction_prompt_start_false(self, text):
+        """Returns False when no instruction prompt is present."""
+        assert has_instruction_prompt_start(text) is False
 
+    def test_has_instruction_prompt_start_case_insensitive(self):
+        """Detects instruction prompts regardless of casing."""
+        assert has_instruction_prompt_start("PLEASE DESCRIBE your role") is True
+        assert has_instruction_prompt_start("tell me more") is True
 
-def test_has_instruction_prompt_not_at_start_whitespace_only():
-    """Returns False for whitespace-only input."""
-    assert has_instruction_prompt_not_at_start("   ") is False
+    def test_has_instruction_prompt_start_with_leading_whitespace(self):
+        """Ignores leading whitespace."""
+        assert has_instruction_prompt_start("   Tell me what happened") is True
+
+    @pytest.mark.parametrize("text", EDGE_CASES)
+    def test_has_instruction_prompt_start_edge_cases(self, text):
+        """Returns False for edge cases."""
+        assert has_instruction_prompt_start(text) is False
+
+    # ===== NOT AT START =====
+
+    @pytest.mark.parametrize("text", INSTRUCTION_NOT_AT_START_TRUE_CASES)
+    def test_has_instruction_prompt_not_at_start_true(self, text):
+        """Returns True when instruction prompt appears later."""
+        assert has_instruction_prompt_not_at_start(text) is True
+
+    @pytest.mark.parametrize("text", INSTRUCTION_START_TRUE_CASES)
+    def test_has_instruction_prompt_not_at_start_false_for_start(self, text):
+        """Returns False when instruction is at the start."""
+        assert has_instruction_prompt_not_at_start(text) is False
+
+    @pytest.mark.parametrize("text", ABSENT_INSTRUCTION_CASES)
+    def test_has_instruction_prompt_not_at_start_false(self, text):
+        """Returns False when no instruction prompt is present."""
+        assert has_instruction_prompt_not_at_start(text) is False
+
+    def test_has_instruction_prompt_not_at_start_case_insensitive(self):
+        """Detects instruction prompts regardless of casing."""
+        assert has_instruction_prompt_not_at_start("Can you TELL ME more") is True
+        assert has_instruction_prompt_not_at_start("PLEASE EXPLAIN this") is False
+
+    def test_has_instruction_prompt_not_at_start_with_leading_whitespace(self):
+        """Handles leading whitespace correctly."""
+        assert has_instruction_prompt_not_at_start("   Tell me more") is False
+        assert has_instruction_prompt_not_at_start("   Can you tell me more") is True
+
+    def test_has_instruction_prompt_not_at_start_punctuation(self):
+        """Handles punctuation correctly."""
+        assert has_instruction_prompt_not_at_start("Can you, tell me what happened?") is True
+        assert has_instruction_prompt_not_at_start("Tell me, what happened?") is False
+
+    @pytest.mark.parametrize("text", EDGE_CASES)
+    def test_has_instruction_prompt_not_at_start_edge_cases(self, text):
+        """Returns False for edge cases."""
+        assert has_instruction_prompt_not_at_start(text) is False
