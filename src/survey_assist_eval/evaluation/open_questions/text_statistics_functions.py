@@ -117,12 +117,10 @@ def get_text_stats(text: str) -> dict[str, int | float | list[int]]:
     return {
         "word_count": textstat.lexicon_count(text, removepunct=True),
         "sentence_count": textstat.sentence_count(text),
-        "syllable_count": textstat.syllable_count(text),
         "character_count": textstat.char_count(text),
         "letter_count": textstat.letter_count(text),
         "words_per_sentence": word_counts_per_setence(text),
         "mean_words_per_sentence": textstat.words_per_sentence(text),
-        "mean_syllables_per_word": textstat.avg_syllables_per_word(text),
     }
 
 
@@ -210,9 +208,6 @@ def summarise_text_stats(  # noqa: PLR0913 pylint: disable=R0917, R0913
         "mean_word_count_per_sentence": np.mean(
             df[f"{prefix}words_per_sentence"].sum()
         ),
-        "mean_of_mean_syllables_per_word": df[
-            f"{prefix}mean_syllables_per_word"
-        ].mean(),
         "pct_over_word_count_threshold": (
             df[f"{prefix}word_count"] > word_threshold
         ).mean()

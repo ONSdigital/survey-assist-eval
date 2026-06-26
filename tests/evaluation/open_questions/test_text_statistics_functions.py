@@ -66,12 +66,10 @@ def test_get_text_stats_returns_expected_values():
 
     assert stats["word_count"] == 6
     assert stats["sentence_count"] == 1
-    assert stats["syllable_count"] == 7
     assert stats["character_count"] == 23
     assert stats["letter_count"] == 21
     assert stats["words_per_sentence"] == [2, 4]
     assert stats["mean_words_per_sentence"] == pytest.approx(6)
-    assert stats["mean_syllables_per_word"] == pytest.approx(1.1666666666666667)
 
 
 def test_add_text_stats_columns_adds_prefixed_columns():
@@ -125,9 +123,6 @@ def test_summarise_text_stats_computes_summary_using_text_column():
     assert summary["median_word_count"] == 4
     assert summary["mean_sentence_count"] == pytest.approx(1.0)
     assert summary["mean_word_count_per_sentence"] == pytest.approx(5)
-    assert summary["mean_of_mean_syllables_per_word"] == pytest.approx(
-        1.3269230769230769
-    )
     assert summary["pct_over_sentence_count_threshold"] == pytest.approx(0.0)
     assert summary["pct_with_long_sentence_over_word_count_threshold"] == pytest.approx(
         1 / 3 * 100
@@ -143,8 +138,7 @@ def test_summarise_text_stats_uses_existing_prefix_columns():
             "answer_word_count": [1, 30, 5],
             "answer_sentence_count": [1, 3, 1],
             "answer_words_per_sentence": [[1], [3, 21, 6], [5]],
-            "answer_mean_words_per_sentence": [1.0, 25.0, 5.0],
-            "answer_mean_syllables_per_word": [1.0, 1.2, 1.1],
+            "answer_mean_words_per_sentence": [1.0, 25.0, 5.0]
         }
     )
 
