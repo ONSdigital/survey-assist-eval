@@ -60,6 +60,7 @@ def has_interrogative_start(text: str) -> bool:
 
 
 
+
 def has_instruction_prompt_not_at_start(text: str) -> bool:
     """Check if the text contains instruction-style prompts anywhere except 
     at the beginning.
@@ -77,24 +78,29 @@ def has_instruction_prompt_not_at_start(text: str) -> bool:
     stripped_text = text.lstrip().lower()
 
     patterns = [
-        r"\btell me\b",
-        r"\bdescribe\b",
-        r"\bexplain\b",
         r"\bplease describe\b",
         r"\bplease explain\b",
         r"\bplease tell me\b",
         r"\bplease share\b",
+        r"\btell me\b",
+        r"\bdescribe\b",
+        r"\bexplain\b",
         r"\bshare\b",
         r"\bgive details\b",
     ]
 
+    matches = []
+
     for pattern in patterns:
         match = re.search(pattern, stripped_text)
-        if match and match.start() != 0:
-            return True
+        if match:
+            matches.append(match.start())
 
-    return False
+    if not matches:
+        return False
 
+    # Only consider the earliest match
+    return min(matches) != 0
 
 
 def has_instruction_prompt_start(text: str) -> bool:

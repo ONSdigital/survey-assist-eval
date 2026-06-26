@@ -4,7 +4,8 @@ import pytest
 from survey_assist_eval.evaluation.open_questions.question_structure_functions import (
     has_question_mark,
     has_interrogative_not_at_start,
-    has_interrogative_start
+    has_interrogative_start,
+    has_instruction_prompt_not_at_start
 )
 
 
@@ -179,3 +180,66 @@ def test_has_interrogative_start_non_string_input():
 def test_has_interrogative_start_whitespace_only():
     """Returns False for whitespace-only input."""
     assert has_interrogative_start("   ") is False
+
+
+def test_has_instruction_prompt_not_at_start_returns_false_when_at_start():
+    """Returns False when instruction prompt is the first phrase."""
+    assert has_instruction_prompt_not_at_start("Tell me what happened") is False
+    assert has_instruction_prompt_not_at_start("Explain this clearly") is False
+    assert has_instruction_prompt_not_at_start("Please describe your role") is False
+
+
+def test_has_instruction_prompt_not_at_start_returns_true_when_in_middle():
+    """Returns True when instruction prompt appears later in the text."""
+    assert has_instruction_prompt_not_at_start("Can you tell me what happened") is True
+    assert has_instruction_prompt_not_at_start("I want you to explain this") is True
+    assert has_instruction_prompt_not_at_start("Could you please describe your role") is True
+
+
+def test_has_instruction_prompt_not_at_start_case_insensitive():
+    """Detects instruction prompts regardless of casing."""
+    assert has_instruction_prompt_not_at_start("Can you TELL ME more") is True
+    assert has_instruction_prompt_not_at_start("PLEASE EXPLAIN this") is False
+
+
+def test_has_instruction_prompt_not_at_start_with_leading_whitespace():
+    """Ignores leading whitespace when determining the start."""
+    assert has_instruction_prompt_not_at_start("   Tell me more") is False
+    assert has_instruction_prompt_not_at_start("   Can you tell me more") is True
+
+
+def test_has_instruction_prompt_not_at_start_returns_false_when_absent():
+    """Returns False when no instruction prompt is present."""
+    assert has_instruction_prompt_not_at_start("This is a normal sentence") is False
+
+
+def test_has_instruction_prompt_not_at_start_word_boundaries():
+    """Does not match partial words containing instruction substrings."""
+    assert has_instruction_prompt_not_at_start("This is a shareholder report") is False
+    assert has_instruction_prompt_not_at_start("Descriptive text only") is False
+
+
+def test_has_instruction_prompt_not_at_start_with_punctuation():
+    """Handles punctuation correctly around instruction prompts."""
+    assert has_instruction_prompt_not_at_start("Can you, tell me what happened?") is True
+    assert has_instruction_prompt_not_at_start("Tell me, what happened?") is False
+
+
+def test_has_instruction_prompt_not_at_start_empty_string():
+    """Returns False for empty string input."""
+    assert has_instruction_prompt_not_at_start("") is False
+
+
+def test_has_instruction_prompt_not_at_start_none_input():
+    """Returns False when input is None."""
+    assert has_instruction_prompt_not_at_start(None) is False
+
+
+def test_has_instruction_prompt_not_at_start_non_string_input():
+    """Returns False when input is not a string."""
+    assert has_instruction_prompt_not_at_start(123) is False
+
+
+def test_has_instruction_prompt_not_at_start_whitespace_only():
+    """Returns False for whitespace-only input."""
+    assert has_instruction_prompt_not_at_start("   ") is False
