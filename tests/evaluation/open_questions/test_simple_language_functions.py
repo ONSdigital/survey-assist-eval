@@ -1,4 +1,5 @@
 """Tests for simple language functions."""
+import pytest 
 
 from survey_assist_eval.evaluation.open_questions.simple_language_functions import (
     extract_acronyms, get_avg_syllables_per_word

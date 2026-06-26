@@ -3,7 +3,8 @@ import pytest
 
 from survey_assist_eval.evaluation.open_questions.question_structure_functions import (
     has_question_mark,
-    has_interrogative_not_at_start
+    has_interrogative_not_at_start,
+    has_interrogative_start
 )
 
 
@@ -109,3 +110,72 @@ def test_has_interrogative_not_at_start_non_string_input():
 def test_has_interrogative_not_at_start_whitespace_only():
     """Returns False for whitespace-only input."""
     assert has_interrogative_not_at_start("   ") is False
+
+
+def test_has_interrogative_start_returns_true_for_wh_words():
+    """Returns True when text starts with a WH-word."""
+    assert has_interrogative_start("What is this") is True
+    assert has_interrogative_start("Why does this happen") is True
+    assert has_interrogative_start("How does it work") is True
+
+
+def test_has_interrogative_start_returns_true_for_auxiliary_verbs():
+    """Returns True when text starts with an auxiliary verb."""
+    assert has_interrogative_start("Is this correct") is True
+    assert has_interrogative_start("Do you understand") is True
+    assert has_interrogative_start("Can we proceed") is True
+
+
+def test_has_interrogative_start_case_insensitive():
+    """Detects interrogatives regardless of casing."""
+    assert has_interrogative_start("WHAT is this") is True
+    assert has_interrogative_start("is this correct") is True
+
+
+def test_has_interrogative_start_with_leading_whitespace():
+    """Ignores leading whitespace when checking the start of text."""
+    assert has_interrogative_start("   What is this") is True
+    assert has_interrogative_start("   Do you agree") is True
+
+
+def test_has_interrogative_start_returns_false_when_not_at_start():
+    """Returns False when interrogative appears later in the text."""
+    assert has_interrogative_start("Tell me what this is") is False
+    assert has_interrogative_start("I wonder why that happens") is False
+
+
+def test_has_interrogative_start_returns_false_when_absent():
+    """Returns False when no interrogative or auxiliary verb is present."""
+    assert has_interrogative_start("This is a statement") is False
+
+
+def test_has_interrogative_start_word_boundaries():
+    """Does not match partial words containing interrogative substrings."""
+    assert has_interrogative_start("Whatever happens") is False
+    assert has_interrogative_start("The whole idea") is False
+
+
+def test_has_interrogative_start_with_punctuation():
+    """Handles punctuation correctly at the start of text."""
+    assert has_interrogative_start("What? Really.") is True
+    assert has_interrogative_start("Is this okay?") is True
+
+
+def test_has_interrogative_start_empty_string():
+    """Returns False for empty string input."""
+    assert has_interrogative_start("") is False
+
+
+def test_has_interrogative_start_none_input():
+    """Returns False when input is None."""
+    assert has_interrogative_start(None) is False
+
+
+def test_has_interrogative_start_non_string_input():
+    """Returns False when input is not a string."""
+    assert has_interrogative_start(123) is False
+
+
+def test_has_interrogative_start_whitespace_only():
+    """Returns False for whitespace-only input."""
+    assert has_interrogative_start("   ") is False
