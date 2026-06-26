@@ -59,17 +59,22 @@ def has_interrogative_start(text: str) -> bool:
     return re.search(pattern, text.lower(), re.VERBOSE) is not None
 
 
-def has_instruction_prompt_anywhere(text: str) -> bool:
-    """Check if the text contains instruction-style prompts.
+
+def has_instruction_prompt_not_at_start(text: str) -> bool:
+    """Check if the text contains instruction-style prompts anywhere except 
+    at the beginning.
 
     Args:
-        text: Input text.
+        text (str): Input text.
 
     Returns:
-        bool: True if an instruction prompt is found, else False.
+        bool: True if an instruction prompt is found not at the start of the
+        text, else False.
     """
     if not isinstance(text, str):
         return False
+
+    stripped_text = text.lstrip().lower()
 
     patterns = [
         r"\btell me\b",
@@ -83,8 +88,13 @@ def has_instruction_prompt_anywhere(text: str) -> bool:
         r"\bgive details\b",
     ]
 
-    text = text.lower()
-    return any(re.search(p, text) for p in patterns)
+    for pattern in patterns:
+        match = re.search(pattern, stripped_text)
+        if match and match.start() != 0:
+            return True
+
+    return False
+
 
 
 def has_instruction_prompt_start(text: str) -> bool:
