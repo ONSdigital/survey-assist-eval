@@ -108,7 +108,10 @@ class TestGetAndPrepareTestData:
     def test_get_and_prepare_test_data(self, dummy_input_test_data):
         """Test that the function processes input data correctly."""
         input_df, expected_org_descs = dummy_input_test_data
-        with get_and_prepare_test_data_mocks(input_df) as mocks:
+        with (
+            patch.dict("os.environ", {}, clear=True),
+            get_and_prepare_test_data_mocks(input_df) as mocks
+        ):
             result_df = data_module.get_and_prepare_test_data(
                 "dummy_path"
             )
