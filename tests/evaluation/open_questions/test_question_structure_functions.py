@@ -2,7 +2,8 @@
 import pytest
 
 from survey_assist_eval.evaluation.open_questions.question_structure_functions import (
-    has_question_mark
+    has_question_mark,
+    has_interrogative_not_at_start
 )
 
 
@@ -47,3 +48,64 @@ def test_has_question_mark_whitespace_only():
 def test_has_question_mark_question_mark_with_spaces():
     """Returns True when question mark is surrounded by whitespace."""
     assert has_question_mark(" ? ") is True
+
+
+def test_has_interrogative_not_at_start_returns_false_when_at_start():
+    """Returns False when WH-word is the first word."""
+    assert has_interrogative_not_at_start("What is this") is False
+    assert has_interrogative_not_at_start("Why does this happen") is False
+
+
+def test_has_interrogative_not_at_start_returns_true_when_in_middle():
+    """Returns True when WH-word appears later in the sentence."""
+    assert has_interrogative_not_at_start("Tell me what this is") is True
+    assert has_interrogative_not_at_start("I wonder why that happens") is True
+
+
+def test_has_interrogative_not_at_start_case_insensitive():
+    """Detects WH-words regardless of casing."""
+    assert has_interrogative_not_at_start("Tell me WHAT this is") is True
+    assert has_interrogative_not_at_start("WHY is that") is False
+
+
+def test_has_interrogative_not_at_start_with_leading_whitespace():
+    """Ignores leading whitespace when determining the first word."""
+    assert has_interrogative_not_at_start("   What is this") is False
+    assert has_interrogative_not_at_start("   Tell me what this is") is True
+
+
+def test_has_interrogative_not_at_start_returns_false_when_absent():
+    """Returns False when no WH-word is present."""
+    assert has_interrogative_not_at_start("This is a statement") is False
+
+
+def test_has_interrogative_not_at_start_word_boundaries():
+    """Does not match partial words containing WH substrings."""
+    assert has_interrogative_not_at_start("This is whatever you want") is False
+    assert has_interrogative_not_at_start("The whole thing") is False
+
+
+def test_has_interrogative_not_at_start_punctuation():
+    """Handles punctuation correctly around WH-words."""
+    assert has_interrogative_not_at_start("Tell me, what is this?") is True
+    assert has_interrogative_not_at_start("What? Really.") is False
+
+
+def test_has_interrogative_not_at_start_empty_string():
+    """Returns False for empty string input."""
+    assert has_interrogative_not_at_start("") is False
+
+
+def test_has_interrogative_not_at_start_none_input():
+    """Returns False when input is None."""
+    assert has_interrogative_not_at_start(None) is False
+
+
+def test_has_interrogative_not_at_start_non_string_input():
+    """Returns False when input is not a string."""
+    assert has_interrogative_not_at_start(123) is False
+
+
+def test_has_interrogative_not_at_start_whitespace_only():
+    """Returns False for whitespace-only input."""
+    assert has_interrogative_not_at_start("   ") is False

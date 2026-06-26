@@ -15,20 +15,27 @@ def has_question_mark(text: str) -> bool:
     return isinstance(text, str) and "?" in text
 
 
-def has_interrogative_anywhere(text: str) -> bool:
-    """Check if the text contains interrogative (WH) words anywhere.
+
+def has_interrogative_not_at_start(text: str) -> bool:
+    """Check if the text contains interrogative (WH) words anywhere except 
+    at the beginning.
 
     Args:
-        text: Input text.
+        text (str): Input text.
 
     Returns:
-        bool: True if a WH-word is found, else False.
+        bool: True if a WH-word is found not at the start of the text, 
+        else False.
     """
     if not isinstance(text, str):
         return False
 
+    stripped_text = text.lstrip().lower()
+
     pattern = r"\b(what|why|how|when|where|who|whom|whose|which)\b"
-    return re.search(pattern, text.lower()) is not None
+    match = re.search(pattern, stripped_text)
+
+    return match is not None and match.start() != 0
 
 
 def has_interrogative_start(text: str) -> bool:
