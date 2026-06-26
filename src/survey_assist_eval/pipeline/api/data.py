@@ -8,8 +8,12 @@ import os
 import re
 from typing import Any
 
+# ignoring E0611 (name not in module) for NAType import, as it is a valid
+# import from pandas._libs.missing but pylint does not recognise it since
+# static analysis of C extensions is not supported.
 import numpy as np
 import pandas as pd
+from pandas._libs.missing import NAType  # pylint: disable=E0611
 from survey_assist_utils.logging import get_logger
 
 RANDOM_SEED = 42
@@ -29,6 +33,20 @@ TEST_INPUT_COLUMNS = [
     "clerical_codes",
     "api_payload",
 ]
+_LOOKUP_RESULT_FIELDS = (
+    "lookup_classified",
+    "lookup_error",
+    "lookup_code",
+    "lookup_description",
+)
+_CLASSIFY_RESULT_FIELDS = (
+    "classify_classified",
+    "classify_error",
+    "classify_code",
+    "classify_description",
+    "classify_followup",
+    "classify_candidates",
+)
 
 
 def _build_org_description(*parts: str) -> str:
@@ -159,10 +177,43 @@ def prep_data_for_lookup(
     return lookup_ids, lookup_payloads
 
 
+def _lookup_resp_handler(
+    resp: dict[str, Any] | None
+) -> dict[str, bool | str | NAType]:
+    """Handle the response from the lookup API.
+
+    Args:
+        resp: The lookup API response from `ApiEvaluator` (dict or None).
+
+    Returns:
+        dict: A dictionary containing:
+            - classified_by_lookup: True if the record was classified by the
+                lookup API, False if not classified, or pd.NA if there was an
+                error during the lookup call.
+            - lookup_error: True if there was an error during the lookup call,
+                False otherwise.
+            - lookup_code: The code returned by the lookup API, or pd.NA if
+                there was an error during the lookup call.
+            - lookup_description: The description returned by the lookup API,
+                if a lookup match was found, else pd.NA.
+    """
+    values: tuple[bool | str | NAType, bool, str | NAType, str | NAType]
+    # case 1: valid response and classified by lookup
+    if resp != {} and resp is not None:
+        values = (True, False, resp["code"], resp["description"])
+    # case 2: valid response but not found by lookup
+    elif resp is None:
+        values = (False, False, pd.NA, pd.NA)
+    # case 3: invalid response (i.e. {}) = API error
+    else:
+        values = (pd.NA, True, pd.NA, pd.NA)
+    return dict(zip(_LOOKUP_RESULT_FIELDS, values, strict=True))
+
+
 def record_lookup_results(
     df: pd.DataFrame,
     lookup_ids: list[str],
-    lookup_responses: list[dict[str, Any]]
+    lookup_responses: list[dict[str, Any] | None]
 ) -> pd.DataFrame:
     """Record the results of the lookup evaluation.
 
@@ -173,12 +224,14 @@ def record_lookup_results(
     Args:
         df: DataFrame containing the input test data.
         lookup_ids: List of unique IDs for the lookup calls.
-        lookup_responses: List of dictionaries containing the API responses
-            for each record.
+        lookup_responses: List of dictionaries/None containing the API
+            responses for each record.
 
     Returns:
         pd.DataFrame: DataFrame with the recorded lookup results.
     """
+    if len(lookup_responses) == 0:
+        raise ValueError("No lookup responses provided")
     if len(lookup_ids) != len(lookup_responses):
         raise ValueError(
             "Mismatch between number of lookup IDs and lookup responses. "
@@ -187,39 +240,9 @@ def record_lookup_results(
     output_df = df.copy()
 
     # build and unpack key results from the lookup responses
-    classified_by_lookup: list[bool | object] = []
-    lookup_error = []
-    lookup_code = []
-    lookup_description = []
-    for resp in lookup_responses:
-        # case 1: valid response with classification
-        if resp != {} and resp is not None:
-            classified_by_lookup.append(True)
-            lookup_error.append(False)
-            lookup_code.append(resp["code"])
-            lookup_description.append(resp["description"])
-        # case 2: valid response with no classification
-        elif resp is None:
-            classified_by_lookup.append(False)
-            lookup_error.append(False)
-            lookup_code.append(pd.NA)
-            lookup_description.append(pd.NA)
-        # case 3: invalid response (i.e. API error)
-        else:
-            classified_by_lookup.append(pd.NA)
-            lookup_error.append(True)
-            lookup_code.append(pd.NA)
-            lookup_description.append(pd.NA)
-
-    lookup_df = pd.DataFrame(
-        {
-            "unique_id": lookup_ids,
-            "classified_by_lookup": classified_by_lookup,
-            "lookup_code": lookup_code,
-            "lookup_description": lookup_description,
-            "lookup_error": lookup_error,
-        }
-    )
+    rows = [_lookup_resp_handler(resp) for resp in lookup_responses]
+    lookup_df = pd.DataFrame.from_records(rows, columns=_LOOKUP_RESULT_FIELDS)
+    lookup_df.insert(0, "unique_id", pd.Series(lookup_ids))
     if lookup_df["unique_id"].nunique() != output_df["unique_id"].nunique():
         raise ValueError(
             "Mismatch between number of lookup results and input "
@@ -244,20 +267,54 @@ def prep_data_for_classify(
         tuple: List of unique IDs for the classify calls and a list of
             dictionaries containing the API payloads for each record.
     """
-    if "classified_by_lookup" not in df.columns:
+    if "lookup_classified" not in df.columns:
         raise ValueError(
-            "DataFrame must contain 'classified_by_lookup' to prep for "
+            "DataFrame must contain 'lookup_classified' to prep for "
             "classify evaluation."
         )
     # select not classified by lookup and no error during the lookup call
     # (i.e. treat lookup errors as do not continue to classify to prevent
     # misclassification).
     classify_calls = df[
-        (~df["classified_by_lookup"]) & (~df["lookup_error"])
+        (~df["lookup_classified"]) & (~df["lookup_error"])
     ].copy()
     classify_ids = classify_calls["unique_id"].tolist()
     classify_payloads = classify_calls["api_payload"].tolist()
     return classify_ids, classify_payloads
+
+
+def _classify_resp_handler(
+    resp: dict[str, Any]
+) -> dict[str, bool | str | NAType | list[dict[str, Any]]]:
+    """Handle the response from the classify API.
+
+    Args:
+        resp: The classify API response from `ApiEvaluator` (dict or None).
+
+    Returns:
+        dict: A dictionary containing the processed classify results.
+    """
+    values: tuple[
+        str | NAType,
+        bool,
+        str | NAType,
+        str | NAType,
+        str | NAType,
+        list[dict[str, Any]] | NAType
+    ]
+    if resp != {}:
+        result = resp["results"][0]
+        values = (
+            result["classified"],
+            False,
+            result["code"],
+            result["description"],
+            result["followup"],
+            result["candidates"],
+        )
+    else:
+        values = (pd.NA, True, pd.NA, pd.NA, pd.NA, pd.NA)
+    return dict(zip(_CLASSIFY_RESULT_FIELDS, values, strict=True))
 
 
 def record_classify_results(
@@ -288,42 +345,13 @@ def record_classify_results(
     output_df = df.copy()
 
     # build and unpack key results from the classify responses
-    classified_by_classify = []
-    classify_code = []
-    classify_description = []
-    classify_followup = []
-    classify_candidates = []
-    classify_error = []
-    for resp in classify_responses:
-        # case 1: valid reponse
-        if resp != {}:
-            result = resp["result"]
-            classified_by_classify.append(result["classified"])
-            classify_code.append(result["code"])
-            classify_description.append(result["description"])
-            classify_followup.append(result["followup"])
-            classify_candidates.append(result["candidates"])
-        # case 2: invalid response = {} (i.e. API error)
-        else:
-            classified_by_classify.append(pd.NA)
-            classify_code.append(pd.NA)
-            classify_description.append(pd.NA)
-            classify_followup.append(pd.NA)
-            classify_candidates.append(pd.NA)
-            classify_error.append(True)
-
-    # merge the classify results back to the original DataFrame on the ID
-    classify_df = pd.DataFrame(
-        {
-            "unique_id": classify_ids,
-            "classified_by_classify": classified_by_classify,
-            "classify_code": classify_code,
-            "classify_description": classify_description,
-            "classify_followup": classify_followup,
-            "classify_candidates": classify_candidates,
-            "classify_error": classify_error,
-        }
+    rows = [_classify_resp_handler(resp) for resp in classify_responses]
+    classify_df = pd.DataFrame.from_records(
+        rows, columns=_CLASSIFY_RESULT_FIELDS
     )
+    classify_df.insert(0, "unique_id", pd.Series(classify_ids))
+
+    # join the classify results back to the original DataFrame on the unique ID
     output_df = output_df.merge(classify_df, on="unique_id", how="left")
 
     # fill NaN value for the classify columns, equivalent to filling the
