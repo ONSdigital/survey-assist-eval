@@ -13,7 +13,7 @@ from survey_assist_utils.logging import get_logger
 
 RANDOM_SEED = 42
 REQUIRED_COLUMNS = {
-    "unique_id": "id",
+    "unique_id": "unique_id",
     "soc2020_job_title": "job_title",
     "soc2020_job_description": "job_description",
     "sic2007_self_employed": "self_employed",
@@ -21,7 +21,7 @@ REQUIRED_COLUMNS = {
     "clerical_codes": "clerical_codes",
 }
 TEST_INPUT_COLUMNS = [
-    "id",
+    "unique_id",
     "job_title",
     "job_description",
     "org_description",
