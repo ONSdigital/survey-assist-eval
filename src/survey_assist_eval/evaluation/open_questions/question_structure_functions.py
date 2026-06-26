@@ -15,27 +15,20 @@ def has_question_mark(text: str) -> bool:
     return isinstance(text, str) and "?" in text
 
 
-
-def has_interrogative_not_at_start(text: str) -> bool:
-    """Check if the text contains interrogative (WH) words anywhere except 
-    at the beginning.
+def has_interrogative_anywhere(text: str) -> bool:
+    """Check if the text contains interrogative (WH) words anywhere.
 
     Args:
-        text (str): Input text.
+        text: Input text.
 
     Returns:
-        bool: True if a WH-word is found not at the start of the text, 
-        else False.
+        bool: True if a WH-word is found, else False.
     """
     if not isinstance(text, str):
         return False
 
-    stripped_text = text.lstrip().lower()
-
     pattern = r"\b(what|why|how|when|where|who|whom|whose|which)\b"
-    match = re.search(pattern, stripped_text)
-
-    return match is not None and match.start() != 0
+    return re.search(pattern, text.lower()) is not None
 
 
 def has_interrogative_start(text: str) -> bool:
@@ -59,48 +52,50 @@ def has_interrogative_start(text: str) -> bool:
     return re.search(pattern, text.lower(), re.VERBOSE) is not None
 
 
-
-
-def has_instruction_prompt_not_at_start(text: str) -> bool:
-    """Check if the text contains instruction-style prompts anywhere except 
-    at the beginning.
+def has_interrogative_not_at_start(text: str) -> bool:
+    """Check if the text contains interrogative (WH) words but does not start
+    with an interrogative or auxiliary verb.
 
     Args:
         text (str): Input text.
 
     Returns:
-        bool: True if an instruction prompt is found not at the start of the
-        text, else False.
+        bool: True if a WH-word is found and the text does not start with a
+        question form, else False.
+    """
+    return (
+        has_interrogative_anywhere(text)
+        and not has_interrogative_start(text)
+    )
+
+
+
+def has_instruction_prompt_anywhere(text: str) -> bool:
+    """Check if the text contains instruction-style prompts.
+
+    Args:
+        text: Input text.
+
+    Returns:
+        bool: True if an instruction prompt is found, else False.
     """
     if not isinstance(text, str):
         return False
 
-    stripped_text = text.lstrip().lower()
-
     patterns = [
+        r"\btell me\b",
+        r"\bdescribe\b",
+        r"\bexplain\b",
         r"\bplease describe\b",
         r"\bplease explain\b",
         r"\bplease tell me\b",
         r"\bplease share\b",
-        r"\btell me\b",
-        r"\bdescribe\b",
-        r"\bexplain\b",
         r"\bshare\b",
         r"\bgive details\b",
     ]
 
-    matches = []
-
-    for pattern in patterns:
-        match = re.search(pattern, stripped_text)
-        if match:
-            matches.append(match.start())
-
-    if not matches:
-        return False
-
-    # Only consider the earliest match
-    return min(matches) != 0
+    text = text.lower()
+    return any(re.search(p, text) for p in patterns)
 
 
 def has_instruction_prompt_start(text: str) -> bool:
@@ -131,31 +126,48 @@ def has_instruction_prompt_start(text: str) -> bool:
     return re.search(pattern, text.lower(), re.VERBOSE) is not None
 
 
+def has_instruction_prompt_not_at_start(text: str) -> bool:
+    """Check if the text contains instruction-style prompts but does not start
+    with one.
+
+    Args:
+        text (str): Input text.
+
+    Returns:
+        bool: True if an instruction prompt is found not at the start of the
+        text, else False.
+    """
+    return (
+        has_instruction_prompt_anywhere(text)
+        and not has_instruction_prompt_start(text)
+    )
+
+
+
+
 def count_question_signals(text: str) -> int:
     """Count distinct question signals in the text.
 
     Signals include:
     - Question mark
-    - Interrogative start
-    - Interrogative anywhere
+    - Interrogative at start
+    - Interrogative not at start
     - Instruction prompt at start
-    - Instruction prompt anywhere
+    - Instruction prompt not at start
 
     Args:
-        text: Input text.
+        text (str): Input text.
 
     Returns:
         int: Number of detected signals.
     """
-    signals = [
+    return sum([
         has_question_mark(text),
         has_interrogative_start(text),
-        has_interrogative_anywhere(text),
+        has_interrogative_not_at_start(text),
         has_instruction_prompt_start(text),
-        has_instruction_prompt_anywhere(text),
-    ]
-
-    return sum(signals)
+        has_instruction_prompt_not_at_start(text),
+    ])
 
 
 def is_compound_question(text: str) -> bool:
