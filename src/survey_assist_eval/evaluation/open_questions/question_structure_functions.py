@@ -143,8 +143,6 @@ def has_instruction_prompt_not_at_start(text: str) -> bool:
     )
 
 
-
-
 def count_question_signals(text: str) -> int:
     """Count distinct question signals in the text.
 
