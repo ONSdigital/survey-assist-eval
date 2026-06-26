@@ -1,4 +1,4 @@
-"""This notebook evaluates SOC classification on a sample of 4,000 dataset."""
+"""This notebook evaluates SOC classification on a sample of 4k+ dataset."""
 
 # ruff: noqa: S605
 # pylint: disable=C0103,R0801
@@ -23,7 +23,7 @@ bucket_name = os.getenv("EVALUATION_BUCKET_NAME")
 if not bucket_name:
     raise ValueError("EVALUATION_BUCKET_NAME environment variable not set")
 print(f"Using bucket for data loading: {bucket_name}")
-output_folder = f"gs://{bucket_name}/evaluation-pipeline/soc_4k/two_prompt_v1"  # %%
+
 input_data_file = (
     f"gs://{bucket_name}/evaluation-pipeline/original_datasets/soc_4k/"
     + "soc_4k_test_data.parquet"
@@ -34,18 +34,16 @@ input_data_file = (
 work_folder = "data/pipeline/soc_4k"
 os.makedirs(work_folder, exist_ok=True)
 
-if not os.path.exists(f"{output_folder}/STG4.parquet"):  # this doesn't work with GCS
+if not os.path.exists(f"{work_folder}/STG4.parquet"):  # this doesn't work with GCS
     print("Running evaluation pipeline...")
     os.system(
         f"./scripts/soc_pipeline/run_full_pipeline.sh -p 2 -i {input_data_file} -o {work_folder}"
     )
-    # move output to bucket
-    os.system(f"gsutil cp {work_folder}/STG4.parquet {output_folder}/STG4.parquet")
 else:
     print("Evaluation pipeline already run, loading results...")
 
 # %%
-df = pd.read_parquet(f"{output_folder}/STG4.parquet")
+df = pd.read_parquet(f"{work_folder}/STG4.parquet")
 print(df.head())
 
 # %%
@@ -85,13 +83,12 @@ os.system(
 )
 
 # %%
-input_data_file = f"{work_folder}/STG2.parquet"
-df = pd.read_parquet(input_data_file)
+df = pd.read_parquet(f"{work_folder}/STG2.parquet")
 
 # subset when working with intermediate outputs
 df_sub = df[df.reasoning.notna()]
-
 df_sub["match"] = df_sub.soc2020_code == df_sub.initial_code
+
 print(f"Total rows: {len(df_sub)}")
 print("-" * 20)
 for lh in [0.6, 0.8, 0.9]:
