@@ -1,6 +1,6 @@
 """In this notebook we investigate common issues with SOC classification on the ashe kb datsaset."""
 
-# pylint: disable=C0103
+# pylint: disable=C0103, R0801
 
 # %%
 import os
