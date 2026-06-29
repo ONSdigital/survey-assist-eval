@@ -136,6 +136,72 @@ def dummy_lookup_results(
     return responses, expected_results, [2, 5, 6]
 
 
+@pytest.fixture
+def dummy_classify_results(
+    dummy_lookup_results
+) -> tuple[list[dict[str, str] | None], pd.DataFrame]:
+    """Dummy classify results for testing the record_classify_results."""
+    # simulate the API responses for classification
+    responses = [
+        # classified by the API
+        {
+            "results":
+                [{
+                    "classified": True,
+                    "code": "2",
+                    "description": "description 1",
+                    "followup": None,
+                    "candidates": [
+                        {"code": "2a", "description": "description 2a"}
+                    ],
+                }],
+        },
+        # not classified by the API - so follow up is required
+        {
+            "results":
+                [{
+                    "classified": False,
+                    "code": None,
+                    "description": None,
+                    "followup": "test follow up",
+                    "candidates": [
+                        {"code": "5a", "description": "description 5a"}
+                    ],
+                }],
+
+        },
+        {},  # simulate an API failure
+    ]
+
+    # build the expected results DataFrame for comparison in tests
+    expected_results = dummy_lookup_results[1].copy()
+    expected_results["classify_classified"] = [
+        pd.NA, True, pd.NA, pd.NA, False, pd.NA
+    ]
+    expected_results["classify_error"] = [
+        pd.NA, False, pd.NA, pd.NA, False, True
+    ]
+    expected_results["classify_code"] = [
+        pd.NA, "2", pd.NA, pd.NA, pd.NA, pd.NA
+    ]
+    expected_results["classify_description"] = [
+        pd.NA, "description 1", pd.NA, pd.NA, pd.NA, pd.NA
+    ]
+    expected_results["classify_followup"] = [
+        pd.NA, pd.NA, pd.NA, pd.NA, "test follow up", pd.NA
+    ]
+    expected_results["classify_candidates"] = [
+        pd.NA,
+        [{"code": "2a", "description": "description 2a"}],
+        pd.NA,
+        pd.NA,
+        [{"code": "5a", "description": "description 5a"}],
+        pd.NA,
+    ]
+
+    return responses, expected_results
+
+
 @contextmanager
 def get_and_prepare_test_data_mocks(df: pd.DataFrame):
     """Context manager to mock get_and_prepare_test_data function."""
@@ -332,7 +398,7 @@ class TestRecordLookupResults:
         """Test function raises ValueError when no responses are provided."""
         input_df = dummy_data_lookup_prep
         ids = dummy_data_lookup_prep["unique_id"].tolist()
-        responses = []  # No responses
+        responses = []
 
         with pytest.raises(ValueError, match="No lookup responses provided"):
             data_module.record_lookup_results(input_df, ids, responses)
@@ -396,3 +462,50 @@ class TestPrepDataForClassify:
             KeyError, match="DataFrame must contain 'lookup_classified'"
         ):
             data_module.prep_data_for_classify(input_df)
+
+
+class TestRecordClassifyResults:
+    """Unit tests for the record_classify_results function."""
+
+    def test_record_classify_results(
+        self, dummy_lookup_results, dummy_classify_results
+    ):
+        """Test that the function records classify results correctly."""
+        _, input_df, classify_ids = dummy_lookup_results
+        responses, expected_results = dummy_classify_results
+
+        result_df = data_module.record_classify_results(
+            input_df, classify_ids, responses
+        )
+
+        assert_frame_equal(result_df, expected_results)
+
+    def test_record_classify_results_no_responses(
+        self, dummy_lookup_results
+    ):
+        """Test function raises ValueError when no responses are provided."""
+        _, input_df, classify_ids = dummy_lookup_results
+        responses = []
+
+        with pytest.raises(ValueError, match="No classify responses provided"):
+            data_module.record_classify_results(
+                input_df, classify_ids, responses
+            )
+
+    def test_record_classify_results_mismatched_lengths(
+        self, dummy_lookup_results
+    ):
+        """Test for ValueError when lengths of ids and responses mismatch."""
+        _, input_df, classify_ids = dummy_lookup_results
+        responses = [{"classified": True}]  # Mismatched length
+
+        with pytest.raises(
+            ValueError,
+            match=(
+                "Mismatch between number of classify IDs and classify """
+                "responses"
+            )
+        ):
+            data_module.record_classify_results(
+                input_df, classify_ids, responses
+            )
