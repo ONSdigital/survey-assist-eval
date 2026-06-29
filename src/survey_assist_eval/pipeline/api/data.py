@@ -337,6 +337,8 @@ def record_classify_results(
     Returns:
         pd.DataFrame: DataFrame with the recorded classify results.
     """
+    if len(classify_responses) == 0:
+        raise ValueError("No classify responses provided")
     if len(classify_ids) != len(classify_responses):
         raise ValueError(
             "Mismatch between number of classify IDs and classify responses. "
@@ -363,5 +365,10 @@ def record_classify_results(
         col: pd.NA for col in classify_df.columns if col != "unique_id"
     }
     output_df.fillna(fillna_columns, inplace=True)
+
+    # replace None API responses with pd.NA for consistency
+    output_df[_CLASSIFY_RESULT_FIELDS] = output_df[
+        _CLASSIFY_RESULT_FIELDS
+    ].map(lambda x: pd.NA if x is None else x)
 
     return output_df
