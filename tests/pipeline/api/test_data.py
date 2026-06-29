@@ -51,6 +51,41 @@ def dummy_input_test_data() -> tuple[pd.DataFrame, pd.Series]:
     return pd.DataFrame(data), pd.Series(expected_org_descriptions)
 
 
+@pytest.fixture
+def dummy_data_lookup_prep() -> pd.DataFrame:
+    """Dummy data for lookup call preparation."""
+    data = {
+        "unique_id": [1, 2, 3, 4],
+        "job_title": ["job_1", "job_2", "job_3", "job_4"],
+        "job_description": ["desc_1", "desc_2", "desc_3", "desc_4"],
+        "org_description": ["org_1", "org_2", "org_3", "org_4"],
+        "clerical_codes": ["code_1", "code_2", "code_3", "code_4"],
+        "api_payload": [
+            {
+                "job_title": "job_1",
+                "job_description": "desc_1",
+                "org_description": "org_1",
+            },
+            {
+                "job_title": "job_2",
+                "job_description": "desc_2",
+                "org_description": "org_2",
+            },
+            {
+                "job_title": "job_3",
+                "job_description": "desc_3",
+                "org_description": "org_3",
+            },
+            {
+                "job_title": "job_4",
+                "job_description": "desc_4",
+                "org_description": "org_4",
+            },
+        ]
+    }
+    return pd.DataFrame(data)
+
+
 @contextmanager
 def get_and_prepare_test_data_mocks(df: pd.DataFrame):
     """Context manager to mock get_and_prepare_test_data function."""
@@ -189,3 +224,37 @@ class TestGetAndPrepareTestData:
             pytest.raises(ValueError, match="Must be greater than 0")
         ):
             data_module.get_and_prepare_test_data("dummy_path")
+
+
+# Allowing a single test class method to improve test suite organisation
+# pylint: disable=R0903
+class TestPrepDataForLookup:
+    """Unit tests for the prep_data_for_lookup function."""
+
+    def test_prep_data_for_lookup(self, dummy_data_lookup_prep):
+        """Test that the function prepares data correctly for lookup."""
+        input_df = dummy_data_lookup_prep
+        num_rows = len(input_df.index)
+        results = data_module.prep_data_for_lookup(input_df)
+
+        for result in results:
+            assert isinstance(result, list), (
+                f"Expected each result to be a list, but got: {type(result)}"
+            )
+            assert len(result) == num_rows, (
+                f"Expected each result list to have length {num_rows}, "
+                f"but got: {len(result)}"
+            )
+
+        ids, payloads = results
+        assert ids == input_df["unique_id"].tolist(), (
+            f"Expected IDs: {input_df['unique_id'].tolist()}, "
+            f"but got: {ids}"
+        )
+        assert all(isinstance(payload, dict) for payload in payloads), (
+            "Expected each payload to be a dictionary."
+        )
+        assert payloads == input_df["api_payload"].tolist(), (
+            f"Expected payloads: {input_df['api_payload'].tolist()}, "
+            f"but got: {payloads}"
+        )
