@@ -40,6 +40,12 @@ FIRESTORE_COLLECTION_ID = os.getenv("API_EVAL_FIRESTORE_COLLECTION_ID")
 ENVIRONMENT = os.getenv("API_EVAL_ENVIRONMENT")
 EXECUTION_ID = os.getenv("CLOUD_RUN_EXECUTION")
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+LOOKUP_SEMAPHORE_LIMIT = int(
+    os.getenv("API_EVAL_LOOKUP_SEMAPHORE_LIMIT", "5")
+)
+CLASSIFY_SEMAPHORE_LIMIT = int(
+    os.getenv("API_EVAL_CLASSIFY_SEMAPHORE_LIMIT", "2")
+)
 
 logger = get_logger("api_e2e", level=LOG_LEVEL)
 
@@ -64,6 +70,8 @@ def main(classify_type: Literal["sic", "soc"]) -> None:
         execution_id=EXECUTION_ID,
         environment=ENVIRONMENT,
         log_level=LOG_LEVEL,
+        lookup_semaphore_limit=LOOKUP_SEMAPHORE_LIMIT,
+        classify_semaphore_limit=CLASSIFY_SEMAPHORE_LIMIT,
     )
     api_evaluator = ApiEvaluator(api_evaluator_cfg)
 
