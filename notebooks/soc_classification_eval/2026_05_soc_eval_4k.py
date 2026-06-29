@@ -91,10 +91,10 @@ df_sub["match"] = df_sub.soc2020_code == df_sub.initial_code
 
 print(f"Total rows: {len(df_sub)}")
 print("-" * 20)
-for lh in [0.6, 0.8, 0.9]:
-    print(f"Likelihood: {lh}")
-    print(f"Codability: {(df_sub.likelihood >= lh).mean():.2%}")
-    print(f"Accuracy: {(df_sub[df_sub.likelihood >= lh].match).mean():.2%}")
+for label, lh in [("Low", 0.6), ("Medium", 0.8), ("High", 0.9)]:
+    print(f"Confidence level: {label} ({lh})")
+    print(f"Codability: {(df_sub.likelihood >= lh).mean():.0%}")
+    print(f"Accuracy: {(df_sub[df_sub.likelihood >= lh].match).mean():.0%}")
     print("-" * 20)
 
 # %%
@@ -104,8 +104,16 @@ df_sub["distance"] = df_sub.apply(
 df_sub["sem_match"] = df_sub.apply(
     lambda row: row["semantic_search_results"][0]["code"] == row["soc2020_code"], axis=1
 )
-for dd in [0.35, 0.25, 0.15, 0.1, 0.05]:
-    print(f"Semantic Distance: {dd}")
-    print(f"Codability: {(df_sub.distance <= dd).mean():.2%}")
-    print(f"Accuracy: {(df_sub[df_sub.distance <= dd].sem_match).mean():.2%}")
+for label, dd in [
+    ("Low", 0.35),
+    ("Medium", 0.25),
+    ("Medium-High", 0.15),
+    ("High", 0.1),
+    ("Very High", 0.05),
+]:
+    print(f"Confidence level: {label} ({dd})")
+    print(f"Codability: {(df_sub.distance <= dd).mean():.0%}")
+    print(f"Accuracy: {(df_sub[df_sub.distance <= dd].sem_match).mean():.0%}")
     print("-" * 20)
+
+# %%
