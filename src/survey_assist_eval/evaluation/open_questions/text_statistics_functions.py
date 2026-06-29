@@ -66,7 +66,7 @@ def compute_text_statistics(  # noqa: PLR0913 pylint: disable = R0913, R0917
         df, text_column=text_column, prefix="eval_", inplace=True
     )
 
-    metrics = summarise_text_stats(
+    metrics = summarise_text_stat_columns(
         df,
         prefix="eval_",
         word_threshold=word_threshold,
@@ -155,23 +155,21 @@ def add_text_stats_columns(
     return df.join(stats_df)
 
 
-def summarise_text_stats(  # noqa: PLR0913 pylint: disable=R0917, R0913
+def summarise_text_stat_columns(  # noqa: PLR0913, pylint: disable=R0913
     df: pd.DataFrame,
     *,
-    prefix: str | None = None,
-    text_column: str | None = None,
+    prefix: str,
     word_threshold: int = 25,
     sentence_threshold: int = 2,
     long_sentence_threshold: int = 20,
     short_word_count_threshold: int = 2,
 ) -> pd.Series:
-    """Summarise text statistics for a DataFrame.
+    """Summarise precomputed text statistic columns into a Series.
 
     Args:
-        df: DataFrame with text statistic columns already added.
-        prefix: Prefix for stat columns (required if stats already exist).
-        text_column: If provided, stats will be computed using
-            add_text_stats_columns.
+        df: DataFrame containing precomputed text statistic columns.
+        prefix: Prefix used for the statistic columns
+            (e.g. "<prefix>word_count").
         word_threshold: Threshold for "long" text (word count).
         sentence_threshold: Threshold for number of sentences.
         long_sentence_threshold: Threshold for long sentences
@@ -179,55 +177,42 @@ def summarise_text_stats(  # noqa: PLR0913 pylint: disable=R0917, R0913
         short_word_count_threshold: Threshold for "blank or too short".
 
     Returns:
-        A Series with summary statistics.
+        A Series containing summary statistics.
 
     Notes:
-        - If text_column is provided, stats are computed internally.
-        - If not, prefix must be provided and columns must already exist.
+        This function assumes all required columns already exist:
+        - {prefix}word_count
+        - {prefix}sentence_count
+        - {prefix}words_per_sentence
     """
-    if text_column is not None:
-        if prefix is None:
-            prefix = f"{text_column}_"
-        df = add_text_stats_columns(
-            df.copy(),
-            text_column=text_column,
-            prefix=prefix,
-            inplace=False,
-        )
-    elif prefix is None:
-        raise ValueError("Provide either text_column or prefix.")
+    word_count = df[f"{prefix}word_count"]
+    sentence_count = df[f"{prefix}sentence_count"]
+    words_per_sentence = df[f"{prefix}words_per_sentence"]
 
     summary = {
         "n_count": len(df),
-        "mean_word_count": df[f"{prefix}word_count"].mean(),
-        "median_word_count": df[f"{prefix}word_count"].median(),
-        "sd_word_count": df[f"{prefix}word_count"].std(),
-        "mean_sentence_count": df[f"{prefix}sentence_count"].mean(),
-        "mean_word_count_per_sentence": np.mean(
-            df[f"{prefix}words_per_sentence"].sum()
-        ),
-        "pct_over_word_count_threshold": (
-            df[f"{prefix}word_count"] > word_threshold
-        ).mean()
-        * 100,
+        "mean_word_count": word_count.mean(),
+        "median_word_count": word_count.median(),
+        "sd_word_count": word_count.std(),
+        "mean_sentence_count": sentence_count.mean(),
+        "mean_word_count_per_sentence": np.mean(words_per_sentence.sum()),
+        "pct_over_word_count_threshold": (word_count > word_threshold).mean() * 100,
         "pct_over_sentence_count_threshold": (
-            df[f"{prefix}sentence_count"] > sentence_threshold
+            sentence_count > sentence_threshold
         ).mean()
         * 100,
         "pct_with_long_sentence_over_word_count_threshold": (
-            df[f"{prefix}words_per_sentence"].apply(max) > long_sentence_threshold
+            words_per_sentence.apply(max) > long_sentence_threshold
         ).mean()
         * 100,
-        "pct_blank_or_too_short": (
-            df[f"{prefix}word_count"] <= short_word_count_threshold
-        ).mean()
+        "pct_blank_or_too_short": (word_count <= short_word_count_threshold).mean()
         * 100,
     }
 
     return pd.Series(summary)
 
 
-def compare_text_stats(  # noqa: PLR0913 pylint: disable=R0913
+def compare_text_statistics(  # noqa: PLR0913, pylint: disable=R0913
     datasets: dict[str, pd.DataFrame],
     *,
     prefix: str | None = None,
@@ -237,36 +222,57 @@ def compare_text_stats(  # noqa: PLR0913 pylint: disable=R0913
     long_sentence_threshold: int = 20,
     short_word_count_threshold: int = 2,
 ) -> pd.DataFrame:
-    """Compare text statistics for labeled datasets.
+    """Compare text statistics across labelled datasets.
 
     Args:
-        datasets: Mapping of labels to DataFrames.
-        prefix: Prefix for precomputed stat columns. Required if text_column is None.
-        text_column: If provided, stats will be computed from this text column.
+        datasets: Mapping of dataset labels to DataFrames.
+        prefix: Prefix for precomputed stat columns.
+        text_column: Column containing raw text (used to compute stats).
         word_threshold: Threshold for "long" text (word count).
         sentence_threshold: Threshold for number of sentences.
         long_sentence_threshold: Threshold for long sentences.
         short_word_count_threshold: Threshold for "blank or too short".
 
     Returns:
-        A DataFrame containing summary statistics for each labeled dataset.
-    """
-    summaries = []
-    labels = []
+        A DataFrame of summary statistics, indexed by dataset label.
 
-    for label, dataframe in datasets.items():
-        summary = summarise_text_stats(
-            dataframe,
-            prefix=prefix,
-            text_column=text_column,
+    Notes:
+        - Provide `text_column` to compute stats from raw text.
+        - Provide `prefix` if stat columns already exist.
+        - Exactly one of `text_column` or `prefix` must be provided.
+    """
+    if text_column is None and prefix is None:
+        raise ValueError("Provide at least one of 'text_column' or 'prefix'.")
+
+    summaries = []
+
+    for label, df in datasets.items():
+        if text_column is not None:
+            local_prefix = prefix or f"{text_column}_"
+            df_with_stats = add_text_stats_columns(
+                df.copy(),
+                text_column=text_column,
+                prefix=local_prefix,
+                inplace=False,
+            )
+        else:
+            if prefix is None:
+                raise ValueError("Prefix must be provided when text_column is None.")
+            local_prefix = prefix
+            df_with_stats = df
+
+        summary = summarise_text_stat_columns(
+            df_with_stats,
+            prefix=local_prefix,
             word_threshold=word_threshold,
             sentence_threshold=sentence_threshold,
             long_sentence_threshold=long_sentence_threshold,
             short_word_count_threshold=short_word_count_threshold,
         )
-        summaries.append(summary)
-        labels.append(label)
 
-    result = pd.DataFrame(summaries, index=labels)
+        summary.name = label
+        summaries.append(summary)
+
+    result = pd.DataFrame(summaries)
     result.index.name = "dataset"
     return result

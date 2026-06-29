@@ -5,9 +5,9 @@ import pytest
 
 from survey_assist_eval.evaluation.open_questions.text_statistics_functions import (
     add_text_stats_columns,
-    compare_text_stats,
+    compare_text_statistics,
     get_text_stats,
-    summarise_text_stats,
+    summarise_text_stat_columns,
     word_counts_per_setence,
 )
 
@@ -101,8 +101,8 @@ def test_add_text_stats_columns_inplace_modifies_dataframe():
     assert df.loc[0, "answer_word_count"] == 2
 
 
-def test_summarise_text_stats_computes_summary_using_text_column():
-    """Validate summary statistics are computed when a text column is provided."""
+def test_summarise_text_stat_columns_computes_summary():
+    """Validate summary statistics are computed from precomputed columns."""
     df = pd.DataFrame(
         {
             "answer": [
@@ -113,8 +113,17 @@ def test_summarise_text_stats_computes_summary_using_text_column():
         }
     )
 
-    summary = summarise_text_stats(
-        df, prefix=None, text_column="answer", long_sentence_threshold=10
+    df_with_stats = add_text_stats_columns(
+        df,
+        text_column="answer",
+        prefix="answer_",
+        inplace=False,
+    )
+
+    summary = summarise_text_stat_columns(
+        df_with_stats,
+        prefix="answer_",
+        long_sentence_threshold=10,
     )
 
     assert summary["n_count"] == 3
@@ -131,7 +140,7 @@ def test_summarise_text_stats_computes_summary_using_text_column():
     assert summary["pct_blank_or_too_short"] == pytest.approx(0.0)
 
 
-def test_summarise_text_stats_uses_existing_prefix_columns():
+def test_summarise_text_stat_columns_uses_existing_prefix_columns():
     """Verify summary statistics are computed from pre-existing prefixed columns."""
     df = pd.DataFrame(
         {
@@ -142,7 +151,7 @@ def test_summarise_text_stats_uses_existing_prefix_columns():
         }
     )
 
-    summary = summarise_text_stats(df, prefix="answer_")
+    summary = summarise_text_stat_columns(df, prefix="answer_")
 
     assert summary["n_count"] == 3
     assert summary["mean_word_count"] == pytest.approx(12.0)
@@ -153,20 +162,20 @@ def test_summarise_text_stats_uses_existing_prefix_columns():
     )
 
 
-def test_summarise_text_stats_raises_when_no_prefix_or_text_column():
-    """Confirm that a ValueError is raised when neither prefix nor text_column is provided."""
+def test_summarise_text_stat_columns_raises_when_columns_missing():
+    """Confirm error when required stat columns are not present."""
     df = pd.DataFrame({"text": ["one two"]})
 
-    with pytest.raises(ValueError, match="Provide either text_column or prefix"):
-        summarise_text_stats(df, prefix=None, text_column=None)
+    with pytest.raises(KeyError):
+        summarise_text_stat_columns(df, prefix="text_")
 
 
-def test_compare_text_stats_dict_input_returns_dataframe():
+def test_compare_text_statistics_dict_input_returns_dataframe():
     """Ensure the comparison helper returns a DataFrame with proper labels from dict input."""
     df_a = pd.DataFrame({"answer": ["One two.", "Another sentence."]})
     df_b = pd.DataFrame({"answer": ["Short.", "Longer response here."]})
 
-    result = compare_text_stats(
+    result = compare_text_statistics(
         {"group_a": df_a, "group_b": df_b}, text_column="answer"
     )
 
@@ -176,12 +185,12 @@ def test_compare_text_stats_dict_input_returns_dataframe():
     assert result.loc["group_b", "n_count"] == 2
 
 
-def test_compare_text_stats_preserves_labels_in_output():
+def test_compare_text_statistics_preserves_labels_in_output():
     """Validate that dataset labels are preserved in the result index."""
     df_a = pd.DataFrame({"answer": ["One two."]})
     df_b = pd.DataFrame({"answer": ["Short."]})
 
-    result = compare_text_stats({"A": df_a, "B": df_b}, text_column="answer")
+    result = compare_text_statistics({"A": df_a, "B": df_b}, text_column="answer")
 
     assert list(result.index) == ["A", "B"]
     assert result.loc["A", "mean_word_count"] == pytest.approx(2.0)

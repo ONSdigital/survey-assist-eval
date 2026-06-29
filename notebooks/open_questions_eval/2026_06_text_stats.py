@@ -24,7 +24,7 @@ from survey_assist_eval.data_cleaning.open_questions_eval_prep import (
 )
 from survey_assist_eval.evaluation.open_questions.text_statistics_functions import (
     add_text_stats_columns,
-    compare_text_stats,
+    compare_text_statistics,
 )
 
 # %%
@@ -71,7 +71,7 @@ for label, df in stg_dfs_dict.items():
         text_column="followup_question",
     )
 
-stg_text_stat_comparison = compare_text_stats(
+stg_text_stat_comparison = compare_text_statistics(
     stg_dfs_followup_dict,
     prefix="followup_question_",
     word_threshold=MAX_WORD_COUNT_THRESHOLD,
