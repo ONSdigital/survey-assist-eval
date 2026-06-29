@@ -56,11 +56,19 @@ def dummy_input_test_data() -> tuple[pd.DataFrame, pd.Series]:
 def dummy_data_lookup_prep() -> pd.DataFrame:
     """Dummy data for lookup call preparation."""
     data = {
-        "unique_id": [1, 2, 3, 4],
-        "job_title": ["job_1", "job_2", "job_3", "job_4"],
-        "job_description": ["desc_1", "desc_2", "desc_3", "desc_4"],
-        "org_description": ["org_1", "org_2", "org_3", "org_4"],
-        "clerical_codes": ["code_1", "code_2", "code_3", "code_4"],
+        "unique_id": [1, 2, 3, 4, 5, 6],
+        "job_title": [
+            "job_1", "job_2", "job_3", "job_4", "job_5", "job_6",
+        ],
+        "job_description": [
+            "desc_1", "desc_2", "desc_3", "desc_4", "desc_5", "desc_6",
+        ],
+        "org_description": [
+            "org_1", "org_2", "org_3", "org_4", "org_5", "org_6",
+        ],
+        "clerical_codes": [
+            "code_1", "code_2", "code_3", "code_4", "code_5", "code_6",
+        ],
         "api_payload": [
             {
                 "job_title": "job_1",
@@ -82,13 +90,25 @@ def dummy_data_lookup_prep() -> pd.DataFrame:
                 "job_description": "desc_4",
                 "org_description": "org_4",
             },
+            {
+                "job_title": "job_5",
+                "job_description": "desc_5",
+                "org_description": "org_5",
+            },
+            {
+                "job_title": "job_6",
+                "job_description": "desc_6",
+                "org_description": "org_6",
+            },
         ]
     }
     return pd.DataFrame(data)
 
 
 @pytest.fixture
-def dummy_lookup_results(dummy_data_lookup_prep) -> pd.DataFrame:
+def dummy_lookup_results(
+    dummy_data_lookup_prep
+) -> tuple[list[dict[str, str] | None], pd.DataFrame, list[int]]:
     """Dummy lookup results for testing the record_lookup_results function."""
     # dummpy lookup API responses
     responses = [
@@ -96,18 +116,24 @@ def dummy_lookup_results(dummy_data_lookup_prep) -> pd.DataFrame:
         None,  # simulating no lookup result
         {},  # simulating an API failure
         {"code": "4", "description": "description 4"},
+        None,
+        None,
     ]
 
     # add expected lookup results to the dummy data for comparison in tests
     expected_results = dummy_data_lookup_prep.copy()
-    expected_results["lookup_classified"] = [True, False, pd.NA, True]
-    expected_results["lookup_error"] = [False, False, True, False]
-    expected_results["lookup_code"] = ["1", pd.NA, pd.NA, "4"]
+    expected_results["lookup_classified"] = [
+        True, False, pd.NA, True, False, False
+    ]
+    expected_results["lookup_error"] = [
+        False, False, True, False, False, False
+    ]
+    expected_results["lookup_code"] = ["1", pd.NA, pd.NA, "4", pd.NA, pd.NA]
     expected_results["lookup_description"] = [
-        "description 1", pd.NA, pd.NA, "description 4"
+        "description 1", pd.NA, pd.NA, "description 4", pd.NA, pd.NA
     ]
 
-    return responses, expected_results
+    return responses, expected_results, [2, 5, 6]
 
 
 @contextmanager
@@ -292,7 +318,7 @@ class TestRecordLookupResults:
         self, dummy_data_lookup_prep, dummy_lookup_results
     ):
         """Test that the function records lookup results correctly."""
-        responses, expected_results = dummy_lookup_results
+        responses, expected_results, _ = dummy_lookup_results
         input_df = dummy_data_lookup_prep
         ids = dummy_data_lookup_prep["unique_id"].tolist()
 
@@ -324,3 +350,49 @@ class TestRecordLookupResults:
             match="Mismatch between number of lookup IDs and lookup responses"
         ):
             data_module.record_lookup_results(input_df, ids, responses)
+
+
+class TestPrepDataForClassify:
+    """Unit tests for the prep_data_for_classify function."""
+
+    def test_prep_data_for_classify(self, dummy_lookup_results):
+        """Test function prepares data correctly for classification."""
+        _, input_df, classify_ids = dummy_lookup_results
+        ids, payloads = data_module.prep_data_for_classify(input_df)
+
+        assert isinstance(ids, list), (
+            f"Expected ids to be a list, but got: {type(ids)}"
+        )
+        assert isinstance(payloads, list), (
+            f"Expected payloads to be a list, but got: {type(payloads)}"
+        )
+        assert all(isinstance(payload, dict) for payload in payloads), (
+            "Expected each payload to be a dictionary."
+        )
+
+        num_ids = len(ids)
+        num_payloads = len(payloads)
+        num_for_classify = len(classify_ids)
+        assert num_ids == num_for_classify, (
+            f"Expected {num_for_classify} IDs for classification, "
+            f"but got {num_ids}"
+        )
+        assert num_payloads == num_for_classify, (
+            f"Expected {num_for_classify} payloads for classification, "
+            f"but got {num_payloads}"
+        )
+        assert ids == classify_ids, (
+            f"Expected IDs for classification: {classify_ids}, "
+            f"but got: {ids}"
+        )
+
+    def test_prep_data_for_classify_no_lookup_prior(
+        self, dummy_lookup_results
+    ):
+        """Simulate no lookup prior to classification."""
+        _, input_df, _ = dummy_lookup_results
+        input_df.drop(columns=["lookup_classified"], inplace=True)
+        with pytest.raises(
+            KeyError, match="DataFrame must contain 'lookup_classified'"
+        ):
+            data_module.prep_data_for_classify(input_df)
