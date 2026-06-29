@@ -17,6 +17,26 @@ def has_question_mark(text: str) -> bool:
     return isinstance(text, str) and "?" in text
 
 
+def count_wh_interrogatives(text: str) -> int:
+    """Count WH-interrogative words in the input text.
+
+    WH-interrogatives include:
+        what, why, how, when, where, who, whom, whose, which
+
+    Args:
+        text: Input text to analyse.
+
+    Returns:
+        int: Number of WH-interrogative word matches found in the text.
+             Returns 0 if input is not a string.
+    """
+    if not isinstance(text, str):
+        return 0
+
+    pattern = r"\b(what|why|how|when|where|who|whom|whose|which)\b"
+    return len(re.findall(pattern, text.lower()))
+
+
 def has_interrogative_anywhere(text: str) -> bool:
     """Check if the text contains interrogative (WH) words anywhere.
 
@@ -65,7 +85,33 @@ def has_interrogative_not_at_start(text: str) -> bool:
         bool: True if a WH-word is found and the text does not start with a
         question form, else False.
     """
-    return has_interrogative_anywhere(text) and not has_interrogative_start(text)
+    return count_wh_interrogatives(text) > 0 and not has_interrogative_start(text)
+
+
+def count_instruction_prompts(text: str) -> int:
+    """Count instruction-style prompt phrases in the input text.
+
+    Instruction prompts include directive or request-based language such as:
+        "tell me", "describe", "explain", "share", "give details",
+        including polite variants (e.g. "please explain", "please describe").
+
+    Args:
+        text: Input text to analyse.
+
+    Returns:
+        int: Number of instruction prompt matches found in the text.
+             Returns 0 if input is not a string.
+    """
+    if not isinstance(text, str):
+        return 0
+
+    pattern = re.compile(
+        r"""\b(please (describe|explain|tell me|share)
+        |tell me|describe|explain|share|give details)\b""",
+        re.IGNORECASE,
+    )
+
+    return len(pattern.findall(text))
 
 
 def has_instruction_prompt_anywhere(text: str) -> bool:
@@ -135,28 +181,26 @@ def has_instruction_prompt_not_at_start(text: str) -> bool:
         bool: True if an instruction prompt is found not at the start of the
         text, else False.
     """
-    return has_instruction_prompt_anywhere(text) and not has_instruction_prompt_start(
+    return count_instruction_prompts(text) > 0 and not has_instruction_prompt_start(
         text
     )
 
 
-def count_question_signals(text: str) -> int:
-    """Count distinct question signals in the text.
+def is_question(text: str) -> bool:
+    """Determine whether a text is a question based on question signals.
 
-    Signals include:
-    - Question mark
-    - Interrogative at start
-    - Interrogative not at start
-    - Instruction prompt at start
-    - Instruction prompt not at start
+    A text is considered a question if any question signal is present.
 
     Args:
-        text (str): Input text.
+        text: Input text.
 
     Returns:
-        int: Number of detected signals.
+        True if the text contains at least one question signal, else False.
     """
-    return sum(
+    if not isinstance(text, str):
+        return False
+
+    return any(
         [
             has_question_mark(text),
             has_interrogative_start(text),
@@ -190,8 +234,13 @@ def is_compound_question(text: str) -> bool:
         return True
 
     # Rule 2: multiple interrogatives (e.g. "what ... and how ...")
-    interrogatives = re.findall(r"\b(what|why|how|when|where|who|which)\b", text)
-    if len(interrogatives) > 1:
+    if count_wh_interrogatives(text) > 1:
+        return True
+
+    if count_instruction_prompts(text) > 1:
+        return True
+
+    if has_interrogative_start(text) and count_wh_interrogatives(text) > 1:
         return True
 
     # Rule 3: conjunctions linking clauses
@@ -223,7 +272,7 @@ def has_single_question(text: str) -> bool:
         return False
 
     # Rule 2: must have at least one question signal
-    if count_question_signals(text) == 0:
+    if not is_question(text):
         return False
 
     # Rule 3: reject compound questions
@@ -252,7 +301,7 @@ def get_question_structure_metrics(text: str) -> dict[str, int | bool]:
             has_instruction_prompt_not_at_start(text)
         ),
         # Summary signal count
-        "question_signal_count": count_question_signals(text),
+        "question_signal_count": is_question(text),
         # Question structure classifications
         "is_compound_question": is_compound_question(text),
         "has_single_question": has_single_question(text),
@@ -294,4 +343,4 @@ def add_question_structure_columns(
     if inplace:
         df.loc[:, question_metrics_df.columns] = question_metrics_df
 
-    return df
+    return df.join(question_metrics_df)
