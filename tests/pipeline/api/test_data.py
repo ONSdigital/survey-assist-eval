@@ -164,6 +164,7 @@ class TestBuildOrgDescription:
 class TestGetAndPrepareTestData:
     """Unit tests for the get_and_prepare_test_data function."""
 
+    # pylint: disable=W0212
     def test_get_and_prepare_test_data(self, dummy_input_test_data):
         """Test that the function processes input data correctly."""
         input_df, expected_org_descs = dummy_input_test_data
@@ -175,7 +176,7 @@ class TestGetAndPrepareTestData:
                 "dummy_path"
             )
         # Check that the DataFrame has the expected columns
-        expected_columns = data_module.TEST_INPUT_COLUMNS
+        expected_columns = data_module._TEST_INPUT_FIELDS
         assert set(result_df.columns) == set(expected_columns), (
             f"Expected columns: {expected_columns}, "
             f"but got: {set(result_df.columns)}"
@@ -187,7 +188,7 @@ class TestGetAndPrepareTestData:
             f"but got: {org_descs}"
         )
         mocks["pd.read_parquet"].assert_called_once_with(
-            "dummy_path", columns=list(data_module.REQUIRED_COLUMNS.keys())
+            "dummy_path", columns=list(data_module._REQUIRED_FIELDS_MAP.keys())
         )
 
     def test_get_and_prepare_test_data_with_random_sample(

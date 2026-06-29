@@ -16,8 +16,8 @@ import pandas as pd
 from pandas._libs.missing import NAType  # pylint: disable=E0611
 from survey_assist_utils.logging import get_logger
 
-RANDOM_SEED = 42
-REQUIRED_COLUMNS = {
+_RANDOM_SEED = 42
+_REQUIRED_FIELDS_MAP = {
     "unique_id": "unique_id",
     "soc2020_job_title": "job_title",
     "soc2020_job_description": "job_description",
@@ -25,7 +25,7 @@ REQUIRED_COLUMNS = {
     "sic2007_employee": "employee",
     "clerical_codes": "clerical_codes",
 }
-TEST_INPUT_COLUMNS = [
+_TEST_INPUT_FIELDS = [
     "unique_id",
     "job_title",
     "job_description",
@@ -86,7 +86,7 @@ def get_and_prepare_test_data(
 
     # read test data
     logger.debug(f"Loading test data from {filepath}...")
-    df = pd.read_parquet(filepath, columns=list(REQUIRED_COLUMNS.keys()))
+    df = pd.read_parquet(filepath, columns=list(_REQUIRED_FIELDS_MAP.keys()))
 
     # generate a random sample only if env vars are set
     # pylint is wrong, it should be capitalised as it's an env var
@@ -96,7 +96,7 @@ def get_and_prepare_test_data(
     if RANDOM_SAMPLE_SIZE is not None:
         logger.info(
             f"Attempting to generate a random sample of size "
-            f"{RANDOM_SAMPLE_SIZE} with seed {RANDOM_SEED}..."
+            f"{RANDOM_SAMPLE_SIZE} with seed {_RANDOM_SEED}..."
         )
         try:
             random_sample = int(RANDOM_SAMPLE_SIZE)
@@ -119,7 +119,7 @@ def get_and_prepare_test_data(
             )
         df = df.sample(
             n=random_sample,
-            random_state=RANDOM_SEED
+            random_state=_RANDOM_SEED
         ).reset_index(drop=True)
         logger.info(
             f"Random sample of size {random_sample} generated successfully."
@@ -130,7 +130,7 @@ def get_and_prepare_test_data(
         )
 
     # perform common data preparation steps
-    df.rename(columns=REQUIRED_COLUMNS, inplace=True)
+    df.rename(columns=_REQUIRED_FIELDS_MAP, inplace=True)
     df["org_description"] = df.apply(
         lambda row: _build_org_description(
             row["self_employed"], row["employee"]
@@ -157,7 +157,7 @@ def get_and_prepare_test_data(
     )
 
     # return only the columns needed for API evaluation
-    return df[TEST_INPUT_COLUMNS]
+    return df[_TEST_INPUT_FIELDS]
 
 
 def prep_data_for_lookup(
