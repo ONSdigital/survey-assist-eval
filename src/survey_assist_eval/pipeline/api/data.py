@@ -275,7 +275,8 @@ def prep_data_for_classify(
     # (i.e. treat lookup errors as do not continue to classify to prevent
     # misclassification).
     classify_calls = df[
-        (~df["lookup_classified"]) & (~df["lookup_error"])
+        df["lookup_classified"].eq(False)
+        & df["lookup_error"].eq(False)
     ].copy()
     classify_ids = classify_calls["unique_id"].tolist()
     classify_payloads = classify_calls["api_payload"].tolist()
