@@ -267,7 +267,7 @@ def prep_data_for_classify(
             dictionaries containing the API payloads for each record.
     """
     if "lookup_classified" not in df.columns:
-        raise ValueError(
+        raise KeyError(
             "DataFrame must contain 'lookup_classified' to prep for "
             "classify evaluation."
         )
