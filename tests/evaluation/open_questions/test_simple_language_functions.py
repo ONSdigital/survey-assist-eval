@@ -1,10 +1,11 @@
 """Tests for simple language functions."""
-import pytest 
+
+from textstat import textstat
 
 from survey_assist_eval.evaluation.open_questions.simple_language_functions import (
-    extract_acronyms, get_avg_syllables_per_word
+    extract_acronyms,
+    get_avg_syllables_per_word,
 )
-from textstat import textstat
 
 
 def test_extract_acronyms_simple_acronyms_basic_and_digits():
@@ -77,10 +78,10 @@ def test_get_avg_syllables_per_word_returns_expected_average():
         "Simple sentence",
         "This is a simple sentence",
         "More complex wording with variability",
-        "A"
+        "A",
     ]
 
-    expected = [2,1.4,2.4,1]
+    expected = [2, 1.4, 2.4, 1]
 
     for i, text in enumerate(texts):
         assert get_avg_syllables_per_word(text) == expected[i]
@@ -88,11 +89,7 @@ def test_get_avg_syllables_per_word_returns_expected_average():
 
 def test_get_avg_syllables_per_word_matches_textstat_exactly():
     """Matches textstat's average syllables per word calculation."""
-    texts = [
-        "Simple sentence",
-        "More complex wording with variability",
-        "A"
-    ]
+    texts = ["Simple sentence", "More complex wording with variability", "A"]
 
     for text in texts:
         assert get_avg_syllables_per_word(text) == textstat.avg_syllables_per_word(text)

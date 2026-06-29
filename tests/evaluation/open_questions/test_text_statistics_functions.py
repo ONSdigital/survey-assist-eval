@@ -76,7 +76,7 @@ def test_add_text_stats_columns_adds_prefixed_columns():
     """Check that text stat columns are added and prefixed correctly."""
     df = pd.DataFrame({"answer": ["One two three.", "Another short answer."]})
 
-    result = add_text_stats_columns(df, text_column="answer", result_prefix="answer_")
+    result = add_text_stats_columns(df, text_column="answer", prefix="answer_")
 
     assert "answer_word_count" in result.columns
     assert "answer_sentence_count" in result.columns
@@ -93,7 +93,7 @@ def test_add_text_stats_columns_inplace_modifies_dataframe():
     df = pd.DataFrame({"answer": ["One two."]})
 
     result = add_text_stats_columns(
-        df, text_column="answer", result_prefix="answer_", inplace=True
+        df, text_column="answer", prefix="answer_", inplace=True
     )
 
     assert result is df
@@ -138,7 +138,7 @@ def test_summarise_text_stats_uses_existing_prefix_columns():
             "answer_word_count": [1, 30, 5],
             "answer_sentence_count": [1, 3, 1],
             "answer_words_per_sentence": [[1], [3, 21, 6], [5]],
-            "answer_mean_words_per_sentence": [1.0, 25.0, 5.0]
+            "answer_mean_words_per_sentence": [1.0, 25.0, 5.0],
         }
     )
 

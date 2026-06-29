@@ -2,6 +2,8 @@
 
 import re
 
+import pandas as pd
+
 
 def has_question_mark(text: str) -> bool:
     """Check if the text contains a question mark.
@@ -63,11 +65,7 @@ def has_interrogative_not_at_start(text: str) -> bool:
         bool: True if a WH-word is found and the text does not start with a
         question form, else False.
     """
-    return (
-        has_interrogative_anywhere(text)
-        and not has_interrogative_start(text)
-    )
-
+    return has_interrogative_anywhere(text) and not has_interrogative_start(text)
 
 
 def has_instruction_prompt_anywhere(text: str) -> bool:
@@ -137,9 +135,8 @@ def has_instruction_prompt_not_at_start(text: str) -> bool:
         bool: True if an instruction prompt is found not at the start of the
         text, else False.
     """
-    return (
-        has_instruction_prompt_anywhere(text)
-        and not has_instruction_prompt_start(text)
+    return has_instruction_prompt_anywhere(text) and not has_instruction_prompt_start(
+        text
     )
 
 
@@ -159,13 +156,15 @@ def count_question_signals(text: str) -> int:
     Returns:
         int: Number of detected signals.
     """
-    return sum([
-        has_question_mark(text),
-        has_interrogative_start(text),
-        has_interrogative_not_at_start(text),
-        has_instruction_prompt_start(text),
-        has_instruction_prompt_not_at_start(text),
-    ])
+    return sum(
+        [
+            has_question_mark(text),
+            has_interrogative_start(text),
+            has_interrogative_not_at_start(text),
+            has_instruction_prompt_start(text),
+            has_instruction_prompt_not_at_start(text),
+        ]
+    )
 
 
 def is_compound_question(text: str) -> bool:
@@ -197,7 +196,7 @@ def is_compound_question(text: str) -> bool:
 
     # Rule 3: conjunctions linking clauses
     conjunctions = r"\b(and|or|also)\b"
-    return not re.search(conjunctions, text)
+    return re.search(conjunctions, text) is not None
 
 
 def has_single_question(text: str) -> bool:
@@ -229,3 +228,70 @@ def has_single_question(text: str) -> bool:
 
     # Rule 3: reject compound questions
     return not is_compound_question(text)
+
+
+def get_question_structure_metrics(text: str) -> dict[str, int | bool]:
+    """Return question structure metrics for one string.
+
+    Args:
+        text: Text to analyse.
+
+    Returns:
+        A dict containing question signal counts, question structure flags,
+        and single/compound question classifications.
+    """
+    return {
+        # Question signal flags
+        "has_question_mark": has_question_mark(text),
+        "has_interrogative_start": has_interrogative_start(text),
+        "has_interrogative_anywhere": has_interrogative_anywhere(text),
+        "has_interrogative_not_at_start": has_interrogative_not_at_start(text),
+        "has_instruction_prompt_start": has_instruction_prompt_start(text),
+        "has_instruction_prompt_anywhere": has_instruction_prompt_anywhere(text),
+        "has_instruction_prompt_not_at_start": (
+            has_instruction_prompt_not_at_start(text)
+        ),
+        # Summary signal count
+        "question_signal_count": count_question_signals(text),
+        # Question structure classifications
+        "is_compound_question": is_compound_question(text),
+        "has_single_question": has_single_question(text),
+    }
+
+
+def add_question_structure_columns(
+    df: pd.DataFrame,
+    text_column: str,
+    prefix: str | None = None,
+    inplace: bool = False,
+) -> pd.DataFrame:
+    """Add question structure metric columns derived from a text column.
+
+    Args:
+        df: DataFrame with text data.
+        text_column: Column containing text.
+        prefix: Prefix for new columns. Defaults to "{text_column}_".
+        inplace: If True, add columns in place and return the same DataFrame.
+
+    Returns:
+        DataFrame with added text stat columns.
+    """
+    question_metrics_df = (
+        df[text_column]
+        .fillna("")
+        .astype(str)
+        .apply(get_question_structure_metrics)
+        .apply(pd.Series)
+    )
+
+    if prefix is None:
+        prefix = f"{text_column}_"
+
+    question_metrics_df = question_metrics_df.rename(
+        columns=lambda col: f"{prefix}{col}"
+    )
+
+    if inplace:
+        df.loc[:, question_metrics_df.columns] = question_metrics_df
+
+    return df

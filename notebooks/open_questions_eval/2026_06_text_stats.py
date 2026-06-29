@@ -1,4 +1,4 @@
-"""A script to evaluate the open questions."""
+"""A script to show question text statistics."""
 
 # pylint: disable=C0103
 

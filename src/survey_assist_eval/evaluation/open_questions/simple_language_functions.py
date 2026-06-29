@@ -1,6 +1,7 @@
 """Functions for checking simple language in open questions."""
 
 import re
+
 from textstat import textstat
 
 
@@ -51,8 +52,7 @@ def extract_acronyms(text: str, extended: bool = False) -> list[str]:
 
 
 def get_avg_syllables_per_word(text: str) -> float:
-    """
-    Return the average number of syllables per word in the text.
+    """Return the average number of syllables per word in the text.
 
     Args:
         text: Input text.
@@ -64,6 +64,3 @@ def get_avg_syllables_per_word(text: str) -> float:
         return 0.0
 
     return textstat.avg_syllables_per_word(text)
-
-
-

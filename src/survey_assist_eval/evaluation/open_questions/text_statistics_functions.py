@@ -16,7 +16,6 @@ class OpenQuestionTextStatistics(BaseModel):
     sd_word_count: float
     mean_sentence_count: float
     mean_word_count_per_sentence: float
-    mean_of_mean_syllables_per_word: float
     pct_over_word_count_threshold: float
     pct_over_sentence_count_threshold: float
     pct_with_long_sentence_over_word_count_threshold: float
@@ -31,7 +30,6 @@ class OpenQuestionTextStatistics(BaseModel):
             f" Standard Deviation of Word Count: {self.sd_word_count:.2f}",
             f" Mean Sentence Count: {self.mean_sentence_count:.2f}",
             f" Mean Word Count per Sentence: {self.mean_word_count_per_sentence:.2f}",
-            f" Mean of Mean Syllables per Word: {self.mean_of_mean_syllables_per_word:.2f}",
             f" Percent Over Word Threshold Count: {self.pct_over_word_count_threshold:.2f}%",
             f" Percent Over Setence Threshold Count: {self.pct_over_sentence_count_threshold:.2f}%",
             f" Percent with Long Sentences: {
@@ -65,7 +63,7 @@ def compute_text_statistics(  # noqa: PLR0913 pylint: disable = R0913, R0917
         A Series with summary statistics for the open-ended question.
     """
     df = add_text_stats_columns(
-        df, text_column=text_column, result_prefix="eval_", inplace=True
+        df, text_column=text_column, prefix="eval_", inplace=True
     )
 
     metrics = summarise_text_stats(
@@ -127,7 +125,7 @@ def get_text_stats(text: str) -> dict[str, int | float | list[int]]:
 def add_text_stats_columns(
     df: pd.DataFrame,
     text_column: str,
-    result_prefix: str | None = None,
+    prefix: str | None = None,
     inplace: bool = False,
 ) -> pd.DataFrame:
     """Add text stats columns for a DataFrame text column.
@@ -135,7 +133,7 @@ def add_text_stats_columns(
     Args:
         df: DataFrame with text data.
         text_column: Column containing text.
-        result_prefix: Prefix for new columns. Defaults to "{text_column}_".
+        prefix: Prefix for new columns. Defaults to "{text_column}_".
         inplace: If True, add columns in place and return the same DataFrame.
 
     Returns:
@@ -145,10 +143,10 @@ def add_text_stats_columns(
         df[text_column].fillna("").astype(str).apply(get_text_stats).apply(pd.Series)
     )
 
-    if result_prefix is None:
-        result_prefix = f"{text_column}_"
+    if prefix is None:
+        prefix = f"{text_column}_"
 
-    stats_df = stats_df.rename(columns=lambda col: f"{result_prefix}{col}")
+    stats_df = stats_df.rename(columns=lambda col: f"{prefix}{col}")
 
     if inplace:
         df.loc[:, stats_df.columns] = stats_df
@@ -193,7 +191,7 @@ def summarise_text_stats(  # noqa: PLR0913 pylint: disable=R0917, R0913
         df = add_text_stats_columns(
             df.copy(),
             text_column=text_column,
-            result_prefix=prefix,
+            prefix=prefix,
             inplace=False,
         )
     elif prefix is None:
