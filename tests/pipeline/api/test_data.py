@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
+from pandas.testing import assert_frame_equal
 
 from survey_assist_eval.pipeline.api import data as data_module
 
@@ -84,6 +85,29 @@ def dummy_data_lookup_prep() -> pd.DataFrame:
         ]
     }
     return pd.DataFrame(data)
+
+
+@pytest.fixture
+def dummy_lookup_results(dummy_data_lookup_prep) -> pd.DataFrame:
+    """Dummy lookup results for testing the record_lookup_results function."""
+    # dummpy lookup API responses
+    responses = [
+        {"code": "1", "description": "description 1"},
+        None,  # simulating no lookup result
+        {},  # simulating an API failure
+        {"code": "4", "description": "description 4"},
+    ]
+
+    # add expected lookup results to the dummy data for comparison in tests
+    expected_results = dummy_data_lookup_prep.copy()
+    expected_results["lookup_classified"] = [True, False, pd.NA, True]
+    expected_results["lookup_error"] = [False, False, True, False]
+    expected_results["lookup_code"] = ["1", pd.NA, pd.NA, "4"]
+    expected_results["lookup_description"] = [
+        "description 1", pd.NA, pd.NA, "description 4"
+    ]
+
+    return responses, expected_results
 
 
 @contextmanager
@@ -258,3 +282,44 @@ class TestPrepDataForLookup:
             f"Expected payloads: {input_df['api_payload'].tolist()}, "
             f"but got: {payloads}"
         )
+
+
+class TestRecordLookupResults:
+    """Unit tests for the record_lookup_results function."""
+
+    def test_record_lookup_results(
+        self, dummy_data_lookup_prep, dummy_lookup_results
+    ):
+        """Test that the function records lookup results correctly."""
+        responses, expected_results = dummy_lookup_results
+        input_df = dummy_data_lookup_prep
+        ids = dummy_data_lookup_prep["unique_id"].tolist()
+
+        result_df = data_module.record_lookup_results(
+            input_df, ids, responses
+        )
+
+        assert_frame_equal(result_df, expected_results)
+
+    def test_record_lookup_results_no_responses(self, dummy_data_lookup_prep):
+        """Test function raises ValueError when no responses are provided."""
+        input_df = dummy_data_lookup_prep
+        ids = dummy_data_lookup_prep["unique_id"].tolist()
+        responses = []  # No responses
+
+        with pytest.raises(ValueError, match="No lookup responses provided"):
+            data_module.record_lookup_results(input_df, ids, responses)
+
+    def test_record_lookup_results_mismatched_lengths(
+        self, dummy_data_lookup_prep
+    ):
+        """Test for ValueError when lengths of ids and responses mismatch."""
+        input_df = dummy_data_lookup_prep
+        ids = dummy_data_lookup_prep["unique_id"].tolist()
+        responses = [{"code": "1", "description": "description 1"}]
+
+        with pytest.raises(
+            ValueError,
+            match="Mismatch between number of lookup IDs and lookup responses"
+        ):
+            data_module.record_lookup_results(input_df, ids, responses)
