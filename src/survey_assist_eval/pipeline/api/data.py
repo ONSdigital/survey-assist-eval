@@ -33,20 +33,20 @@ TEST_INPUT_COLUMNS = [
     "clerical_codes",
     "api_payload",
 ]
-_LOOKUP_RESULT_FIELDS = (
+_LOOKUP_RESULT_FIELDS = [
     "lookup_classified",
     "lookup_error",
     "lookup_code",
     "lookup_description",
-)
-_CLASSIFY_RESULT_FIELDS = (
+]
+_CLASSIFY_RESULT_FIELDS = [
     "classify_classified",
     "classify_error",
     "classify_code",
     "classify_description",
     "classify_followup",
     "classify_candidates",
-)
+]
 
 
 def _build_org_description(*parts: str) -> str:
