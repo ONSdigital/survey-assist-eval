@@ -243,15 +243,14 @@ def record_lookup_results(
     rows = [_lookup_resp_handler(resp) for resp in lookup_responses]
     lookup_df = pd.DataFrame.from_records(rows, columns=_LOOKUP_RESULT_FIELDS)
     lookup_df.insert(0, "unique_id", pd.Series(lookup_ids))
-    if lookup_df["unique_id"].nunique() != output_df["unique_id"].nunique():
-        raise ValueError(
-            "Mismatch between number of lookup results and input "
-            "data. Expected a lookup result for each input record."
-        )
 
     # join the lookup results back to the original DataFrame on the unique ID
+    # validate a one-to-one merge to ensure that each unique_id has a
+    # single lookup result (just another sense check)
     # no need to fillna values as lookup results are complete for all records
-    output_df = output_df.merge(lookup_df, on="unique_id", how="left")
+    output_df = output_df.merge(
+        lookup_df, on="unique_id", how="left", validate="one_to_one"
+    )
     return output_df
 
 
@@ -352,7 +351,9 @@ def record_classify_results(
     classify_df.insert(0, "unique_id", pd.Series(classify_ids))
 
     # join the classify results back to the original DataFrame on the unique ID
-    output_df = output_df.merge(classify_df, on="unique_id", how="left")
+    output_df = output_df.merge(
+        classify_df, on="unique_id", how="left", validate="one_to_one"
+    )
 
     # fill NaN value for the classify columns, equivalent to filling the
     # records that were not classified by the classify API (i.e. lookup only
