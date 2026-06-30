@@ -83,19 +83,22 @@ os.system(
 )
 
 # %%
-df = pd.read_parquet(f"{work_folder}/STG2.parquet")
+df = pd.read_parquet(f"{work_folder}/STG7.parquet")
 
-# subset when working with intermediate outputs
-df_sub = df[df.reasoning.notna()]
-df_sub["match"] = df_sub.soc2020_code == df_sub.initial_code
+for stage in ["initial", "final"]:
+    # subset when working with intermediate outputs
+    df_sub = df[df[f"{stage}_reasoning"].notna()]
+    df_sub["match"] = df_sub.soc2020_code == df_sub[f"{stage}_code"]
 
-print(f"Total rows: {len(df_sub)}")
-print("-" * 20)
-for label, lh in [("Low", 0.6), ("Medium", 0.8), ("High", 0.9)]:
-    print(f"Confidence level: {label} ({lh})")
-    print(f"Codability: {(df_sub.likelihood >= lh).mean():.0%}")
-    print(f"Accuracy: {(df_sub[df_sub.likelihood >= lh].match).mean():.0%}")
+    print(f"Total rows in {stage} stage: {len(df_sub)}")
     print("-" * 20)
+    for label, lh in [("Low", 0.6), ("Medium", 0.8), ("High", 0.9)]:
+        print(f"Confidence level: {label} ({lh})")
+        print(f"Codability: {(df_sub[f"{stage}_likelihood"] >= lh).mean():.0%}")
+        print(
+            f"Accuracy: {(df_sub[df_sub[f"{stage}_likelihood"] >= lh].match).mean():.0%}"
+        )
+        print("-" * 20)
 
 # %%
 df_sub["distance"] = df_sub.apply(
