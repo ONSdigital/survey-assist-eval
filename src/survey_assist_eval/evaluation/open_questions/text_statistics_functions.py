@@ -24,7 +24,7 @@ class OpenQuestionTextStatistics(BaseModel):
     def report_metrics(self):
         """Pretty print the open questions evaluation metrics."""
         lines = [
-            "\nOpen questions metrics:",
+            "\nText statistics:",
             f" Number of open questions: {self.n_count:.0f}",
             f" Median Word Count: {self.median_word_count:.2f}",
             f" Standard Deviation of Word Count: {self.sd_word_count:.2f}",

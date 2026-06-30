@@ -3,6 +3,72 @@
 import re
 
 import pandas as pd
+from pydantic import BaseModel
+
+
+class QuestionStructureMetrics(BaseModel):
+    """Container for all question structure evaluation metrics."""
+
+    n_follow_up_questions: int
+    pct_is_question: float
+    pct_is_single_question: float
+    pct_with_instruction_prompt_start: float
+    mean_instruction_prompt_count_excluding_zero: float | None
+    pct_with_interrogative_start: float
+    mean_interrogative_wh_count_excluding_zero: float | None
+    pct_has_question_mark: float
+
+    def report_metrics(self) -> str:
+        """Pretty print the question structure evaluation metrics."""
+        lines = [
+            "\nQuestion structure metrics:",
+            f" Number of follow-up questions: {self.n_follow_up_questions:.0f}",
+            f" Percentage is_question: {self.pct_is_question:.2f}%",
+            " Percentage is_single_question:" f" {self.pct_is_single_question:.2f}%",
+            " Percentage with instruction_prompt_start:"
+            f" {self.pct_with_instruction_prompt_start:.2f}%",
+            (
+                f" Mean instruction prompt count (excluding zero):"
+                f" {self.mean_instruction_prompt_count_excluding_zero:.2f}"
+                if pd.notna(self.mean_instruction_prompt_count_excluding_zero)
+                else " Mean instruction prompt count (excluding zero): N/A"
+            ),
+            f" Percentage with interrogative_start: {self.pct_with_interrogative_start:.2f}%",
+            (
+                f" Mean interrogative WH count (excluding zero):"
+                f" {self.mean_interrogative_wh_count_excluding_zero:.2f}"
+                if self.mean_interrogative_wh_count_excluding_zero is not None
+                else " Mean interrogative WH count (excluding zero): N/A"
+            ),
+            f" Percentage with question mark: {self.pct_has_question_mark:.2f}%",
+        ]
+        return "\n".join(lines)
+
+
+def compute_question_structure_metrics(
+    df,
+    *,
+    text_column: str,
+    prefix: str = "eval_",
+) -> QuestionStructureMetrics:
+    """Evaluate question structure quality for generated follow-up questions.
+
+    Args:
+        df: DataFrame containing generated questions.
+        text_column: Column containing the text responses.
+        prefix: Prefix for generated metric columns.
+
+    Returns:
+        QuestionStructureMetrics: Structured summary of metrics.
+    """
+    df = add_question_structure_columns(df, text_column=text_column, prefix=prefix)
+
+    metrics = summarise_question_structure_columns(
+        df,
+        prefix=prefix,
+    )
+
+    return QuestionStructureMetrics(**metrics.to_dict())
 
 
 def has_question_mark(text: str) -> bool:
@@ -313,7 +379,6 @@ def add_question_structure_columns(
     df: pd.DataFrame,
     text_column: str,
     prefix: str | None = None,
-    inplace: bool = False,
 ) -> pd.DataFrame:
     """Add question structure metric columns derived from a text column.
 
@@ -321,7 +386,6 @@ def add_question_structure_columns(
         df: DataFrame with text data.
         text_column: Column containing text.
         prefix: Prefix for new columns. Defaults to "{text_column}_".
-        inplace: If True, add columns in place and return the same DataFrame.
 
     Returns:
         DataFrame with added text stat columns.
@@ -340,9 +404,6 @@ def add_question_structure_columns(
     question_metrics_df = question_metrics_df.rename(
         columns=lambda col: f"{prefix}{col}"
     )
-
-    if inplace:
-        df.loc[:, question_metrics_df.columns] = question_metrics_df
 
     return df.join(question_metrics_df)
 
@@ -384,8 +445,8 @@ def summarise_question_structure_columns(
         # Percentages
         "pct_is_question": is_question_col.mean() * 100,
         "pct_is_single_question": is_single_question_col.mean() * 100,
-        "pct_instruction_prompt_start": instruction_prompt_start_col.mean() * 100,
-        "pct_interrogative_start": interrogative_start_col.mean() * 100,
+        "pct_with_instruction_prompt_start": instruction_prompt_start_col.mean() * 100,
+        "pct_with_interrogative_start": interrogative_start_col.mean() * 100,
         "pct_has_question_mark": has_question_mark_col.mean() * 100,
         "mean_instruction_prompt_count_excluding_zero": instruction_prompt_count_col[
             instruction_prompt_count_col > 0
