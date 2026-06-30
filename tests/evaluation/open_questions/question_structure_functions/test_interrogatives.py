@@ -91,7 +91,6 @@ EDGE_CASES = [
 @pytest.mark.parametrize(
     "text, expected",
     [
-        # Single cases (from your existing examples)
         ("What is this", 1),
         ("Tell me why this happens", 1),
         ("I want to know how it works", 1),
@@ -101,7 +100,6 @@ EDGE_CASES = [
         ("Tell me whom this concerns", 1),
         ("I wonder whose idea this was", 1),
         ("Tell me which option is best", 1),
-        # Multiple cases
         ("What and why did this happen", 2),
         ("Who, what and where", 3),
         ("How and when should we do this", 2),
@@ -114,9 +112,7 @@ def test_count_wh_interrogatives(text, expected):
     assert count_wh_interrogatives(text) == expected
 
 
-pytest.mark.parametrize("text", INTERROGATIVE_ANYWHERE_FALSE_CASES)
-
-
+@pytest.mark.parametrize("text", INTERROGATIVE_ANYWHERE_FALSE_CASES)
 def test_count_wh_interrogatives_false(text):
     """Returns 0 when no WH-interrogative words are present."""
     assert count_wh_interrogatives(text) == 0
