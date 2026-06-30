@@ -103,22 +103,6 @@ def count_wh_interrogatives(text: str) -> int:
     return len(re.findall(pattern, text.lower()))
 
 
-def has_interrogative_anywhere(text: str) -> bool:
-    """Check if the text contains interrogative (WH) words anywhere.
-
-    Args:
-        text: Input text.
-
-    Returns:
-        bool: True if a WH-word is found, else False.
-    """
-    if not isinstance(text, str):
-        return False
-
-    pattern = r"\b(what|why|how|when|where|who|whom|whose|which)\b"
-    return re.search(pattern, text.lower()) is not None
-
-
 def has_interrogative_start(text: str) -> bool:
     """Check if the text starts with an interrogative or auxiliary verb.
 
@@ -178,34 +162,6 @@ def count_instruction_prompts(text: str) -> int:
     )
 
     return len(pattern.findall(text))
-
-
-def has_instruction_prompt_anywhere(text: str) -> bool:
-    """Check if the text contains instruction-style prompts.
-
-    Args:
-        text: Input text.
-
-    Returns:
-        bool: True if an instruction prompt is found, else False.
-    """
-    if not isinstance(text, str):
-        return False
-
-    patterns = [
-        r"\btell me\b",
-        r"\bdescribe\b",
-        r"\bexplain\b",
-        r"\bplease describe\b",
-        r"\bplease explain\b",
-        r"\bplease tell me\b",
-        r"\bplease share\b",
-        r"\bshare\b",
-        r"\bgive details\b",
-    ]
-
-    text = text.lower()
-    return any(re.search(p, text) for p in patterns)
 
 
 def has_instruction_prompt_start(text: str) -> bool:
@@ -358,10 +314,8 @@ def get_question_structure_metrics(text: str) -> dict[str, int | bool]:
         # Question signal flags
         "has_question_mark": has_question_mark(text),
         "interrogative_start": has_interrogative_start(text),
-        "interrogative_anywhere": has_interrogative_anywhere(text),
         "interrogative_not_at_start": has_interrogative_not_at_start(text),
         "instruction_prompt_start": has_instruction_prompt_start(text),
-        "instruction_prompt_anywhere": has_instruction_prompt_anywhere(text),
         "instruction_prompt_not_at_start": (has_instruction_prompt_not_at_start(text)),
         # Question signal counts
         "interrogative_wh_count": count_wh_interrogatives(text),
