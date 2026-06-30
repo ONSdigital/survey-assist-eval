@@ -18,6 +18,7 @@ import pandas as pd
 from industrial_classification_utils.embed.embedding import EmbeddingHandler
 from tqdm import tqdm
 
+from survey_assist_eval.pipeline.constants import LEVEL_OF_EDUCATION
 from survey_assist_eval.pipeline.shared_components import (
     parse_args,
     persist_results,
@@ -84,6 +85,20 @@ def make_merged_industry_desc(row: pd.Series) -> str:
     return f"{ind_desc}{self_emp_desc}"
 
 
+def expand_level_of_education(row: pd.Series) -> str:
+    """Expands the level of education to the qualification description.
+
+    Args:
+        row (pd.Series): A row from the input DataFrame containing level of education.
+
+    Returns:
+        description (str): The expanded descriptions.
+
+    """
+    education_coded = str(row[EDUCATION_COL])
+    return LEVEL_OF_EDUCATION[education_coded]
+
+
 def _make_embedding_handler(in_metadata: dict) -> EmbeddingHandler:
     """Create an :class:`EmbeddingHandler` using settings from metadata where possible."""
     new_embedding_handler = EmbeddingHandler(
@@ -139,6 +154,7 @@ if __name__ == "__main__":
     df[INDUSTRY_DESCR_COL] = df[INDUSTRY_DESCR_COL].apply(clean_text)
     df[SELF_EMPLOYED_DESC_COL] = df[SELF_EMPLOYED_DESC_COL].apply(clean_text)
     df[MERGED_INDUSTRY_DESC_COL] = df.apply(make_merged_industry_desc, axis=1)
+    df[EDUCATION_COL] = df.apply(expand_level_of_education, axis=1)
     df[MERGED_INDUSTRY_DESC_COL] = df[MERGED_INDUSTRY_DESC_COL].apply(clean_text)
     if args.second_run:
         df[FOLLOWUP_ANSWER_COL] = df[FOLLOWUP_ANSWER_COL].apply(clean_text)
