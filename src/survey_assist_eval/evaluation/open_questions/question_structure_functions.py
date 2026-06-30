@@ -204,9 +204,8 @@ def is_question(text: str) -> bool:
         [
             has_question_mark(text),
             has_interrogative_start(text),
-            has_interrogative_not_at_start(text),
-            has_instruction_prompt_start(text),
-            has_instruction_prompt_not_at_start(text),
+            count_wh_interrogatives(text) > 0,
+            count_instruction_prompts(text) > 0,
         ]
     )
 
@@ -248,7 +247,7 @@ def is_compound_question(text: str) -> bool:
     return re.search(conjunctions, text) is not None
 
 
-def has_single_question(text: str) -> bool:
+def is_single_question(text: str) -> bool:
     """Check whether the text contains a single question.
 
     Criteria:
@@ -292,19 +291,21 @@ def get_question_structure_metrics(text: str) -> dict[str, int | bool]:
     return {
         # Question signal flags
         "has_question_mark": has_question_mark(text),
-        "has_interrogative_start": has_interrogative_start(text),
-        "has_interrogative_anywhere": has_interrogative_anywhere(text),
-        "has_interrogative_not_at_start": has_interrogative_not_at_start(text),
-        "has_instruction_prompt_start": has_instruction_prompt_start(text),
-        "has_instruction_prompt_anywhere": has_instruction_prompt_anywhere(text),
-        "has_instruction_prompt_not_at_start": (
-            has_instruction_prompt_not_at_start(text)
-        ),
+        "interrogative_start": has_interrogative_start(text),
+        "interrogative_anywhere": has_interrogative_anywhere(text),
+        "interrogative_not_at_start": has_interrogative_not_at_start(text),
+        "instruction_prompt_start": has_instruction_prompt_start(text),
+        "instruction_prompt_anywhere": has_instruction_prompt_anywhere(text),
+        "instruction_prompt_not_at_start": (has_instruction_prompt_not_at_start(text)),
+        # Question signal counts
+        "interrogative_wh_count": count_wh_interrogatives(text),
+        "instruction_prompt_count": count_instruction_prompts(text),
         # Summary signal count
         "question_signal_count": is_question(text),
         # Question structure classifications
+        "is_question": is_question(text),
         "is_compound_question": is_compound_question(text),
-        "has_single_question": has_single_question(text),
+        "is_single_question": is_single_question(text),
     }
 
 
@@ -344,3 +345,54 @@ def add_question_structure_columns(
         df.loc[:, question_metrics_df.columns] = question_metrics_df
 
     return df.join(question_metrics_df)
+
+
+def summarise_question_structure_columns(
+    df: pd.DataFrame,
+    *,
+    prefix: str,
+) -> pd.Series:
+    """Summarise precomputed question structure metric columns into a Series.
+
+    Args:
+        df: DataFrame containing precomputed question structure columns.
+        prefix: Prefix used for the metric columns
+            (e.g. "<prefix>is_question").
+
+    Returns:
+        A Series containing summary statistics.
+
+    Notes:
+        This function assumes all required boolean columns already exist:
+        - {prefix}is_question
+        - {prefix}is_single_question
+        - {prefix}instruction_prompt_start
+        - {prefix}interrogative_start
+        - {prefix}has_question_mark
+    """
+    is_question_col = df[f"{prefix}is_question"]
+    is_single_question_col = df[f"{prefix}is_single_question"]
+    instruction_prompt_start_col = df[f"{prefix}instruction_prompt_start"]
+    instruction_prompt_count_col = df[f"{prefix}instruction_prompt_count"]
+    interrogative_start_col = df[f"{prefix}interrogative_start"]
+    interrogative_wh_count_col = df[f"{prefix}interrogative_wh_count"]
+    has_question_mark_col = df[f"{prefix}has_question_mark"]
+
+    summary = {
+        # Count
+        "n_follow_up_questions": len(df),
+        # Percentages
+        "pct_is_question": is_question_col.mean() * 100,
+        "pct_is_single_question": is_single_question_col.mean() * 100,
+        "pct_instruction_prompt_start": instruction_prompt_start_col.mean() * 100,
+        "pct_interrogative_start": interrogative_start_col.mean() * 100,
+        "pct_has_question_mark": has_question_mark_col.mean() * 100,
+        "mean_instruction_prompt_count_excluding_zero": instruction_prompt_count_col[
+            instruction_prompt_count_col > 0
+        ].mean(),
+        "mean_interrogative_wh_count_excluding_zero": interrogative_wh_count_col[
+            interrogative_wh_count_col > 0
+        ].mean(),
+    }
+
+    return pd.Series(summary)
