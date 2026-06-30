@@ -3,20 +3,10 @@
 import pytest
 
 from survey_assist_eval.evaluation.open_questions.question_structure_functions import (
-    has_instruction_prompt_anywhere,
+    count_instruction_prompts,
     has_instruction_prompt_not_at_start,
     has_instruction_prompt_start,
 )
-
-INSTRUCTION_ANYWHERE_TRUE_CASES = [
-    "Tell me what happened",
-    "Please describe your role",
-    "Explain the process",
-    "Can you share your feedback",
-    "I need you to give details of this",
-    "Please tell me more",
-    "Could you please explain this",
-]
 
 INSTRUCTION_START_TRUE_CASES = [
     "Tell me what happened",
@@ -70,22 +60,31 @@ EDGE_CASES = [
 ]
 
 
-@pytest.mark.parametrize("text", INSTRUCTION_ANYWHERE_TRUE_CASES)
-def test_has_instruction_prompt_anywhere_true(text):
-    """Returns True when instruction prompt appears anywhere."""
-    assert has_instruction_prompt_anywhere(text) is True
-
-
-@pytest.mark.parametrize("text", ABSENT_INSTRUCTION_CASES)
-def test_has_instruction_prompt_anywhere_false(text):
-    """Returns False when no instruction prompt is present."""
-    assert has_instruction_prompt_anywhere(text) is False
+@pytest.mark.parametrize(
+    "text, expected",
+    [
+        ("Please describe your role", 1),
+        ("Explain the process", 1),
+        ("Can you share your feedback", 1),
+        ("I need you to give details of this", 1),
+        ("Please tell me more", 1),
+        ("Could you please explain this", 1),
+        ("Tell me what happened", 1),
+        ("Tell me and explain this", 2),
+        ("Please describe and explain your role", 2),
+        ("Tell me, describe, and explain", 3),
+        ("Can you please describe the bird and describe yourself", 2),
+    ],
+)
+def test_count_instruction_prompts_multiple(text, expected):
+    """Counts multiple instruction prompts in a single string."""
+    assert count_instruction_prompts(text) == expected
 
 
 @pytest.mark.parametrize("text", EDGE_CASES)
-def test_has_instruction_prompt_anywhere_edge_cases(text):
-    """Returns False for edge cases."""
-    assert has_instruction_prompt_anywhere(text) is False
+def test_count_instruction_prompts_edge_cases(text):
+    """Returns 0 for non-string and empty inputs."""
+    assert count_instruction_prompts(text) == 0
 
 
 @pytest.mark.parametrize("text", INSTRUCTION_START_TRUE_CASES)

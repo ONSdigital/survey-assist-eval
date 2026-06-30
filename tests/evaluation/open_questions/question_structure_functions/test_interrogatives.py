@@ -3,22 +3,10 @@
 import pytest
 
 from survey_assist_eval.evaluation.open_questions.question_structure_functions import (
-    has_interrogative_anywhere,
+    count_wh_interrogatives,
     has_interrogative_not_at_start,
     has_interrogative_start,
 )
-
-INTERROGATIVE_ANYWHERE_TRUE_CASES = [
-    "What is this",
-    "Tell me why this happens",
-    "I want to know how it works",
-    "Explain when this occurred",
-    "Tell me where this is",
-    "I wonder who is responsible",
-    "Tell me whom this concerns",
-    "I wonder whose idea this was",
-    "Tell me which option is best",
-]
 
 INTERROGATIVE_ANYWHERE_FALSE_CASES = [
     "Is this correct",
@@ -100,28 +88,50 @@ EDGE_CASES = [
 ]
 
 
-@pytest.mark.parametrize("text", INTERROGATIVE_ANYWHERE_TRUE_CASES)
-def test_has_interrogative_anywhere_true(text):
-    """Returns True when WH-word appears anywhere."""
-    assert has_interrogative_anywhere(text) is True
+@pytest.mark.parametrize(
+    "text, expected",
+    [
+        # Single cases (from your existing examples)
+        ("What is this", 1),
+        ("Tell me why this happens", 1),
+        ("I want to know how it works", 1),
+        ("Explain when this occurred", 1),
+        ("Tell me where this is", 1),
+        ("I wonder who is responsible", 1),
+        ("Tell me whom this concerns", 1),
+        ("I wonder whose idea this was", 1),
+        ("Tell me which option is best", 1),
+        # Multiple cases
+        ("What and why did this happen", 2),
+        ("Who, what and where", 3),
+        ("How and when should we do this", 2),
+        ("Why, how, and when does this work", 3),
+        ("Which option and whose idea was it", 2),
+    ],
+)
+def test_count_wh_interrogatives(text, expected):
+    """Counts WH-interrogative words correctly for single and multiple cases."""
+    assert count_wh_interrogatives(text) == expected
 
 
-@pytest.mark.parametrize("text", INTERROGATIVE_ANYWHERE_FALSE_CASES)
-def test_has_interrogative_anywhere_false(text):
-    """Returns False when no WH-word is present."""
-    assert has_interrogative_anywhere(text) is False
+pytest.mark.parametrize("text", INTERROGATIVE_ANYWHERE_FALSE_CASES)
+
+
+def test_count_wh_interrogatives_false(text):
+    """Returns 0 when no WH-interrogative words are present."""
+    assert count_wh_interrogatives(text) == 0
 
 
 @pytest.mark.parametrize("text", ABSENT_INTERROGATIVE_CASES)
-def test_has_interrogative_anywhere_absent_case(text):
-    """Returns False when no interrogative signal is present."""
-    assert has_interrogative_anywhere(text) is False
+def test_count_wh_interrogatives_absent_case(text):
+    """Returns 0 when no interrogative signals are present in the text."""
+    assert count_wh_interrogatives(text) == 0
 
 
 @pytest.mark.parametrize("text", EDGE_CASES)
-def test_has_interrogative_anywhere_edge_cases(text):
-    """Returns False for all edge cases."""
-    assert has_interrogative_anywhere(text) is False
+def test_count_wh_interrogatives_edge_cases(text):
+    """Returns 0 for non-string, empty, or otherwise invalid inputs."""
+    assert count_wh_interrogatives(text) == 0
 
 
 @pytest.mark.parametrize("text", INTERROGATIVE_START_TRUE_CASES)
