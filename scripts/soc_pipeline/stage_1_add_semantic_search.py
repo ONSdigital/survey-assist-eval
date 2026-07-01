@@ -18,7 +18,7 @@ import pandas as pd
 from industrial_classification_utils.embed.embedding import EmbeddingHandler
 from tqdm import tqdm
 
-from survey_assist_eval.pipeline.constants import LEVEL_OF_EDUCATION
+from survey_assist_eval.data_cleaning.constants import LEVEL_OF_EDUCATION
 from survey_assist_eval.pipeline.shared_components import (
     parse_args,
     persist_results,
