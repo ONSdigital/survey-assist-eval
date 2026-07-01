@@ -4,6 +4,7 @@ import pytest
 
 from survey_assist_eval.evaluation.open_questions.question_structure_functions import (
     contains_multiple_asks,
+    get_question_structure_metrics,
     has_question_mark,
     is_question,
     is_single_question,
@@ -12,6 +13,12 @@ from survey_assist_eval.evaluation.open_questions.question_structure_functions i
 # ============================================================================
 # Test Data - Shared between tests
 # ============================================================================
+
+NON_QUESTION_TEXT_INPUTS = [
+    pytest.param("This is a statement.", id="statement"),
+    pytest.param("I like apples", id="simple_statement"),
+    pytest.param("Running quickly today", id="fragment"),
+]
 
 NON_STRING_INPUTS = [
     pytest.param(None, id="none_input"),
@@ -47,14 +54,7 @@ def test_has_question_mark_returns_true(text):
     ), f"Expected True when '?' is present in text: {text!r}"
 
 
-@pytest.mark.parametrize(
-    "text",
-    [
-        pytest.param("This is a statement.", id="statement"),
-        pytest.param("I like apples", id="simple_statement"),
-        pytest.param("Running quickly today", id="fragment"),
-    ],
-)
+@pytest.mark.parametrize("text", NON_QUESTION_TEXT_INPUTS)
 def test_has_question_mark_returns_false_when_absent(text):
     """Returns False when a question mark is absent."""
     assert (
@@ -122,14 +122,7 @@ def test_is_question_true_multiple_signals(text):
     ), f"Expected True for multiple question signals in: {text!r}"
 
 
-@pytest.mark.parametrize(
-    "text",
-    [
-        pytest.param("This is a statement.", id="statement_sentence"),
-        pytest.param("I like apples", id="simple_statement"),
-        pytest.param("Running quickly today", id="fragment_not_question"),
-    ],
-)
+@pytest.mark.parametrize("text", NON_QUESTION_TEXT_INPUTS)
 def test_is_question_false_no_signals(text):
     """Returns False when no question signals are present."""
     assert (
@@ -308,13 +301,7 @@ def test_contains_multiple_asks_false_single_question(text):
     ), f"Expected False for single non-compound question: {text!r}"
 
 
-@pytest.mark.parametrize(
-    "text",
-    [
-        pytest.param("This is a statement.", id="statement"),
-        pytest.param("Running quickly today", id="fragment"),
-    ],
-)
+@pytest.mark.parametrize("text", NON_QUESTION_TEXT_INPUTS)
 def test_contains_multiple_asks_false_non_question(text):
     """Returns False for non-question text."""
     assert (
@@ -377,14 +364,7 @@ def test_is_single_question_false_multiple_question_groups(text):
     ), f"Expected False for multiple question groups in: {text!r}"
 
 
-@pytest.mark.parametrize(
-    "text",
-    [
-        pytest.param("This is a statement.", id="statement"),
-        pytest.param("I like apples", id="simple_statement"),
-        pytest.param("Running quickly today", id="fragment"),
-    ],
-)
+@pytest.mark.parametrize("text", NON_QUESTION_TEXT_INPUTS)
 def test_is_single_question_false_non_questions(text):
     """Returns False when no question signals are present."""
     assert (
@@ -453,3 +433,163 @@ def test_is_single_question_non_string(text):
         f"Expected False for non-string input: {text!r} "
         f"(type: {type(text).__name__})"
     )
+
+
+# ============================================================================
+# Test get_question_structure_metrics function
+# ============================================================================
+
+EXPECTED_FALSE_QUESTION_STRUCTURE_METRICS = {
+    "has_question_mark": False,
+    "interrogative_start": False,
+    "instruction_prompt_start": False,
+    "interrogative_wh_count": 0,
+    "instruction_prompt_count": 0,
+    "is_question": False,
+    "contains_multiple_asks": False,
+    "is_single_question": False,
+}
+
+
+@pytest.mark.parametrize(
+    "text, expected",
+    [
+        pytest.param(
+            "What is your name?",
+            {
+                "has_question_mark": True,
+                "interrogative_start": True,
+                "instruction_prompt_start": False,
+                "interrogative_wh_count": 1,
+                "instruction_prompt_count": 0,
+                "is_question": True,
+                "contains_multiple_asks": False,
+                "is_single_question": True,
+            },
+            id="single_wh_question",
+        ),
+        pytest.param(
+            "How does this work",
+            {
+                "has_question_mark": False,
+                "interrogative_start": True,
+                "instruction_prompt_start": False,
+                "interrogative_wh_count": 1,
+                "instruction_prompt_count": 0,
+                "is_question": True,
+                "contains_multiple_asks": False,
+                "is_single_question": True,
+            },
+            id="single_wh_no_qmark",
+        ),
+        pytest.param(
+            "Please explain this",
+            {
+                "has_question_mark": False,
+                "interrogative_start": False,
+                "instruction_prompt_start": True,
+                "interrogative_wh_count": 0,
+                "instruction_prompt_count": 1,
+                "is_question": True,
+                "contains_multiple_asks": False,
+                "is_single_question": True,
+            },
+            id="single_instruction_prompt",
+        ),
+        pytest.param(
+            "What happened and why did it happen?",
+            {
+                "has_question_mark": True,
+                "interrogative_start": True,
+                "instruction_prompt_start": False,
+                "interrogative_wh_count": 2,
+                "instruction_prompt_count": 0,
+                "is_question": True,
+                "contains_multiple_asks": True,
+                "is_single_question": False,
+            },
+            id="multiple_wh_interrogatives",
+        ),
+        pytest.param(
+            "Describe your role. Explain your responsibilities.",
+            {
+                "has_question_mark": False,
+                "interrogative_start": False,
+                "instruction_prompt_start": True,
+                "interrogative_wh_count": 0,
+                "instruction_prompt_count": 2,
+                "is_question": True,
+                "contains_multiple_asks": True,
+                "is_single_question": False,
+            },
+            id="multiple_instruction_prompts",
+        ),
+        pytest.param(
+            "What is your name? Where do you live?",
+            {
+                "has_question_mark": True,
+                "interrogative_start": True,
+                "instruction_prompt_start": False,
+                "interrogative_wh_count": 2,
+                "instruction_prompt_count": 0,
+                "is_question": True,
+                "contains_multiple_asks": True,
+                "is_single_question": False,
+            },
+            id="multiple_separate_questions",
+        ),
+    ],
+)
+def test_get_question_structure_metrics_returns_expected_metrics(text, expected):
+    """Returns expected question structure metrics."""
+    assert (
+        get_question_structure_metrics(text) == expected
+    ), f"Expected question structure metrics for {text!r} to be {expected}"
+
+
+@pytest.mark.parametrize("text", NON_QUESTION_TEXT_INPUTS)
+def test_get_question_structure_metrics_non_question_text(text):
+    """Returns falsey question structure metrics for non-question text."""
+    assert (
+        get_question_structure_metrics(text)
+        == EXPECTED_FALSE_QUESTION_STRUCTURE_METRICS
+    ), f"Expected falsey question structure metrics for non-question text: {text!r}"
+
+
+@pytest.mark.parametrize("text", EMPTY_TEXT_INPUTS)
+def test_get_question_structure_metrics_empty_text(text):
+    """Returns falsey question structure metrics for empty text inputs."""
+    assert (
+        get_question_structure_metrics(text)
+        == EXPECTED_FALSE_QUESTION_STRUCTURE_METRICS
+    ), f"Expected falsey question structure metrics for empty text input: {text!r}"
+
+
+@pytest.mark.parametrize("text", NON_STRING_INPUTS)
+def test_get_question_structure_metrics_non_string(text):
+    """Returns falsey question structure metrics for non-string inputs."""
+    assert (
+        get_question_structure_metrics(text)
+        == EXPECTED_FALSE_QUESTION_STRUCTURE_METRICS
+    ), (
+        f"Expected falsey question structure metrics for non-string input: {text!r} "
+        f"(type: {type(text).__name__})"
+    )
+
+
+def test_get_question_structure_metrics_returns_expected_keys():
+    """Returns all expected question structure metric keys."""
+    expected_keys = {
+        "has_question_mark",
+        "interrogative_start",
+        "instruction_prompt_start",
+        "interrogative_wh_count",
+        "instruction_prompt_count",
+        "is_question",
+        "contains_multiple_asks",
+        "is_single_question",
+    }
+
+    assert set(get_question_structure_metrics("What is your name?")) == (
+        expected_keys
+    ), "Expected get_question_structure_metrics to return all expected keys"

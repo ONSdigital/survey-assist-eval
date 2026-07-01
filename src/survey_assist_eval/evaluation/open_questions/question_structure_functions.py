@@ -311,14 +311,10 @@ def get_question_structure_metrics(text: str) -> dict[str, int | bool]:
         # Question signal flags
         "has_question_mark": has_question_mark(text),
         "interrogative_start": has_interrogative_start(text),
-        "interrogative_not_at_start": has_interrogative_not_at_start(text),
         "instruction_prompt_start": has_instruction_prompt_start(text),
-        "instruction_prompt_not_at_start": (has_instruction_prompt_not_at_start(text)),
         # Question signal counts
         "interrogative_wh_count": count_wh_interrogatives(text),
         "instruction_prompt_count": count_instruction_prompts(text),
-        # Summary signal count
-        "question_signal_count": is_question(text),
         # Question structure classifications
         "is_question": is_question(text),
         "contains_multiple_asks": contains_multiple_asks(text),
