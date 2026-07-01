@@ -232,39 +232,45 @@ def is_question(text: str) -> bool:
     )
 
 
-def is_compound_question(text: str) -> bool:
-    """Check whether the text is likely a compound (double-barrelled) question.
+def contains_multiple_asks(text: str) -> bool:
+    """Check whether the text contains more than one ask.
 
-    Criteria:
-    - Contains multiple clauses joined by conjunctions (e.g. 'and', 'or')
-    - May include multiple question signals (e.g. multiple interrogatives)
+    Multiple asks may be expressed as:
+    - Multiple question groups (e.g. "What is your name? Where do you live?")
+    - Multiple WH interrogatives (e.g. "What is your name and where do you live?")
+    - Multiple instruction prompts (e.g. "Describe your role and explain
+    your responsibilities.")
 
     Args:
         text: Input text.
 
     Returns:
-        bool: True if the text is likely compound, else False.
+        bool: True if the text contains multiple asks, else False.
     """
     if not isinstance(text, str) or not text.strip():
         return False
 
     text = text.strip().lower()
 
-    # Rule 1: multiple question marks
-    if text.count("?") > 1:
+    # Multiple explicit questions
+    question_groups = re.findall(r"\?+", text)
+
+    if len(question_groups) > 1:
         return True
 
-    # Rule 2: multiple interrogatives (e.g. "what ... and how ...")
+    # Multiple WH questions
     if count_wh_interrogatives(text) > 1:
         return True
 
+    # Multiple instructions / requests
     if count_instruction_prompts(text) > 1:
         return True
 
+    # Interrogative opening followed by multiple WH clauses
     if has_interrogative_start(text) and count_wh_interrogatives(text) > 1:
         return True
 
-    # Rule 3: conjunctions linking clauses
+    # Conjunctions linking clauses
     conjunctions = r"\b(and|or|also)\b"
     return re.search(conjunctions, text) is not None
 
@@ -288,16 +294,7 @@ def is_single_question(text: str) -> bool:
 
     text = text.strip()
 
-    # Rule 1: multiple '?' means multiple questions
-    if text.count("?") > 1:
-        return False
-
-    # Rule 2: must have at least one question signal
-    if not is_question(text):
-        return False
-
-    # Rule 3: reject compound questions
-    return not is_compound_question(text)
+    return is_question(text) and not contains_multiple_asks(text)
 
 
 def get_question_structure_metrics(text: str) -> dict[str, int | bool]:
@@ -324,7 +321,7 @@ def get_question_structure_metrics(text: str) -> dict[str, int | bool]:
         "question_signal_count": is_question(text),
         # Question structure classifications
         "is_question": is_question(text),
-        "is_compound_question": is_compound_question(text),
+        "contains_multiple_asks": contains_multiple_asks(text),
         "is_single_question": is_single_question(text),
     }
 
