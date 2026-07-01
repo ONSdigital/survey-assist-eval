@@ -181,14 +181,12 @@ class TestCountInstructionPrompts:
             count_instruction_prompts(text) >= 1
         ), f"Should count instruction with contraction: {text!r}"
 
-    def test_count_edge_cases(self):
+    @pytest.mark.parametrize("text", EDGE_CASES)
+    def test_count_edge_cases(self, text):
         """Returns 0 for non-string and empty inputs."""
-        for text in EDGE_CASES:
-            # Extract the actual value from pytest.param
-            value = text.values[0] if hasattr(text, "values") else text
-            assert (
-                count_instruction_prompts(value) == 0
-            ), f"Expected 0 for edge case: {value!r} (type: {type(value).__name__})"
+        assert (
+            count_instruction_prompts(text) == 0
+        ), f"Expected 0 for edge case: {text!r} (type: {type(text).__name__})"
 
 
 # ============================================================================
@@ -199,32 +197,26 @@ class TestCountInstructionPrompts:
 class TestHasInstructionPromptStart:
     """Tests for has_instruction_prompt_start function."""
 
-    def test_true_cases(self):
+    @pytest.mark.parametrize("text", INSTRUCTION_START_TRUE_CASES)
+    def test_true_cases(self, text):
         """Returns True when instruction prompt is at the start."""
-        for text in INSTRUCTION_START_TRUE_CASES:
-            # Extract the actual value from pytest.param
-            value = text.values[0] if hasattr(text, "values") else text
-            assert (
-                has_instruction_prompt_start(value) is True
-            ), f"Expected True for instruction at start: {value!r}"
+        assert (
+            has_instruction_prompt_start(text) is True
+        ), f"Expected True for instruction at start: {text!r}"
 
-    def test_false_for_middle(self):
+    @pytest.mark.parametrize("text", INSTRUCTION_NOT_AT_START_TRUE_CASES)
+    def test_false_for_middle(self, text):
         """Returns False when instruction appears later in text."""
-        for text in INSTRUCTION_NOT_AT_START_TRUE_CASES:
-            # Extract the actual value from pytest.param
-            value = text.values[0] if hasattr(text, "values") else text
-            assert (
-                has_instruction_prompt_start(value) is False
-            ), f"Expected False for instruction not at start: {value!r}"
+        assert (
+            has_instruction_prompt_start(text) is False
+        ), f"Expected False for instruction not at start: {text!r}"
 
-    def test_false_absent_instruction(self):
+    @pytest.mark.parametrize("text", ABSENT_INSTRUCTION_CASES)
+    def test_false_absent_instruction(self, text):
         """Returns False when no instruction prompt is present."""
-        for text in ABSENT_INSTRUCTION_CASES:
-            # Extract the actual value from pytest.param
-            value = text.values[0] if hasattr(text, "values") else text
-            assert (
-                has_instruction_prompt_start(value) is False
-            ), f"Expected False for non-instruction text: {value!r}"
+        assert (
+            has_instruction_prompt_start(text) is False
+        ), f"Expected False for non-instruction text: {text!r}"
 
     def test_case_insensitive(self):
         """Detects instruction prompts regardless of casing."""
@@ -277,14 +269,12 @@ class TestHasInstructionPromptStart:
             has_instruction_prompt_start(value) is True
         ), f"Should handle contractions: {value!r}"
 
-    def test_edge_cases(self):
+    @pytest.mark.parametrize("text", EDGE_CASES)
+    def test_edge_cases(self, text):
         """Returns False for edge cases."""
-        for text in EDGE_CASES:
-            # Extract the actual value from pytest.param
-            value = text.values[0] if hasattr(text, "values") else text
-            assert (
-                has_instruction_prompt_start(value) is False
-            ), f"Expected False for edge case: {value!r} (type: {type(value).__name__})"
+        assert (
+            has_instruction_prompt_start(text) is False
+        ), f"Expected False for edge case: {text!r} (type: {type(text).__name__})"
 
 
 # ============================================================================
@@ -295,32 +285,26 @@ class TestHasInstructionPromptStart:
 class TestHasInstructionPromptNotAtStart:
     """Tests for has_instruction_prompt_not_at_start function."""
 
-    def test_true_cases(self):
+    @pytest.mark.parametrize("text", INSTRUCTION_NOT_AT_START_TRUE_CASES)
+    def test_true_cases(self, text):
         """Returns True when instruction prompt appears later."""
-        for text in INSTRUCTION_NOT_AT_START_TRUE_CASES:
-            # Extract the actual value from pytest.param
-            value = text.values[0] if hasattr(text, "values") else text
-            assert (
-                has_instruction_prompt_not_at_start(value) is True
-            ), f"Expected True for instruction not at start: {value!r}"
+        assert (
+            has_instruction_prompt_not_at_start(text) is True
+        ), f"Expected True for instruction not at start: {text!r}"
 
-    def test_false_for_start(self):
+    @pytest.mark.parametrize("text", INSTRUCTION_START_TRUE_CASES)
+    def test_false_for_start(self, text):
         """Returns False when instruction is at the start."""
-        for text in INSTRUCTION_START_TRUE_CASES:
-            # Extract the actual value from pytest.param
-            value = text.values[0] if hasattr(text, "values") else text
-            assert (
-                has_instruction_prompt_not_at_start(value) is False
-            ), f"Expected False for instruction at start: {value!r}"
+        assert (
+            has_instruction_prompt_not_at_start(text) is False
+        ), f"Expected False for instruction at start: {text!r}"
 
-    def test_false_absent_instruction(self):
+    @pytest.mark.parametrize("text", ABSENT_INSTRUCTION_CASES)
+    def test_false_absent_instruction(self, text):
         """Returns False when no instruction prompt is present."""
-        for text in ABSENT_INSTRUCTION_CASES:
-            # Extract the actual value from pytest.param
-            value = text.values[0] if hasattr(text, "values") else text
-            assert (
-                has_instruction_prompt_not_at_start(value) is False
-            ), f"Expected False for non-instruction text: {value!r}"
+        assert (
+            has_instruction_prompt_not_at_start(text) is False
+        ), f"Expected False for non-instruction text: {text!r}"
 
     def test_case_insensitive(self):
         """Detects instruction prompts regardless of casing."""
@@ -343,11 +327,9 @@ class TestHasInstructionPromptNotAtStart:
     @pytest.mark.parametrize("text", WHITESPACE_VARIATIONS_NOT_START)
     def test_whitespace_variations(self, text):
         """Handles various whitespace patterns."""
-        # Extract the actual value from pytest.param
-        value = text.values[0] if hasattr(text, "values") else text
         assert (
-            has_instruction_prompt_not_at_start(value) is True
-        ), f"Should handle whitespace variations: {value!r}"
+            has_instruction_prompt_not_at_start(text) is True
+        ), f"Should handle whitespace variations: {text!r}"
 
     def test_punctuation(self):
         """Handles punctuation correctly."""
@@ -386,11 +368,9 @@ class TestHasInstructionPromptNotAtStart:
             has_instruction_prompt_not_at_start(value) is True
         ), f"Should handle contractions: {value!r}"
 
-    def test_edge_cases(self):
+    @pytest.mark.parametrize("text", EDGE_CASES)
+    def test_edge_cases(self, text):
         """Returns False for edge cases."""
-        for text in EDGE_CASES:
-            # Extract the actual value from pytest.param
-            value = text.values[0] if hasattr(text, "values") else text
-            assert (
-                has_instruction_prompt_not_at_start(value) is False
-            ), f"Expected False for edge case: {value!r} (type: {type(value).__name__})"
+        assert (
+            has_instruction_prompt_not_at_start(text) is False
+        ), f"Expected False for edge case: {text!r} (type: {type(text).__name__})"
