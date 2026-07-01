@@ -47,6 +47,7 @@ scikit-learn = "^1.8.0"
 scipy = "^1.16.3"
 sic-classification-utils = { git = "https://github.com/ONSdigital/sic-classification-utils.git", tag = "v0.1.15" }
 soc-classification-utils = { git = "https://github.com/ONSdigital/soc-classification-utils.git", tag = "v0.1.6" }
+survey-assist-embed-core = { git = "https://github.com/ONSdigital/survey-assist-embed-core.git", rev = "a88844c" }
 
 [tool.isort]
 profile = "black"

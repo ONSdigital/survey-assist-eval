@@ -15,7 +15,7 @@ from re import sub as regex_sub
 
 import numpy as np
 import pandas as pd
-from industrial_classification_utils.embed.embedding import EmbeddingHandler
+from survey_assist_embed_core import EmbeddingHandler, build_embedding_index
 from tqdm import tqdm
 
 from survey_assist_eval.pipeline.shared_components import (
@@ -120,11 +120,15 @@ def make_merged_industry_desc(row: pd.Series) -> str:
 
 def _make_embedding_handler(in_metadata: dict) -> EmbeddingHandler:
     """Create an :class:`EmbeddingHandler` using settings from metadata where possible."""
-    new_embedding_handler = EmbeddingHandler(
+    build_embedding_index(
         embedding_model_name=in_metadata["embedding_model_name"],
+        output_dir=in_metadata["embedding_db_dir"],
+        index_source_file=in_metadata["soc_embed_source_file"],
+    )
+
+    new_embedding_handler = EmbeddingHandler(
         db_dir=in_metadata["embedding_db_dir"],
         k_matches=in_metadata["embedding_k_matches"],
-        index_source_file=in_metadata["soc_embed_source_file"],
     )
 
     return new_embedding_handler

@@ -21,7 +21,7 @@ def _get_default_metadata() -> dict:
         and lookup file paths.
     """
     return {
-        "embedding_model_name": "all-MiniLM-L6-v2",  # text-embedding-004
+        "embedding_model_name": "sentence-transformers/all-MiniLM-L6-v2",  # text-embedding-004
         "embedding_db_dir": "data/vector_store",
         "embedding_k_matches": 20,
         "llm_model_name": "gemini-2.5-flash",
