@@ -73,33 +73,56 @@ def test_has_question_mark_question_mark_with_spaces():
 
 
 @pytest.mark.parametrize(
-    "text, expected",
+    "text",
     [
-        pytest.param("Is this a question?", True, id="question_mark"),
-        pytest.param("What is your name", True, id="wh_word_what"),
-        pytest.param("How does this work", True, id="wh_word_how"),
-        pytest.param("Tell me how this works", True, id="instruction_tell_me"),
-        pytest.param("Please explain this", True, id="instruction_please_explain"),
-        pytest.param("Do you like this", True, id="auxiliary_do"),
-        pytest.param("Can we proceed", True, id="modal_can"),
-        pytest.param("What is your name?", True, id="wh_word_with_qmark"),
-        pytest.param("Can you explain this?", True, id="modal_with_qmark"),
-        pytest.param(
-            "Please tell me what this means?",
-            True,
-            id="instruction_plus_qmark",
-        ),
-        pytest.param("How can you fix this", True, id="wh_word_modal_combo"),
-        pytest.param("This is a statement.", False, id="statement_sentence"),
-        pytest.param("I like apples", False, id="simple_statement"),
-        pytest.param("Running quickly today", False, id="fragment_not_question"),
+        pytest.param("Is this a question?", id="question_mark"),
+        pytest.param("What is your name", id="wh_word_what"),
+        pytest.param("How does this work", id="wh_word_how"),
+        pytest.param("Tell me how this works", id="instruction_tell_me"),
+        pytest.param("Please explain this", id="instruction_please_explain"),
+        pytest.param("Do you like this", id="auxiliary_do"),
+        pytest.param("Can we proceed", id="modal_can"),
     ],
 )
-def test_is_question_text_cases(text, expected):
-    """Returns expected classification for a range of question and non-question text examples."""
+def test_is_question_true_single_signal(text):
+    """Returns True when exactly one question signal is present."""
     assert (
-        is_question(text) is expected
-    ), f"Expected is_question({text!r}) to be {expected}, but got different result"
+        is_question(text) is True
+    ), f"Expected True for single question signal in: {text!r}"
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        pytest.param("What is your name?", id="wh_word_plus_qmark"),
+        pytest.param("Can you explain this?", id="modal_plus_qmark"),
+        pytest.param(
+            "Please tell me what this means?",
+            id="instruction_wh_word_qmark",
+        ),
+        pytest.param("How can you fix this", id="wh_word_plus_modal"),
+    ],
+)
+def test_is_question_true_multiple_signals(text):
+    """Returns True when multiple question signals are present."""
+    assert (
+        is_question(text) is True
+    ), f"Expected True for multiple question signals in: {text!r}"
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        pytest.param("This is a statement.", id="statement_sentence"),
+        pytest.param("I like apples", id="simple_statement"),
+        pytest.param("Running quickly today", id="fragment_not_question"),
+    ],
+)
+def test_is_question_false_no_signals(text):
+    """Returns False when no question signals are present."""
+    assert (
+        is_question(text) is False
+    ), f"Expected False when no question signals are present: {text!r}"
 
 
 @pytest.mark.parametrize(
