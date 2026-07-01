@@ -7,6 +7,8 @@
 # Allow todo comments without triggering errors (keep useful reminders)
 # pylint: disable=fixme
 
+# TODO: move main into ApiEvalutor class method when it's fully built.
+
 
 import argparse
 import datetime
@@ -20,9 +22,11 @@ from survey_assist_eval.pipeline.api.core import (
     ApiEvaluator,
     ApiEvaluatorConfig,
 )
+from survey_assist_eval.pipeline.api.data import get_and_prepare_test_data
 
 load_dotenv()
 GCP_PROJECT_ID = os.getenv("PROJECT_ID")
+GCP_TEST_DATA_BUCKET_PATH = os.getenv("EVALUATION_BUCKET_NAME")
 API_GW_URL = f"https://{os.getenv('API_GATEWAY')}"
 API_GW_SA_EMAIL = os.getenv("SA_EMAIL")
 FIRESTORE_DB_ID = os.getenv("API_EVAL_FIRESTORE_DB_ID")
@@ -83,6 +87,7 @@ def main(classify_type: Literal["sic", "soc"]) -> None:
     )
     api_evaluator_cfg = ApiEvaluatorConfig(
         gcp_project_id=GCP_PROJECT_ID,
+        gcp_test_data_bucket_path=GCP_TEST_DATA_BUCKET_PATH,
         api_gw_url=API_GW_URL,
         api_gw_sa_email=API_GW_SA_EMAIL,
         classify_type=classify_type,
@@ -100,6 +105,11 @@ def main(classify_type: Literal["sic", "soc"]) -> None:
 
     # TODO: implement data collection and preparation steps once implemented
     logger.info("Collecting and preparing input data...")
+    # temp usage of internal parameter during developmend only, see top TODO
+    df = get_and_prepare_test_data(
+        api_evaluator_cfg._test_data_file_path,  # pylint: disable=w0212
+    )
+    logger.info(f"Input data collected and prepared: {len(df)} records.")
 
     # TODO: add post-processing of lookup responses before classify
     logger.info("Performing lookup calls to API...")

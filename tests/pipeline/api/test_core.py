@@ -22,6 +22,7 @@ def default_api_eval_config() -> dict:
     """Fixture for default ApiEvaluatorConfig values."""
     return {
         "gcp_project_id": "test_project",
+        "gcp_test_data_bucket_path": "gs://test-bucket/path",
         "api_gw_url": "https://api-gw-url",
         "api_gw_sa_email": "api-gw-sa@email.com",
         "firestore_db_id": "test_db",
@@ -34,6 +35,46 @@ def default_api_eval_config() -> dict:
     }
 
 
+@contextmanager
+def api_eval_config_mocks():
+    """Handler for mocking ApiEvaluatorConfig initialisation."""
+    with ExitStack() as stack:
+        stack.enter_context(
+            patch.object(
+                core_module.ApiEvaluatorConfig,
+                "_get_test_data_file_path",
+                return_value="gs://test-bucket/path/test_data.parquet",
+            )
+        )
+        yield
+
+
+@contextmanager
+def api_eval_config_gcs_exists_mocks(exists: bool = True):
+    """Handler for mocking GCS file existence check in ApiEvaluatorConfig."""
+    with ExitStack() as stack:
+        mock_storage_client = MagicMock()
+        mock_bucket = MagicMock()
+        mock_blob = MagicMock()
+
+        mock_storage_client.bucket.return_value = mock_bucket
+        mock_bucket.blob.return_value = mock_blob
+        mock_blob.exists.return_value = exists
+
+        mock_storage = stack.enter_context(
+            patch(
+                "survey_assist_eval.pipeline.api.core.storage.Client",
+                return_value=mock_storage_client,
+            )
+        )
+        yield {
+            "storage_client": mock_storage_client,
+            "bucket": mock_bucket,
+            "blob": mock_blob,
+            "mock_storage": mock_storage,
+        }
+
+
 @pytest.fixture
 def api_eval_config(
     request: pytest.FixtureRequest,
@@ -43,7 +84,9 @@ def api_eval_config(
     classify_type = request.param
     config = default_api_eval_config.copy()
     config["classify_type"] = classify_type
-    return core_module.ApiEvaluatorConfig(**config)
+
+    with api_eval_config_mocks():
+        return core_module.ApiEvaluatorConfig(**config)
 
 
 @pytest.fixture
@@ -138,7 +181,9 @@ def api_eval_get_api_config_mocks(
 
 
 @contextmanager
-def api_eval_call_api_lookup_mocks(lookup_not_found: bool = False):
+def api_eval_call_api_lookup_mocks(
+    lookup_not_found: bool = False, lookup_api_error: bool = False
+):
     """Handler for mocking external calls in call_api_endpoint for 'lookup'."""
     with ExitStack() as stack:
         mock_response = MagicMock()
@@ -146,6 +191,11 @@ def api_eval_call_api_lookup_mocks(lookup_not_found: bool = False):
             mock_response.status = 404
             mock_response.json = AsyncMock(
                 return_value={"error": "not found"}
+            )
+        elif lookup_api_error:
+            mock_response.status = 500
+            mock_response.json = AsyncMock(
+                return_value={"error": "internal server error"}
             )
         else:
             mock_response.status = 200
@@ -248,7 +298,8 @@ class TestApiEvaluatorConfig:
         """Integration test for ApiEvaluatorConfig."""
         config = default_api_eval_config.copy()
         config["classify_type"] = classify_type
-        aeconfig = core_module.ApiEvaluatorConfig(**config)
+        with api_eval_config_mocks():
+            aeconfig = core_module.ApiEvaluatorConfig(**config)
 
         # assert all values are correctly assigned in the dataclass
         for key, value in config.items():
@@ -275,7 +326,7 @@ class TestApiEvaluatorConfig:
         config = default_api_eval_config.copy()
         config["classify_type"] = "invalid_type"
 
-        with pytest.raises(
+        with api_eval_config_mocks(), pytest.raises(
             ValueError,
             match="Invalid classify type: invalid_type. Valid classify types",
         ):
@@ -293,7 +344,7 @@ class TestApiEvaluatorConfig:
         full_semaphore_limit = f"{semaphore_limit}_semaphore_limit"
         config[full_semaphore_limit] = limit
 
-        with pytest.raises(
+        with api_eval_config_mocks(), pytest.raises(
             ValueError,
             match=f"{full_semaphore_limit} must be at least 1. Got {limit}",
         ):
@@ -307,7 +358,7 @@ class TestApiEvaluatorConfig:
         config["classify_type"] = "sic"  # valid classify type for this test
         config["log_level"] = "INVALID"
 
-        with pytest.raises(
+        with api_eval_config_mocks(), pytest.raises(
             ValueError,
             match="Invalid log level: INVALID. Valid log levels are",
         ):
@@ -330,6 +381,40 @@ class TestApiEvaluatorConfig:
                 f"Timestamp part of job_id '{timestamp}' is not in the "
                 "expected format YYYYMMDDHHMMSS."
             )
+
+    # ignoring pylint to unit test the test file path explicity
+    # pylint: disable=W0212
+    @pytest.mark.parametrize("classify_type", ["sic", "soc"])
+    def test_api_evaluator_config__get_test_data_file_path(
+        self, classify_type: str, default_api_eval_config: dict
+    ) -> None:
+        """Ensure correct test data file path is returned for classify type."""
+        config = default_api_eval_config.copy()
+        config["classify_type"] = classify_type
+        with api_eval_config_gcs_exists_mocks() as gcs_mocks:
+            ae_config = core_module.ApiEvaluatorConfig(**config)
+        test_data_file = ae_config._test_data_file_path.split(
+            "/", maxsplit=1
+        )[-1]
+        assert classify_type in test_data_file, (
+            "Expected test data file path to contain classify_type "
+            f"'{classify_type}' but got '{test_data_file}'."
+        )
+        gcs_mocks["mock_storage"].assert_called_once()
+
+    @pytest.mark.parametrize("classify_type", ["sic", "soc"])
+    def test_api_evaluator_config__get_test_data_file_path_missing_file(
+        self, classify_type: str, default_api_eval_config: dict
+    ) -> None:
+        """Ensure FileNotFoundError is raised when test data file missing."""
+        config = default_api_eval_config.copy()
+        config["classify_type"] = classify_type
+        with (
+            api_eval_config_gcs_exists_mocks(exists=False) as gcs_mocks,
+            pytest.raises(FileNotFoundError, match="Test data file not found"),
+        ):
+            core_module.ApiEvaluatorConfig(**config)
+        gcs_mocks["mock_storage"].assert_called_once()
 
 
 class TestApiEvaluator:
@@ -532,6 +617,39 @@ class TestApiEvaluator:
         )
 
     @pytest.mark.parametrize("api_eval_config", ["sic", "soc"], indirect=True)
+    def test_api_evaluator_call_api_endpoint_lookup_api_error(
+        self,
+        api_eval_config: core_module.ApiEvaluatorConfig,
+        api_evaluator_test_data: list[dict[str, str]]
+    ) -> None:
+        """Test call_api_endpoint raises HTTPError for lookup API error.
+
+        This simulates a scenario where the lookup API returns a non-2XX
+        response and shows that the ApiEvaluator class correctly returns a
+        response without raising an exception.
+        """
+        with (
+            api_eval_init_mocks() as init_mock,
+            api_eval_call_api_lookup_mocks(lookup_api_error=True),
+        ):
+            ae = core_module.ApiEvaluator(api_eval_config)
+            response = ae.call_api_endpoint("lookup", api_evaluator_test_data)
+
+        num_jwt_calls = init_mock["get_jwt"].call_count
+        expected_jwt_calls = 1 + len(api_evaluator_test_data)
+        assert num_jwt_calls == expected_jwt_calls, (
+            f"Expected jwt check/refresh to be called {expected_jwt_calls}; "
+            f"num test data inputs + 1 for the init. Got {num_jwt_calls}."
+        )
+
+        # ensure correct and expected reponse are returned
+        num_test_data_inputs = len(api_evaluator_test_data)
+        assert response == [{}] * num_test_data_inputs, (
+            "Expected call_api_endpoint to return an empty dict for each test "
+            "data input in the response when lookup API error occurs."
+        )
+
+    @pytest.mark.parametrize("api_eval_config", ["sic", "soc"], indirect=True)
     def test_api_evaluator_call_api_endpoint_lookup_missing_params(
         self,
         api_eval_config: core_module.ApiEvaluatorConfig,
@@ -631,9 +749,9 @@ class TestApiEvaluator:
 
         # ensure correct and expected reponse are returned
         num_test_data_inputs = len(api_evaluator_test_data)
-        assert response == [None] * num_test_data_inputs, (
-            "Expected call_api_endpoint to return None for each test data "
-            "input in the response when lookup match is not found."
+        assert response == [{}] * num_test_data_inputs, (
+            "Expected call_api_endpoint to return an empty dict for each test "
+            "data input in the response when lookup match is not found."
         )
 
     @pytest.mark.parametrize("api_eval_config", ["sic", "soc"], indirect=True)
