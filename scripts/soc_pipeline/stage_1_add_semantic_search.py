@@ -95,8 +95,10 @@ def expand_level_of_education(row: pd.Series) -> str:
         description (str): The expanded descriptions.
 
     """
-    education_coded = str(row[EDUCATION_COL])
-    return LEVEL_OF_EDUCATION[education_coded]
+    education_coded = str(row["level_of_education"])
+    if education_coded in LEVEL_OF_EDUCATION:
+        return LEVEL_OF_EDUCATION[education_coded]
+    return education_coded
 
 
 def _make_embedding_handler(in_metadata: dict) -> EmbeddingHandler:
