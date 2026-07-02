@@ -44,6 +44,40 @@ OUTPUT_COL_FINAL = "second_semantic_search_results"
 tqdm.pandas()
 
 
+def _prep_columns(df: pd.DataFrame, second_run_flag: bool) -> pd.DataFrame:
+    """Prepares the DataFrame for semantic search by ensuring that the necessary
+    output columns exist. If the columns do not exist, they are created with default values.
+
+    Args:
+        df (pd.DataFrame): The input DataFrame containing survey responses.
+        second_run_flag (bool): Flag indicating whether this is the second run (final codes)
+            or not, which determines which column to use for the search query.
+
+    Returns:
+        pd.DataFrame: The modified DataFrame with the necessary output columns.
+    """
+    output_col = OUTPUT_COL_FINAL if second_run_flag else OUTPUT_COL_INITIAL
+    if output_col in df.columns:
+        return df  # Output column already exists, no need to modify
+
+    df[output_col] = pd.Series([[] for _ in range(len(df))], index=df.index)
+
+    # Clean the Survey Response columns:
+    if second_run_flag:
+        df[FOLLOWUP_ANSWER_COL] = df[FOLLOWUP_ANSWER_COL].apply(clean_text)
+        msk = df["unambiguously_codable"]
+        df.loc[msk, OUTPUT_COL_FINAL] = df.loc[msk, OUTPUT_COL_INITIAL]
+    else:
+        df[JOB_DESCRIPTION_COL] = df[JOB_DESCRIPTION_COL].apply(clean_text)
+        df[JOB_TITLE_COL] = df[JOB_TITLE_COL].apply(clean_text)
+        df[INDUSTRY_DESCR_COL] = df[INDUSTRY_DESCR_COL].apply(clean_text)
+        df[SELF_EMPLOYED_DESC_COL] = df[SELF_EMPLOYED_DESC_COL].apply(clean_text)
+        df[MERGED_INDUSTRY_DESC_COL] = df.apply(make_merged_industry_desc, axis=1)
+        df[MERGED_INDUSTRY_DESC_COL] = df[MERGED_INDUSTRY_DESC_COL].apply(clean_text)
+
+    return df
+
+
 def clean_text(text: str) -> str:
     """Cleans a text string by removing newlines, converting arbitrary
     whitespace to a single space, removing -9's and standardizing case.
@@ -130,32 +164,21 @@ if __name__ == "__main__":
     args = parse_args("STG1")
 
     df, metadata, start_batch_id = set_up_initial_state(args)
+    df = _prep_columns(df, args.second_run)
+    OUTPUT_COL = OUTPUT_COL_FINAL if args.second_run else OUTPUT_COL_INITIAL
+
+    df_to_code = df if not args.second_run else df[~df["unambiguously_codable"]]
 
     embedding_handler = _make_embedding_handler(metadata)
-
-    # Clean the Survey Response columns:
-    df[JOB_DESCRIPTION_COL] = df[JOB_DESCRIPTION_COL].apply(clean_text)
-    df[JOB_TITLE_COL] = df[JOB_TITLE_COL].apply(clean_text)
-    df[INDUSTRY_DESCR_COL] = df[INDUSTRY_DESCR_COL].apply(clean_text)
-    df[SELF_EMPLOYED_DESC_COL] = df[SELF_EMPLOYED_DESC_COL].apply(clean_text)
-    df[MERGED_INDUSTRY_DESC_COL] = df.apply(make_merged_industry_desc, axis=1)
-    df[MERGED_INDUSTRY_DESC_COL] = df[MERGED_INDUSTRY_DESC_COL].apply(clean_text)
-    if args.second_run:
-        df[FOLLOWUP_ANSWER_COL] = df[FOLLOWUP_ANSWER_COL].apply(clean_text)
-    print("Input loaded")
-
-    OUTPUT_COL = OUTPUT_COL_FINAL if args.second_run else OUTPUT_COL_INITIAL
-    if OUTPUT_COL not in df:
-        df[OUTPUT_COL] = np.empty((len(df), 0)).tolist()
 
     print("running semantic search...")
     for batch_id, batch in tqdm(
         enumerate(
             np.split(
-                df,
+                df_to_code,
                 np.arange(
                     start_batch_id * metadata["batch_size"],
-                    len(df),
+                    len(df_to_code),
                     metadata["batch_size"],
                 ),
             )
