@@ -39,6 +39,9 @@ if [ -z "$output_folder" ] || [ -z "$input_file" ]; then
     exit 2
 fi
 
+# supress tqdm bar
+export TQDM_DISABLE=1
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 echo "RUNNING: STAGE 1 (semantic search)"
