@@ -31,7 +31,8 @@ class OpenQuestionTextStatistics(BaseModel):
             f" Mean Sentence Count: {self.mean_sentence_count:.2f}",
             f" Mean Word Count per Sentence: {self.mean_word_count_per_sentence:.2f}",
             f" Percent Over Word Threshold Count: {self.pct_over_word_count_threshold:.2f}%",
-            f" Percent Over Setence Threshold Count: {self.pct_over_sentence_count_threshold:.2f}%",
+            " Percent Over sentence Threshold Count: "
+            f"{self.pct_over_sentence_count_threshold:.2f}%",
             f" Percent with Long Sentences: {
                 self.pct_with_long_sentence_over_word_count_threshold:.2f}%",
             f" Percent with Blank or Too Short Sentences: {self.pct_blank_or_too_short:.2f}%",
@@ -78,7 +79,7 @@ def compute_text_statistics(  # noqa: PLR0913 pylint: disable = R0913, R0917
     return OpenQuestionTextStatistics(**metrics.to_dict())
 
 
-def word_counts_per_setence(text: str) -> list[int]:
+def word_counts_per_sentence(text: str) -> list[int]:
     """Return the number of words in each sentence of the input text.
 
     Sentences are split on ., !, and ?.
@@ -117,7 +118,7 @@ def get_text_stats(text: str) -> dict[str, int | float | list[int]]:
         "sentence_count": textstat.sentence_count(text),
         "character_count": textstat.char_count(text),
         "letter_count": textstat.letter_count(text),
-        "words_per_sentence": word_counts_per_setence(text),
+        "words_per_sentence": word_counts_per_sentence(text),
         "mean_words_per_sentence": textstat.words_per_sentence(text),
     }
 

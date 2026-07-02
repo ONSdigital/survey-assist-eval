@@ -5,6 +5,7 @@ from textstat import textstat
 from survey_assist_eval.evaluation.open_questions.simple_language_functions import (
     extract_acronyms,
     get_avg_syllables_per_word,
+    get_syllable_count_per_word,
 )
 
 # ============================================================================
@@ -105,6 +106,59 @@ def test_extract_acronyms_long_token_not_split():
         "A&B&C&D&E",
         "A.B.C.D.E",
     }, "Expected long uppercase tokens to remain intact rather than be split."
+
+
+# ============================================================================
+# Test get_syllable_count_per_word function
+# ============================================================================
+
+
+def test_get_syllable_count_per_word_single_word():
+    """Verify syllable count for a single word."""
+    text = "hello"
+    result = get_syllable_count_per_word(text)
+
+    assert result == [2], f"Expected [2] for {text!r}, got {result}"
+
+
+def test_get_syllable_count_per_word_multiple_words():
+    """Validate syllable counts across multiple words."""
+    text = "hello world"
+    result = get_syllable_count_per_word(text)
+
+    assert result == [2, 1], f"Expected [2, 1] for {text!r}, got {result}"
+
+
+def test_get_syllable_count_per_word_multi_syllable_words():
+    """Ensure words with multiple syllables are counted correctly."""
+    text = "question analysis"
+    result = get_syllable_count_per_word(text)
+
+    assert result == [2, 4], f"Expected [2, 4] for {text!r}, got {result}"
+
+
+def test_get_syllable_count_per_word_ignores_extra_whitespace():
+    """Confirm that extra whitespace between words is handled correctly."""
+    text = "hello   world"
+    result = get_syllable_count_per_word(text)
+
+    assert result == [2, 1], f"Expected [2, 1] for {text!r}, got {result}"
+
+
+def test_get_syllable_count_per_word_punctuation():
+    """Verify syllable counts are returned for words with punctuation."""
+    text = "Hello, world!"
+    result = get_syllable_count_per_word(text)
+
+    assert result == [2, 1], f"Expected [2, 1] for {text!r}, got {result}"
+
+
+def test_get_syllable_count_per_word_empty_string():
+    """Check that an empty string returns an empty list."""
+    text = ""
+    result = get_syllable_count_per_word(text)
+
+    assert result == [], f"Expected [] for empty string, got {result}"
 
 
 # ============================================================================

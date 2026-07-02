@@ -12,7 +12,7 @@ from survey_assist_eval.evaluation.open_questions.text_statistics_functions impo
     compute_text_statistics,
     get_text_stats,
     summarise_text_stat_columns,
-    word_counts_per_setence,
+    word_counts_per_sentence,
 )
 
 # ============================================================================
@@ -35,54 +35,54 @@ def sample_text_statistics_df():
 
 
 # ============================================================================
-# Test word_counts_per_setence function
+# Test word_counts_per_sentence function
 # ============================================================================
 
 
-def test_word_counts_per_setence_single_sentence():
+def test_word_counts_per_sentence_single_sentence():
     """Verify word counts for a single sentence."""
-    text = "Hello world. How are you?"
-    result = word_counts_per_setence(text)
+    text = "Hello world, how are you?"
+    result = word_counts_per_sentence(text)
 
-    assert result == [2, 3]
+    assert result == [5]
 
 
-def test_word_counts_per_setence_multiple_sentences():
+def test_word_counts_per_sentence_multiple_sentences():
     """Validate word counts across multiple sentences separated by periods."""
     text = "Hello world. This is a test."
-    result = word_counts_per_setence(text)
+    result = word_counts_per_sentence(text)
 
     assert result == [2, 4]
 
 
-def test_word_counts_per_setence_mixed_delimiters():
+def test_word_counts_per_sentence_mixed_delimiters():
     """Ensure sentences are split on period, exclamation mark, and question mark."""
     text = "Hello! How are you? I am fine."
-    result = word_counts_per_setence(text)
+    result = word_counts_per_sentence(text)
 
     assert result == [1, 3, 3]
 
 
-def test_word_counts_per_setence_ignores_whitespace():
+def test_word_counts_per_sentence_ignores_whitespace():
     """Confirm that leading and trailing whitespace is handled correctly."""
     text = "One.  Two   . Three."
-    result = word_counts_per_setence(text)
+    result = word_counts_per_sentence(text)
 
     assert result == [1, 1, 1]
 
 
-def test_word_counts_per_setence_empty_sentences_excluded():
+def test_word_counts_per_sentence_empty_sentences_excluded():
     """Verify that empty sentences are not included in the result."""
     text = "Hello...World."
-    result = word_counts_per_setence(text)
+    result = word_counts_per_sentence(text)
 
     assert result == [1, 1]
 
 
-def test_word_counts_per_setence_empty_string():
+def test_word_counts_per_sentence_empty_string():
     """Check that an empty string returns an empty list."""
     text = ""
-    result = word_counts_per_setence(text)
+    result = word_counts_per_sentence(text)
 
     assert result == []
 
