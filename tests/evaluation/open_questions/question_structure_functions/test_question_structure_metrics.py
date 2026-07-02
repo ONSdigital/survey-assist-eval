@@ -278,6 +278,34 @@ def test_contains_multiple_asks_true_multiple_signals(text):
     ), f"Expected True for multiple compound-question signals in: {text!r}"
 
 
+@pytest.mark.parametrize(
+    "text",
+    [
+        pytest.param(
+            "Can you explain what happened",
+            id="auxiliary_start_with_embedded_what",
+        ),
+        pytest.param(
+            "Do you know where the information came from",
+            id="auxiliary_start_with_embedded_where",
+        ),
+        pytest.param(
+            "Should we discuss why this occurred",
+            id="auxiliary_start_with_embedded_why",
+        ),
+    ],
+)
+def test_contains_multiple_asks_true_interrogative_start_and_wh_after_first_word(
+    text,
+):
+    """Returns True when text starts with a question form and contains a
+    WH-interrogative after the first word.
+    """
+    assert (
+        contains_multiple_asks(text) is True
+    ), f"Expected True for interrogative start with WH-interrogative after first word: {text!r}"
+
+
 def test_contains_multiple_asks_case_insensitive():
     """Returns True regardless of casing."""
     text = "WHAT IS YOUR ROLE AND HOW LONG HAVE YOU WORKED HERE"

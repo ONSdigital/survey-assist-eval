@@ -9,7 +9,7 @@ from pydantic import BaseModel
 class QuestionStructureMetrics(BaseModel):
     """Container for all question structure evaluation metrics."""
 
-    n_follow_up_questions: int
+    n_count: int
     pct_is_question: float
     pct_is_single_question: float
     pct_with_instruction_prompt_start: float
@@ -22,7 +22,7 @@ class QuestionStructureMetrics(BaseModel):
         """Pretty print the question structure evaluation metrics."""
         lines = [
             "\nQuestion structure metrics:",
-            f" Number of follow-up questions: {self.n_follow_up_questions:.0f}",
+            f" Number of follow-up questions: {self.n_count:.0f}",
             f" Percentage is_question: {self.pct_is_question:.2f}%",
             " Percentage is_single_question:" f" {self.pct_is_single_question:.2f}%",
             " Percentage with instruction_prompt_start:"
@@ -266,8 +266,12 @@ def contains_multiple_asks(text: str) -> bool:
     if count_instruction_prompts(text) > 1:
         return True
 
-    # Interrogative opening followed by multiple WH clauses
-    if has_interrogative_start(text) and count_wh_interrogatives(text) > 1:
+    # Interrogative opening followed by at least one WH interrogative
+    text_without_first_word = " ".join(text.split()[1:])
+    if (
+        has_interrogative_start(text)
+        and count_wh_interrogatives(text_without_first_word) > 0
+    ):
         return True
 
     # Conjunctions linking clauses
@@ -388,7 +392,7 @@ def summarise_question_structure_columns(
 
     summary = {
         # Count
-        "n_follow_up_questions": len(df),
+        "n_count": len(df),
         # Percentages
         "pct_is_question": is_question_col.mean() * 100,
         "pct_is_single_question": is_single_question_col.mean() * 100,
