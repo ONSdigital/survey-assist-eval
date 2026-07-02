@@ -49,33 +49,40 @@ Where:
 
 ## SOC pipeline
 
-The SOC pipeline currently ships as a one-prompt classification flow with follow-up enrichment and a second semantic-search pass. Unlike the SIC pipeline, the full two-prompt / final-classification path is not currently implemented in `scripts/soc_pipeline`.
+The SOC pipeline supports both one-prompt (`-p 1`) and two-prompt (`-p 2`) runner modes.
 
-The currently available stage order is:
-Stage 1 -> Stage 2 -> Stage 4 -> Stage 5 -> Stage 6 (rerun stage 1 with `-s`).
+Current runner behavior:
+- `-p 1` (one-prompt): Stage 1 -> Stage 2
+- `-p 2` (two-prompt): Stage 1 -> Stage 2 -> Stage 3 -> Stage 4 -> Stage 5 -> Stage 6 (rerun stage 1 with `-s`) -> Stage 7 (rerun stage 2 with `-s`)
 
 | Stage | Available script | Pipeline process | Required columns | Columns added |
 |--|--|--|--|--|
 | 1 | `stage_1_add_semantic_search.py` | Create `merged_industry_desc` and perform SOC semantic search | `sic2007_employee`, `soc2020_job_title`, `soc2020_job_description`, `sic2007_self_employed` | `merged_industry_desc`, `semantic_search_results` |
-| 2 | `stage_2_one_prompt_assign_sic_code.py` | Run one-prompt SOC classification, ambiguity assessment, and follow-up question generation | `soc2020_job_title`, `soc2020_job_description`, `merged_industry_desc`, `semantic_search_results` | `unambiguously_codable`, `initial_code`, `alt_soc_candidates`, `followup_question` |
+| 2 (`-p 1`) | `stage_2_one_prompt_assign_sic_code.py` | One-prompt SOC classification (top-1 response mode) | `soc2020_job_title`, `soc2020_job_description`, `merged_industry_desc`, `semantic_search_results` | `initial_code`, `code_title`, `likelihood`, `reasoning` |
+| 2 (`-p 2`) | `stage_2_add_unambiguously_codable_status.py` | Two-prompt initial classification and codability assessment | `soc2020_job_title`, `soc2020_job_description`, `merged_industry_desc`, `semantic_search_results` | `unambiguously_codable`, `initial_code`, `alt_soc_candidates` |
+| 3 | `stage_3_add_open_questions.py` | Generate a follow-up question for the two-prompt path | `unambiguously_codable`, `merged_industry_desc`, `soc2020_job_title`, `soc2020_job_description`, `alt_soc_candidates` | `followup_question` |
 | 4 | `stage_4_add_synthetic_responses.py` | Generate a follow-up answer | `unambiguously_codable`, `merged_industry_desc`, `soc2020_job_title`, `soc2020_job_description`, `followup_question` | `followup_answer` |
 | 5 | `stage_5_modify_job_description.py` | Extend the job description using follow-up question and answer | `soc2020_job_description`, `followup_question`, `followup_answer` | `extended_job_desccription` |
 | 6 | `stage_1_add_semantic_search.py -s` | Run a second semantic-search pass using the follow-up answer in the search query | `soc2020_job_title`, `soc2020_job_description`, `merged_industry_desc`, `followup_answer` | `second_semantic_search_results` |
+| 7 | `stage_2_add_unambiguously_codable_status.py -s` | Final classification and ambiguity assessment for the two-prompt path | `soc2020_job_title`, `soc2020_job_description`, `extended_job_desccription`, `second_semantic_search_results` | `unambiguously_codable_final`, `final_code`, `alt_soc_candidates_final` |
 
 Notes:
-- The stage-2 SOC script keeps a legacy filename, `stage_2_one_prompt_assign_sic_code.py`, but it calls the SOC classifier and writes `alt_soc_candidates`.
-- The SOC `run_full_pipeline.sh` currently executes a complete runnable path only for `-p 1`. The `-p 2` branch still contains commented-out placeholder stages and should not be treated as a complete two-prompt pipeline.
+- The stage-2 one-prompt SOC script keeps a legacy filename, `stage_2_one_prompt_assign_sic_code.py`, but it calls the SOC classifier.
+- The stage-2 two-prompt SOC script is `stage_2_add_unambiguously_codable_status.py`.
+- `-p 1` intentionally stops after Stage 2 to produce top-1 one-prompt outputs (`initial_code`, `code_title`, `likelihood`, `reasoning`).
+- `-p 2` runs the full multi-stage/two-prompt path through Stage 7.
 
 ### Run the full SOC pipeline
 
 Use the runner in `scripts/soc_pipeline`:
 
 ```bash
-./scripts/soc_pipeline/run_full_pipeline.sh -p 1 -i </path/to/input.{csv|parquet}> -o </path/to/output/folder> [-m </path/to/metadata.json>] [-b 20]
+./scripts/soc_pipeline/run_full_pipeline.sh [-p <1|2>] -i </path/to/input.{csv|parquet}> -o </path/to/output/folder> [-m </path/to/metadata.json>] [-b 20]
 ```
 
 Where:
-- `-p 1`: Required for the currently complete SOC runner path.
+- `-p 1` (optional): One-prompt top-1 path (stops after Stage 2).
+- `-p 2` (optional): Two-prompt/full path (runs through Stage 7). Default is `2`.
 - `-i`: Input CSV or parquet file.
 - `-o`: Output folder.
 - `-m` (optional): Existing metadata JSON file.
