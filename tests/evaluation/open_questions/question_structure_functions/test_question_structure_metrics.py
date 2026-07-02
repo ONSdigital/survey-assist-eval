@@ -1,4 +1,6 @@
-"""Tests for question structure functions."""
+"""Tests for question structure metric functions."""
+
+# pylint: disable=duplicate-code
 
 import pytest
 
