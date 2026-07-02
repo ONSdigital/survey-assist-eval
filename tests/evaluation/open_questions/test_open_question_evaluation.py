@@ -9,6 +9,9 @@ from survey_assist_eval.evaluation.open_questions.open_questions_evaluation impo
 from survey_assist_eval.evaluation.open_questions.question_structure_functions import (
     QuestionStructureMetrics,
 )
+from survey_assist_eval.evaluation.open_questions.simple_language_functions import (
+    SimpleLanguageMetrics,
+)
 from survey_assist_eval.evaluation.open_questions.text_statistics_functions import (
     OpenQuestionTextStatistics,
 )
@@ -38,8 +41,10 @@ def test_open_question_evaluation_as_dict_returns_expected_structure():
 
     assert "text_statistics" in result
     assert "question_structure" in result
+    assert "simple_language" in result
     assert isinstance(result["text_statistics"], dict)
     assert isinstance(result["question_structure"], dict)
+    assert isinstance(result["simple_language"], dict)
 
 
 def test_open_question_evaluation_report_metrics_returns_string():
@@ -88,6 +93,7 @@ def test_evaluate_open_questions_returns_expected_model():
     assert isinstance(result, OpenQuestionEvaluation)
     assert isinstance(result.text_statistics, OpenQuestionTextStatistics)
     assert isinstance(result.question_structure, QuestionStructureMetrics)
+    assert isinstance(result.simple_language, SimpleLanguageMetrics)
 
 
 def test_evaluate_open_questions_filters_empty_rows():
@@ -110,6 +116,7 @@ def test_evaluate_open_questions_filters_empty_rows():
 
     assert result.text_statistics.n_count == 2
     assert result.question_structure.n_count == 2
+    assert result.simple_language.n_count == 2
 
 
 def test_evaluate_open_questions_uses_default_text_statistics_config():
@@ -147,3 +154,4 @@ def test_evaluate_open_questions_uses_custom_text_statistics_config():
     )
 
     assert result.text_statistics.pct_over_word_count_threshold == 100.0
+    assert result.simple_language.n_count == 1
