@@ -33,7 +33,12 @@ if not bucket_name:
 
 print(f"Using bucket for data loading: {bucket_name}")
 
+output_dir = "data/figures/sayt"
+if not os.path.exists(output_dir):
+    os.makedirs(output_dir)
 
+
+# %%
 def build_lookup_suggester(
     corpus: list[tuple[str, str]], *, semantic_weight: float | None
 ) -> SAYTSuggester:
@@ -49,15 +54,23 @@ test_df = pd.read_excel(
     f"gs://{bucket_name}/evaluation-pipeline/SAYT/SAYT matching.xlsx",
     dtype=str,
     nrows=100,  # Excel formatting causes 10s of thousands of blank input rows after the real 100
+    header=1,  # first row is header
 )
+rename_columns = {
+    "Correct SIC code": "correct_sic_code",
+    "Full entry looking for": "full_entry",
+    "Position of correct SIC ": "rank_5chars_blaise",
+    "Position of correct SIC .1": "rank_5chars_sa_shared",
+}
 
-test_df = test_df.rename(
-    columns={
-        "Correct SIC code": "correct_sic_code",
-        "Full entry looking for": "full_entry",
-    }
-)
-test_df = test_df[["correct_sic_code", "full_entry"]]
+test_df = test_df.rename(columns=rename_columns)
+test_df = test_df[rename_columns.values()]
+
+# clean the rank values reported by the SAYT team
+for col in ["rank_5chars_blaise", "rank_5chars_sa_shared"]:
+    test_df[col] = pd.to_numeric(
+        test_df[col].replace({"5 or 12": "5"}), errors="coerce"
+    )
 
 # %%
 # check the codes are well formed
@@ -78,10 +91,34 @@ sayt_df["code"] = sayt_df["SIC07"].apply(lambda x: x if len(x) == 5 else f"0{x}"
 sayt_df["display_text"] = sayt_df["SIC_lookup"] + ": " + sayt_df["code"]
 
 sayt_corpus = list(zip(sayt_df["SIC_lookup"], sayt_df["display_text"], strict=False))
+
+# %%
+sic_kb_for_classifai = pd.read_csv(
+    f"gs://{bucket_name}/sic_knowledgebase/sic_kb_for_classifai.csv", dtype=str
+)
+rephrased_df = pd.read_csv(
+    f"gs://{bucket_name}/sic_knowledgebase/sic_rephrased.csv", dtype=str
+)
+sayt2_df = sic_kb_for_classifai.merge(
+    rephrased_df, left_on="label", right_on="sic_code", how="left"
+)
+sayt2_df["display_text"] = sayt2_df["rephrased_description"] + ": " + sayt2_df["label"]
+
+sayt2_corpus = list(zip(sayt2_df["text"], sayt2_df["display_text"], strict=False))
+
+# %%
+sayt_only_n_grams = SAYTSuggester(sayt_corpus, retrievers=[NgramRetrieverSpec()])
+sayt_only_prefix = SAYTSuggester(sayt_corpus, retrievers=[PrefixRetrieverSpec()])
+sayt_only_semantic = SAYTSuggester(
+    sayt_corpus, retrievers=[SemanticRetrieverSpec(weight=1.0)]
+)
 sayt_suggester_without_sem = build_lookup_suggester(sayt_corpus, semantic_weight=None)
 sayt_suggester_with_sem10 = build_lookup_suggester(sayt_corpus, semantic_weight=1.0)
 sayt_suggester_with_sem05 = build_lookup_suggester(sayt_corpus, semantic_weight=0.5)
 sayt_suggester_with_sem15 = build_lookup_suggester(sayt_corpus, semantic_weight=1.5)
+
+# note at this moment this suggester takes a very long time...
+sayt_hybrid_extended_kb = build_lookup_suggester(sayt2_corpus, semantic_weight=1.0)
 
 
 # %%
@@ -106,15 +143,21 @@ def rank_of_correct_code_in_suggestions(
 
 
 # %%
-MAX_SUGGESTIONS = 20
-for num_chars in [4, 5, 7, 9, 150]:
+MAX_SUGGESTIONS = 9
+for num_chars in [4, 5, 7, 10]:  # 150]:
     for suggester_label, suggester in [
+        ("ngrams_only", sayt_only_n_grams),
+        ("prefix_only", sayt_only_prefix),
+        ("semantic_only", sayt_only_semantic),
         ("without_sem", sayt_suggester_without_sem),
-        ("with_sem05", sayt_suggester_with_sem05),
-        ("with_sem10", sayt_suggester_with_sem10),
-        ("with_sem15", sayt_suggester_with_sem15),
+        ("hybrid_sem05", sayt_suggester_with_sem05),
+        ("hybrid_sem10", sayt_suggester_with_sem10),
+        ("hybrid_sem15", sayt_suggester_with_sem15),
+        ("hybrid_extended_kb", sayt_hybrid_extended_kb),
     ]:
-
+        print(
+            f"Getting suggestions for {num_chars} chars using suggester {suggester_label}"
+        )
         test_df[f"suggestions_{num_chars}chars_{suggester_label}"] = test_df.apply(
             get_suggestions_for_row,
             suggester=suggester,
@@ -142,33 +185,63 @@ results_df["num_chars"] = results_df["suggester_numchars"].apply(
     lambda x: int(x.split("_")[1].replace("chars", ""))
 )
 results_df["suggester"] = results_df["suggester_numchars"].apply(
-    lambda x: " ".join(x.split("_")[-2:])
+    lambda x: " ".join(x.split("_")[2:])
 )
 results_df.loc[results_df["rank"] > MAX_SUGGESTIONS, "rank"] = None
 results_df["rank"] = results_df["rank"].fillna(
     MAX_SUGGESTIONS + 2
 )  # Treat not found as worst rank
+results_df["rank"] = results_df["rank"].astype(int)
+
+results_df = results_df.sort_values(by=["num_chars", "suggester", "rank"]).reset_index(
+    drop=True
+)
 
 # %%
 # compare rank histograms for the two suggesters at different num_chars
+suggester_label_map = {
+    "blaise": "Blaise (as reported from SAYT team)",
+    "without sem": "prefix + n_grams (simulating blaise method)",
+    "hybrid sem10": "hybrid method including semantic retriever",
+    "hybrid extended kb": "hybrid method with extended knowledge base",
+}
+plot_df = results_df[results_df["suggester"].isin(suggester_label_map)].copy()
+plot_df["suggester"] = plot_df["suggester"].map(suggester_label_map)
+suggester_list = list(suggester_label_map.values())
 fig = px.histogram(
-    results_df,
+    plot_df,
     x="rank",
     color="suggester",
     facet_col="num_chars",
-    category_orders={"rank": list(range(0, MAX_SUGGESTIONS + 2))},
-    barmode="group",  # next to each other
-    # use frequencies
-    title="Distribution of Ranks of Correct Code in Suggestions by Number of Characters",
+    category_orders={
+        "rank": list(range(0, MAX_SUGGESTIONS + 2)),
+        "suggester": suggester_list,
+    },
+    barmode="group",
+    title=(
+        "Distribution of Ranks of Correct Code in Suggestions by Number of Characters"
+        + " (on SAYT test data of 100 examples)"
+    ),
 )
-# labels on x axis are too crowded, so just show every 5th but use 'NA' for 21
 fig.update_xaxes(
     tickmode="array",
-    tickvals=[*range(0, MAX_SUGGESTIONS, 5), MAX_SUGGESTIONS + 2],
-    ticktext=[str(i) for i in range(0, MAX_SUGGESTIONS, 5)] + ["NA"],
+    tickvals=[*range(1, MAX_SUGGESTIONS + 1, 1), MAX_SUGGESTIONS + 2],
+    ticktext=[str(i) for i in range(1, MAX_SUGGESTIONS + 1, 1)] + ["NA"],
 )
 
-fig.update_layout(bargap=0.1, width=1600)
+fig.update_layout(
+    bargap=0.1,
+    legend={
+        "title": "Suggester method",
+        "orientation": "h",
+        "yanchor": "top",
+        "y": -0.2,
+        "xanchor": "center",
+        "x": 0.5,
+    },
+)
 fig.show()
+
+fig.write_html(f"{output_dir}/sayt_eval_100sample_rank_histograms.html")
 
 # %%
