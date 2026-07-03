@@ -121,38 +121,6 @@ def test_add_text_stats_columns_adds_prefixed_columns():
     assert list(result["answer_word_count"]) == [3, 3]
     assert list(result["answer_sentence_count"]) == [1, 1]
 
-    # original DataFrame should be unchanged when inplace=False
-    assert "answer_word_count" not in df.columns
-
-
-def test_add_text_stats_columns_inplace_modifies_dataframe():
-    """Validate that inplace=True updates the original DataFrame."""
-    df = pd.DataFrame({"answer": ["One two."]})
-
-    result = add_text_stats_columns(
-        df, text_column="answer", prefix="answer_", inplace=True
-    )
-
-    assert result is df
-    assert "answer_word_count" in df.columns
-    assert df.loc[0, "answer_word_count"] == 2
-
-
-def test_add_text_stats_columns_uses_default_prefix_when_none():
-    """Uses '<text_column>_' as the prefix when prefix is None."""
-    df = pd.DataFrame({"answer": ["One two three."]})
-
-    result = add_text_stats_columns(
-        df,
-        text_column="answer",
-        prefix=None,
-    )
-
-    assert "answer_word_count" in result.columns
-    assert "answer_sentence_count" in result.columns
-    assert result.loc[0, "answer_word_count"] == 3
-    assert result.loc[0, "answer_sentence_count"] == 1
-
 
 # ============================================================================
 # Test summarise_text_stat_columns function
@@ -175,7 +143,6 @@ def test_summarise_text_stat_columns_computes_summary():
         df,
         text_column="answer",
         prefix="answer_",
-        inplace=False,
     )
 
     summary = summarise_text_stat_columns(
@@ -323,9 +290,6 @@ def test_compute_text_statistics_returns_metrics_model(sample_text_statistics_df
     assert metrics.mean_sentence_count == pytest.approx(1.0)
     assert metrics.pct_blank_or_too_short == pytest.approx(33.33333333333333)
     assert metrics.pct_over_word_count_threshold == pytest.approx(33.33333333333333)
-    assert (
-        "eval_word_count" in sample_text_statistics_df.columns
-    ), "Expected the wrapper to add stats columns in place."
 
 
 def test_compute_text_statistics_returns_expected_model_type(

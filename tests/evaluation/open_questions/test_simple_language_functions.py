@@ -1,12 +1,70 @@
 """Tests for simple language functions."""
 
+# pylint: disable=redefined-outer-name
+
+import pandas as pd
+import pytest
 from textstat import textstat
 
 from survey_assist_eval.evaluation.open_questions.simple_language_functions import (
+    add_simple_language_columns,
     extract_acronyms,
     get_avg_syllables_per_word,
     get_syllable_count_per_word,
 )
+
+
+@pytest.fixture
+def simple_language_input_df():
+    """Return test data for simple language wrapper function tests.
+
+    Covers diverse text patterns for wrapper testing.
+    """
+    return pd.DataFrame(
+        {
+            "follow_up_question": [
+                "Would you like to participate?",
+                "ONS is a UK government agency.",
+                "Does the NHS provide good service?",
+                "",
+                None,
+            ],
+            "respondent_id": [1, 2, 3, 4, 5],
+        }
+    )
+
+
+@pytest.fixture
+def expected_simple_language_df():
+    """Return expected output after adding simple language columns."""
+    return pd.DataFrame(
+        {
+            "follow_up_question": [
+                "Would you like to participate?",
+                "ONS is a UK government agency.",
+                "Does the NHS provide good service?",
+                "",
+                None,
+            ],
+            "respondent_id": [1, 2, 3, 4, 5],
+            "follow_up_question_n_acronyms": [0, 2, 1, 0, 0],
+            "follow_up_question_avg_syllables_per_word": [
+                1.6,
+                1.66667,
+                1.33333,
+                0.0,
+                0.0,
+            ],
+            "follow_up_question_syllable_counts": [
+                [1, 1, 1, 1, 4],
+                [1, 1, 1, 1, 3, 3],
+                [1, 1, 1, 2, 1, 2],
+                [],
+                [],
+            ],
+        }
+    )
+
 
 # ============================================================================
 # Test extract_acronyms function
@@ -131,10 +189,10 @@ def test_get_syllable_count_per_word_multiple_words():
 
 def test_get_syllable_count_per_word_multi_syllable_words():
     """Ensure words with multiple syllables are counted correctly."""
-    text = "question analysis"
+    text = "question analysis whole"
     result = get_syllable_count_per_word(text)
 
-    assert result == [2, 4], f"Expected [2, 4] for {text!r}, got {result}"
+    assert result == [2, 4, 1], f"Expected [2, 4, 1] for {text!r}, got {result}"
 
 
 def test_get_syllable_count_per_word_ignores_extra_whitespace():
@@ -218,3 +276,21 @@ def test_get_avg_syllables_per_word_non_string_input_returns_zero():
     assert (
         get_avg_syllables_per_word(123) == 0.0
     ), "Expected non-string input to return zero."
+
+
+# ============================================================================
+# Test add_simple_language_columns function
+# ============================================================================
+
+
+def test_add_simple_language_columns_returns_expected_dataframe(
+    simple_language_input_df,
+    expected_simple_language_df,
+):
+    """Adds expected simple language metric columns and values."""
+    result = add_simple_language_columns(
+        simple_language_input_df,
+        text_column="follow_up_question",
+    )
+
+    pd.testing.assert_frame_equal(result, expected_simple_language_df)

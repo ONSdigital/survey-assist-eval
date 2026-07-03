@@ -7,6 +7,10 @@ import pandas as pd
 from pydantic import BaseModel
 from textstat import textstat
 
+from survey_assist_eval.evaluation.open_questions.metric_utils import (
+    add_metrics_columns,
+)
+
 
 class OpenQuestionTextStatistics(BaseModel):
     """Container for all open question evaluation metrics."""
@@ -63,9 +67,7 @@ def compute_text_statistics(  # noqa: PLR0913 pylint: disable = R0913, R0917
     Returns:
         A Series with summary statistics for the open-ended question.
     """
-    df = add_text_stats_columns(
-        df, text_column=text_column, prefix="eval_", inplace=True
-    )
+    df = add_text_stats_columns(df, text_column=text_column, prefix="eval_")
 
     metrics = summarise_text_stat_columns(
         df,
@@ -127,7 +129,6 @@ def add_text_stats_columns(
     df: pd.DataFrame,
     text_column: str,
     prefix: str | None = None,
-    inplace: bool = False,
 ) -> pd.DataFrame:
     """Add text stats columns for a DataFrame text column.
 
@@ -135,25 +136,16 @@ def add_text_stats_columns(
         df: DataFrame with text data.
         text_column: Column containing text.
         prefix: Prefix for new columns. Defaults to "{text_column}_".
-        inplace: If True, add columns in place and return the same DataFrame.
 
     Returns:
         DataFrame with added text stat columns.
     """
-    stats_df = (
-        df[text_column].fillna("").astype(str).apply(get_text_stats).apply(pd.Series)
+    return add_metrics_columns(
+        df,
+        text_column=text_column,
+        metrics_func=get_text_stats,
+        prefix=prefix,
     )
-
-    if prefix is None:
-        prefix = f"{text_column}_"
-
-    stats_df = stats_df.rename(columns=lambda col: f"{prefix}{col}")
-
-    if inplace:
-        df.loc[:, stats_df.columns] = stats_df
-        return df
-
-    return df.join(stats_df)
 
 
 def summarise_text_stat_columns(  # noqa: PLR0913, pylint: disable=R0913
@@ -254,7 +246,6 @@ def compare_text_statistics(  # noqa: PLR0913, pylint: disable=R0913
                 df.copy(),
                 text_column=text_column,
                 prefix=local_prefix,
-                inplace=False,
             )
         else:
             if prefix is None:

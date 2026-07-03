@@ -1,7 +1,6 @@
 """Tests for question structure wrapper functions."""
 
 # pylint: disable=redefined-outer-name
-# pylint: disable=duplicate-code
 
 import numpy as np
 import pandas as pd
@@ -17,28 +16,6 @@ from survey_assist_eval.evaluation.open_questions.question_structure_functions i
 # ============================================================================
 # Test Data - Shared between tests
 # ============================================================================
-EXPECTED_FALSE_QUESTION_STRUCTURE_METRICS = {
-    "has_question_mark": False,
-    "interrogative_start": False,
-    "instruction_prompt_start": False,
-    "interrogative_wh_count": 0,
-    "instruction_prompt_count": 0,
-    "is_question": False,
-    "contains_multiple_asks": False,
-    "is_single_question": False,
-}
-
-
-QUESTION_STRUCTURE_METRIC_COLUMNS = {
-    "has_question_mark",
-    "interrogative_start",
-    "instruction_prompt_start",
-    "interrogative_wh_count",
-    "instruction_prompt_count",
-    "is_question",
-    "contains_multiple_asks",
-    "is_single_question",
-}
 
 
 @pytest.fixture
@@ -49,25 +26,12 @@ def question_structure_input_df():
             "follow_up_question": [
                 "What is your name?",
                 "This is a statement.",
+                "",
                 None,
             ],
-            "respondent_id": [1, 2, 3],
+            "respondent_id": [1, 2, 3, 4],
         }
     )
-
-
-@pytest.fixture
-def expected_default_question_structure_columns():
-    """Return expected question structure columns with default prefix."""
-    return {
-        f"follow_up_question_{column}" for column in QUESTION_STRUCTURE_METRIC_COLUMNS
-    }
-
-
-@pytest.fixture
-def expected_custom_question_structure_columns():
-    """Return expected question structure columns with custom prefix."""
-    return {f"question_{column}" for column in QUESTION_STRUCTURE_METRIC_COLUMNS}
 
 
 @pytest.fixture
@@ -78,17 +42,18 @@ def expected_question_structure_df():
             "follow_up_question": [
                 "What is your name?",
                 "This is a statement.",
+                "",
                 None,
             ],
-            "respondent_id": [1, 2, 3],
-            "follow_up_question_has_question_mark": [True, False, False],
-            "follow_up_question_interrogative_start": [True, False, False],
-            "follow_up_question_instruction_prompt_start": [False, False, False],
-            "follow_up_question_interrogative_wh_count": [1, 0, 0],
-            "follow_up_question_instruction_prompt_count": [0, 0, 0],
-            "follow_up_question_is_question": [True, False, False],
-            "follow_up_question_contains_multiple_asks": [False, False, False],
-            "follow_up_question_is_single_question": [True, False, False],
+            "respondent_id": [1, 2, 3, 4],
+            "follow_up_question_has_question_mark": [True, False, False, False],
+            "follow_up_question_interrogative_start": [True, False, False, False],
+            "follow_up_question_instruction_prompt_start": [False, False, False, False],
+            "follow_up_question_interrogative_wh_count": [1, 0, 0, 0],
+            "follow_up_question_instruction_prompt_count": [0, 0, 0, 0],
+            "follow_up_question_is_question": [True, False, False, False],
+            "follow_up_question_contains_multiple_asks": [False, False, False, False],
+            "follow_up_question_is_single_question": [True, False, False, False],
         }
     )
 
@@ -111,103 +76,6 @@ def test_add_question_structure_columns_returns_expected_dataframe(
     pd.testing.assert_frame_equal(result, expected_question_structure_df)
 
 
-def test_add_question_structure_columns_adds_default_prefixed_columns(
-    question_structure_input_df,
-    expected_default_question_structure_columns,
-):
-    """Adds question structure columns using the text column name as the default prefix."""
-    result = add_question_structure_columns(
-        question_structure_input_df,
-        text_column="follow_up_question",
-    )
-
-    assert expected_default_question_structure_columns.issubset(result.columns), (
-        "Expected add_question_structure_columns to add all question structure "
-        "metric columns with the default text column prefix"
-    )
-
-
-def test_add_question_structure_columns_preserves_original_columns(
-    question_structure_input_df,
-):
-    """Preserves original columns when adding question structure columns."""
-    result = add_question_structure_columns(
-        question_structure_input_df,
-        text_column="follow_up_question",
-    )
-
-    original_columns = set(question_structure_input_df.columns)
-
-    assert original_columns.issubset(
-        result.columns
-    ), "Expected add_question_structure_columns to preserve all original columns"
-
-
-def test_add_question_structure_columns_uses_custom_prefix(
-    question_structure_input_df,
-    expected_custom_question_structure_columns,
-):
-    """Adds question structure columns using a custom prefix."""
-    result = add_question_structure_columns(
-        question_structure_input_df,
-        text_column="follow_up_question",
-        prefix="question_",
-    )
-
-    assert expected_custom_question_structure_columns.issubset(result.columns), (
-        "Expected add_question_structure_columns to add all question structure "
-        "metric columns with the custom prefix"
-    )
-
-
-def test_add_question_structure_columns_does_not_add_default_prefix_when_custom_prefix_used(
-    question_structure_input_df,
-    expected_default_question_structure_columns,
-):
-    """Does not add default-prefixed columns when a custom prefix is supplied."""
-    result = add_question_structure_columns(
-        question_structure_input_df,
-        text_column="follow_up_question",
-        prefix="question_",
-    )
-
-    assert expected_default_question_structure_columns.isdisjoint(result.columns), (
-        "Expected default-prefixed question structure columns not to be added "
-        "when a custom prefix is supplied"
-    )
-
-
-def test_add_question_structure_columns_handles_missing_values_as_empty_text(
-    question_structure_input_df,
-):
-    """Treats missing text values as empty strings when creating metrics."""
-    result = add_question_structure_columns(
-        question_structure_input_df,
-        text_column="follow_up_question",
-    )
-
-    expected_values = {
-        f"follow_up_question_{metric}": value
-        for metric, value in EXPECTED_FALSE_QUESTION_STRUCTURE_METRICS.items()
-    }
-
-    for column, expected_value in expected_values.items():
-        assert (
-            result.loc[2, column] == expected_value
-        ), f"Expected {column} to be {expected_value} for missing text input"
-
-
-def test_add_question_structure_columns_raises_key_error_for_missing_text_column():
-    """Raises KeyError when the text column is not present in the DataFrame."""
-    df = pd.DataFrame({"other_column": ["What is your name?"]})
-
-    with pytest.raises(KeyError):
-        add_question_structure_columns(
-            df,
-            text_column="follow_up_question",
-        )
-
-
 # ============================================================================
 # Test summarise_question_structure_columns function
 # ============================================================================
@@ -222,22 +90,22 @@ def test_summarise_question_structure_columns_returns_expected_summary(
         prefix="follow_up_question_",
     )
 
-    assert result["n_count"] == 3, "Expected n_count to equal the number of rows"
+    assert result["n_count"] == 4, "Expected n_count to equal the number of rows"
     assert result["pct_is_question"] == pytest.approx(
-        33.33, rel=1e-2
+        25, rel=1e-2
     ), "Expected pct_is_question to equal the percentage of questions"
     assert result["pct_is_single_question"] == pytest.approx(
-        33.33, rel=1e-2
+        25, rel=1e-2
     ), "Expected pct_is_single_question to equal the percentage of single questions"
     assert result["pct_with_instruction_prompt_start"] == 0.0, (
         "Expected pct_with_instruction_prompt_start to equal the percentage of "
         "questions starting with an instruction prompt"
     )
-    assert result["pct_with_interrogative_start"] == pytest.approx(33.33, rel=1e-2), (
+    assert result["pct_with_interrogative_start"] == pytest.approx(25, rel=1e-2), (
         "Expected pct_with_interrogative_start to equal the percentage of "
         "questions starting with an interrogative"
     )
-    assert result["pct_has_question_mark"] == pytest.approx(33.33, rel=1e-2), (
+    assert result["pct_has_question_mark"] == pytest.approx(25, rel=1e-2), (
         "Expected pct_has_question_mark to equal the percentage of questions "
         "containing a question mark"
     )
@@ -455,13 +323,13 @@ def test_compute_question_structure_metrics_returns_expected_values(
     )
 
     assert (
-        result.n_count == 3
+        result.n_count == 4
     ), "Expected n_count to equal the number of rows in the input DataFrame"
     assert result.pct_is_question == pytest.approx(
-        33.33, rel=1e-2
+        25, rel=1e-2
     ), "Expected pct_is_question to equal the percentage of questions"
     assert result.pct_is_single_question == pytest.approx(
-        33.33, rel=1e-2
+        25, rel=1e-2
     ), "Expected pct_is_single_question to equal the percentage of single questions"
     assert result.pct_with_instruction_prompt_start == 0.0, (
         "Expected pct_with_instruction_prompt_start to equal the percentage of "
@@ -471,7 +339,7 @@ def test_compute_question_structure_metrics_returns_expected_values(
         "Expected mean_instruction_prompt_count_excluding_zero to be NaN when "
         "there are no non-zero instruction prompt counts"
     )
-    assert result.pct_with_interrogative_start == pytest.approx(33.33, rel=1e-2), (
+    assert result.pct_with_interrogative_start == pytest.approx(25, rel=1e-2), (
         "Expected pct_with_interrogative_start to equal the percentage of "
         "questions starting with an interrogative"
     )
@@ -479,7 +347,7 @@ def test_compute_question_structure_metrics_returns_expected_values(
         "Expected mean_interrogative_wh_count_excluding_zero to equal the mean "
         "interrogative count excluding zero values"
     )
-    assert result.pct_has_question_mark == pytest.approx(33.33, rel=1e-2), (
+    assert result.pct_has_question_mark == pytest.approx(25, rel=1e-2), (
         "Expected pct_has_question_mark to equal the percentage of questions "
         "containing a question mark"
     )
@@ -499,7 +367,7 @@ def test_compute_question_structure_metrics_uses_default_prefix(
         "the default prefix"
     )
     assert (
-        result.n_count == 3
+        result.n_count == 4
     ), "Expected n_count to equal the number of rows when using the default prefix"
 
 
@@ -518,7 +386,7 @@ def test_compute_question_structure_metrics_uses_custom_prefix(
         "a custom prefix"
     )
     assert (
-        result.n_count == 3
+        result.n_count == 4
     ), "Expected n_count to equal the number of rows when using a custom prefix"
 
 

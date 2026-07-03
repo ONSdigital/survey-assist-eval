@@ -5,6 +5,10 @@ import re
 import pandas as pd
 from pydantic import BaseModel
 
+from survey_assist_eval.evaluation.open_questions.metric_utils import (
+    add_metrics_columns,
+)
+
 
 class QuestionStructureMetrics(BaseModel):
     """Container for all question structure evaluation metrics."""
@@ -341,22 +345,12 @@ def add_question_structure_columns(
     Returns:
         DataFrame with added text stat columns.
     """
-    question_metrics_df = (
-        df[text_column]
-        .fillna("")
-        .astype(str)
-        .apply(get_question_structure_metrics)
-        .apply(pd.Series)
+    return add_metrics_columns(
+        df,
+        text_column=text_column,
+        metrics_func=get_question_structure_metrics,
+        prefix=prefix,
     )
-
-    if prefix is None:
-        prefix = f"{text_column}_"
-
-    question_metrics_df = question_metrics_df.rename(
-        columns=lambda col: f"{prefix}{col}"
-    )
-
-    return df.join(question_metrics_df)
 
 
 def summarise_question_structure_columns(
