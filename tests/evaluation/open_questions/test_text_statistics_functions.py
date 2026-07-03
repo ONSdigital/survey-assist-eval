@@ -365,7 +365,7 @@ def test_open_question_text_statistics_report_metrics_formats_output():
     report = metrics.report_metrics()
 
     assert "Text statistics:" in report
-    assert "Number of open questions: 3" in report
+    assert "Number of follow-up questions: 3" in report
     assert "Median Word Count: 3.00" in report
     assert "Percent Over Word Threshold Count: 33.30%" in report
     assert "Percent with Blank or Too Short Sentences: 33.30%" in report
@@ -406,6 +406,6 @@ def test_open_question_text_statistics_report_metrics_contains_metrics():
 
     report = metrics.report_metrics()
 
-    assert "Number of open questions: 10" in report
+    assert "Number of follow-up questions: 10" in report
     assert "Median Word Count: 5.00" in report
     assert "Percent with Blank or Too Short Sentences: 5.00%" in report

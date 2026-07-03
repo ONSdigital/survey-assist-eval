@@ -29,7 +29,7 @@ class OpenQuestionTextStatistics(BaseModel):
         """Pretty print the open questions evaluation metrics."""
         lines = [
             "\nText statistics:",
-            f" Number of open questions: {self.n_count:.0f}",
+            f" Number of follow-up questions: {self.n_count:.0f}",
             f" Median Word Count: {self.median_word_count:.2f}",
             f" Standard Deviation of Word Count: {self.sd_word_count:.2f}",
             f" Mean Sentence Count: {self.mean_sentence_count:.2f}",

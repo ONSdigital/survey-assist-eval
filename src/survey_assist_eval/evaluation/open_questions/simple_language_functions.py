@@ -200,13 +200,17 @@ def summarise_simple_language_columns(
     avg_syllables_per_word_col = df[f"{prefix}avg_syllables_per_word"]
     syllable_counts = df[f"{prefix}syllable_counts"]
 
+    max_syllables = syllable_counts.apply(lambda counts: max(counts) if counts else 0)
+
     summary = {
         "n_count": len(df),
         "pct_with_acronyms": (n_acronyms_col > 0).sum() / len(df) * 100,
         "mean_avg_syllables_per_word": avg_syllables_per_word_col.mean(),
         "pct_with_word_over_syllables_threshold": (
-            syllable_counts.apply(max) > syllables_threshold
-        ).mean(),
+            max_syllables > syllables_threshold
+        ).sum()
+        / len(df)
+        * 100,
     }
 
     return pd.Series(summary)
