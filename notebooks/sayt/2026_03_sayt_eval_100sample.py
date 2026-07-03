@@ -10,11 +10,12 @@ The variables are loaded from the ".env" file.
 
 # %%
 import os
+import time
 
 import pandas as pd
 import plotly.express as px
 from dotenv import load_dotenv
-from industrial_classification_utils.sayt import (
+from survey_assist_embed_core.sayt import (
     NgramRetrieverSpec,
     PrefixRetrieverSpec,
     SAYTSuggester,
@@ -143,29 +144,35 @@ def rank_of_correct_code_in_suggestions(
 
 
 # %%
+test_df2 = test_df.sample(n=10, random_state=42).reset_index(drop=True)
 MAX_SUGGESTIONS = 9
-for num_chars in [4, 5, 7, 10]:  # 150]:
+for num_chars in [7]:  # 4, 5, 7, 10]:  # 150]:
     for suggester_label, suggester in [
-        ("ngrams_only", sayt_only_n_grams),
-        ("prefix_only", sayt_only_prefix),
-        ("semantic_only", sayt_only_semantic),
-        ("without_sem", sayt_suggester_without_sem),
-        ("hybrid_sem05", sayt_suggester_with_sem05),
+        # ("ngrams_only", sayt_only_n_grams),
+        # ("prefix_only", sayt_only_prefix),
+        # ("semantic_only", sayt_only_semantic),
+        # ("without_sem", sayt_suggester_without_sem),
+        # ("hybrid_sem05", sayt_suggester_with_sem05),
         ("hybrid_sem10", sayt_suggester_with_sem10),
-        ("hybrid_sem15", sayt_suggester_with_sem15),
+        # ("hybrid_sem15", sayt_suggester_with_sem15),
         ("hybrid_extended_kb", sayt_hybrid_extended_kb),
     ]:
         print(
             f"Getting suggestions for {num_chars} chars using suggester {suggester_label}"
         )
-        test_df[f"suggestions_{num_chars}chars_{suggester_label}"] = test_df.apply(
+        t_start = time.perf_counter()
+        test_df2[f"suggestions_{num_chars}chars_{suggester_label}"] = test_df2.apply(
             get_suggestions_for_row,
             suggester=suggester,
             max_suggestions=MAX_SUGGESTIONS,
             num_chars=num_chars,
             axis=1,
         )
-        test_df[f"rank_{num_chars}chars_{suggester_label}"] = test_df.apply(
+        elapsed = time.perf_counter() - t_start
+        print(
+            f"  -> suggestions done in {elapsed:.2f}s ({elapsed / len(test_df2) * 1000:.1f}ms/row)"
+        )
+        test_df2[f"rank_{num_chars}chars_{suggester_label}"] = test_df2.apply(
             rank_of_correct_code_in_suggestions,
             correct_code_col="correct_sic_code",
             suggester_label=suggester_label,
@@ -243,5 +250,21 @@ fig.update_layout(
 fig.show()
 
 fig.write_html(f"{output_dir}/sayt_eval_100sample_rank_histograms.html")
+
+# %%
+for suggester_name, suggester in [
+    ("hybrid_sayt_kb", sayt_suggester_with_sem10),
+    ("hybrid_extended_kb", sayt_hybrid_extended_kb),
+]:
+    print(f"Retriever sizes for suggester: {suggester_name}")
+    for configured_retriever in suggester._retrievers:
+        name = configured_retriever.name
+        retriever = configured_retriever.retriever
+        if hasattr(retriever, "_index") and hasattr(retriever._index, "_vector_store"):
+            shape = (
+                retriever._index._vector_store.vectors["embeddings"].to_numpy().shape
+            )
+            print(f"  {name}: matrix shape = {shape}")
+
 
 # %%

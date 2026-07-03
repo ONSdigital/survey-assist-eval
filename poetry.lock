@@ -8876,6 +8876,32 @@ files = [
 ]
 
 [[package]]
+name = "survey-assist-embed-core"
+version = "0.1.0"
+description = ""
+optional = false
+python-versions = ">=3.12,<4.0"
+groups = ["dev"]
+files = []
+develop = false
+
+[package.dependencies]
+autocorrect = ">=2.6.1,<3.0.0"
+classifai = {git = "https://github.com/datasciencecampus/classifai.git", rev = "v1.0.0", extras = ["huggingface"]}
+google-cloud-storage = ">=2.18,<3.0.0"
+numpy = ">=2.3.0,<3.0.0"
+pydantic = ">=2.11.1,<3.0.0"
+scikit-learn = ">=1.9.0,<2.0.0"
+scipy = ">=1.18.0,<2.0.0"
+survey-assist-utils = {git = "https://github.com/ONSdigital/survey-assist-utils.git", rev = "v0.0.8"}
+
+[package.source]
+type = "git"
+url = "https://github.com/ONSdigital/survey-assist-embed-core.git"
+reference = "3724672"
+resolved_reference = "372467261f1922ed4faa9b86649829859e787354"
+
+[[package]]
 name = "survey-assist-utils"
 version = "0.0.8"
 description = "Utility module for Survey Assist"
@@ -10162,4 +10188,4 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<4.0"
-content-hash = "ce4ef98b36b6aae9a0d9d827191a71deb8948676caa91f4ce90474b62e041390"
+content-hash = "ac14acf0cdab07737f432778da4f34435156ec9343c2de9fe3bf816561adeb4e"
