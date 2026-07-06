@@ -8,6 +8,8 @@ The variables are loaded from the ".env" file.
 # ruff: noqa: PLR2004
 # pylint: disable=protected-access,redefined-outer-name,C0103
 
+import logging
+
 # %%
 import os
 import time
@@ -21,22 +23,26 @@ from survey_assist_embed_core.sayt import (
     SAYTSuggester,
     SemanticRetrieverSpec,
 )
+from survey_assist_utils.logging import get_logger
 
 from survey_assist_eval.data_cleaning.code_standard import get_clean_n_digit_codes
 
 # pylint: disable=R0801
 
 # %%
+logger = get_logger(__name__, level="DEBUG")
+logging.getLogger("survey_assist_e...").setLevel(logging.DEBUG)
+
 load_dotenv()
 bucket_name = os.getenv("EVALUATION_BUCKET_NAME")
 if not bucket_name:
     raise ValueError("EVALUATION_BUCKET_NAME environment variable not set")
 
-print(f"Using bucket for data loading: {bucket_name}")
-
 output_dir = "data/figures/sayt"
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
+
+logger.info("Location specs", bucket_name=bucket_name, output_dir=output_dir)
 
 
 # %%
@@ -82,8 +88,10 @@ msk = test_df["correct_sic_code"] != clean_codes.map(
     lambda x: x if pd.isna(x) else next(iter(x))
 )
 if msk.any():
-    print("Found malformed codes:")
-    print(test_df[msk])
+    logger.warning(
+        "Found malformed codes in test data",
+        sample=test_df[msk].head(5).to_dict(orient="records"),
+    )
 
 # %%
 lookup_file_name = f"gs://{bucket_name}/evaluation-pipeline/SAYT/Lookup_IT3_Final.csv"
@@ -144,24 +152,28 @@ def rank_of_correct_code_in_suggestions(
 
 
 # %%
-test_df2 = test_df.sample(n=10, random_state=42).reset_index(drop=True)
+# test_df2 = test_df.sample(n=10, random_state=42).reset_index(drop=True)
+
 MAX_SUGGESTIONS = 9
-for num_chars in [7]:  # 4, 5, 7, 10]:  # 150]:
+for num_chars in [4, 5, 7, 10]:  # 150]:
     for suggester_label, suggester in [
-        # ("ngrams_only", sayt_only_n_grams),
-        # ("prefix_only", sayt_only_prefix),
-        # ("semantic_only", sayt_only_semantic),
-        # ("without_sem", sayt_suggester_without_sem),
-        # ("hybrid_sem05", sayt_suggester_with_sem05),
+        ("ngrams_only", sayt_only_n_grams),
+        ("prefix_only", sayt_only_prefix),
+        ("semantic_only", sayt_only_semantic),
+        ("without_sem", sayt_suggester_without_sem),
+        ("hybrid_sem05", sayt_suggester_with_sem05),
         ("hybrid_sem10", sayt_suggester_with_sem10),
-        # ("hybrid_sem15", sayt_suggester_with_sem15),
+        ("hybrid_sem15", sayt_suggester_with_sem15),
         ("hybrid_extended_kb", sayt_hybrid_extended_kb),
     ]:
-        print(
-            f"Getting suggestions for {num_chars} chars using suggester {suggester_label}"
+        logger.debug(
+            "Starting SAYT suggesting - one loop",
+            num_chars=num_chars,
+            suggester_label=suggester_label,
         )
+
         t_start = time.perf_counter()
-        test_df2[f"suggestions_{num_chars}chars_{suggester_label}"] = test_df2.apply(
+        test_df[f"suggestions_{num_chars}chars_{suggester_label}"] = test_df.apply(
             get_suggestions_for_row,
             suggester=suggester,
             max_suggestions=MAX_SUGGESTIONS,
@@ -169,10 +181,12 @@ for num_chars in [7]:  # 4, 5, 7, 10]:  # 150]:
             axis=1,
         )
         elapsed = time.perf_counter() - t_start
-        print(
-            f"  -> suggestions done in {elapsed:.2f}s ({elapsed / len(test_df2) * 1000:.1f}ms/row)"
+        logger.debug(
+            "  -> suggestions done",
+            elapsed=elapsed,
+            elapsed_per_row=elapsed / len(test_df) * 1000,
         )
-        test_df2[f"rank_{num_chars}chars_{suggester_label}"] = test_df2.apply(
+        test_df[f"rank_{num_chars}chars_{suggester_label}"] = test_df.apply(
             rank_of_correct_code_in_suggestions,
             correct_code_col="correct_sic_code",
             suggester_label=suggester_label,
@@ -212,6 +226,7 @@ suggester_label_map = {
     "hybrid sem10": "hybrid method including semantic retriever",
     "hybrid extended kb": "hybrid method with extended knowledge base",
 }
+# suggester_label_map = {x:x for x in results_df["suggester"].unique()} | suggester_label_map
 plot_df = results_df[results_df["suggester"].isin(suggester_label_map)].copy()
 plot_df["suggester"] = plot_df["suggester"].map(suggester_label_map)
 suggester_list = list(suggester_label_map.values())
@@ -256,7 +271,6 @@ for suggester_name, suggester in [
     ("hybrid_sayt_kb", sayt_suggester_with_sem10),
     ("hybrid_extended_kb", sayt_hybrid_extended_kb),
 ]:
-    print(f"Retriever sizes for suggester: {suggester_name}")
     for configured_retriever in suggester._retrievers:
         name = configured_retriever.name
         retriever = configured_retriever.retriever
@@ -264,7 +278,12 @@ for suggester_name, suggester in [
             shape = (
                 retriever._index._vector_store.vectors["embeddings"].to_numpy().shape
             )
-            print(f"  {name}: matrix shape = {shape}")
+            logger.info(
+                "Retriever index shape",
+                sayt_suggester_name=suggester_name,
+                retriever_name=name,
+                matrix_shape=shape,
+            )
 
 
 # %%
