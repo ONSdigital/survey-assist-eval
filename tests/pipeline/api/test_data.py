@@ -537,7 +537,7 @@ class TestCalcEvalPerf:
     """Unit tests for the calc_eval_perf function."""
 
     def test_calc_eval_perf(self, dummy_cal_eval_perf_data):
-        """Test that the function calculates evaluation performance correctly."""
+        """Test the function calculates evaluation performance correctly."""
         input_df, exp_records, exp_lookup_errs, exp_classify_errs = (
             dummy_cal_eval_perf_data
         )
@@ -579,8 +579,8 @@ class TestCalcEvalPerf:
         assert perf_metrics["lookup_error_rate"] == (
             exp_lookup_errs / exp_records
         ), (
-            f"Expected lookup error rate: {exp_lookup_errs / exp_records}, but "
-            f"got: {perf_metrics['lookup_error_rate']}"
+            f"Expected lookup error rate: {exp_lookup_errs / exp_records}, but"
+            f" got: {perf_metrics['lookup_error_rate']}"
         )
         assert perf_metrics["num_classify_errors"] == exp_classify_errs, (
             f"Expected {exp_classify_errs} classify errors, but got: "
