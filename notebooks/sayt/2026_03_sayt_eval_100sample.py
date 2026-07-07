@@ -8,9 +8,8 @@ The variables are loaded from the ".env" file.
 # ruff: noqa: PLR2004
 # pylint: disable=protected-access,redefined-outer-name,C0103
 
-import logging
-
 # %%
+import logging
 import os
 import time
 
@@ -30,8 +29,10 @@ from survey_assist_eval.data_cleaning.code_standard import get_clean_n_digit_cod
 # pylint: disable=R0801
 
 # %%
-logger = get_logger(__name__, level="DEBUG")
-logging.getLogger("survey_assist_e...").setLevel(logging.DEBUG)
+EXTENDED_RUN = False  # set to True to include more suggesters and debug messages
+
+if EXTENDED_RUN:
+    logging.getLogger("survey_assist_e...").setLevel(logging.DEBUG)
 
 load_dotenv()
 bucket_name = os.getenv("EVALUATION_BUCKET_NAME")
@@ -42,6 +43,7 @@ output_dir = "data/figures/sayt"
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
 
+logger = get_logger(__name__)
 logger.info("Location specs", bucket_name=bucket_name, output_dir=output_dir)
 
 
@@ -66,15 +68,18 @@ test_df = pd.read_excel(
 rename_columns = {
     "Correct SIC code": "correct_sic_code",
     "Full entry looking for": "full_entry",
-    "Position of correct SIC ": "rank_5chars_blaise",
-    "Position of correct SIC .1": "rank_5chars_sa_shared",
+    "Position of correct SIC ": "rank_5chars_Blaise (as reported from SAYT team)",
+    "Position of correct SIC .1": "_rank_5chars_sa_shared",
 }
 
 test_df = test_df.rename(columns=rename_columns)
 test_df = test_df[rename_columns.values()]
 
 # clean the rank values reported by the SAYT team
-for col in ["rank_5chars_blaise", "rank_5chars_sa_shared"]:
+for col in [
+    "rank_5chars_Blaise (as reported from SAYT team)",
+    "_rank_5chars_sa_shared",
+]:
     test_df[col] = pd.to_numeric(
         test_df[col].replace({"5 or 12": "5"}), errors="coerce"
     )
@@ -116,18 +121,38 @@ sayt2_df["display_text"] = sayt2_df["rephrased_description"] + ": " + sayt2_df["
 sayt2_corpus = list(zip(sayt2_df["text"], sayt2_df["display_text"], strict=False))
 
 # %%
-sayt_only_n_grams = SAYTSuggester(sayt_corpus, retrievers=[NgramRetrieverSpec()])
-sayt_only_prefix = SAYTSuggester(sayt_corpus, retrievers=[PrefixRetrieverSpec()])
-sayt_only_semantic = SAYTSuggester(
-    sayt_corpus, retrievers=[SemanticRetrieverSpec(weight=1.0)]
-)
-sayt_suggester_without_sem = build_lookup_suggester(sayt_corpus, semantic_weight=None)
-sayt_suggester_with_sem10 = build_lookup_suggester(sayt_corpus, semantic_weight=1.0)
-sayt_suggester_with_sem05 = build_lookup_suggester(sayt_corpus, semantic_weight=0.5)
-sayt_suggester_with_sem15 = build_lookup_suggester(sayt_corpus, semantic_weight=1.5)
+suggesters = {
+    "Blaise proxy method (prefix + n_grams)": build_lookup_suggester(
+        sayt_corpus, semantic_weight=None
+    ),
+    "Hybrid method including semantic retriever": build_lookup_suggester(
+        sayt_corpus, semantic_weight=1.0
+    ),
+    "Hybrid method with extended knowledge base": build_lookup_suggester(
+        sayt2_corpus, semantic_weight=1.0
+    ),
+}
 
-# note at this moment this suggester takes a very long time...
-sayt_hybrid_extended_kb = build_lookup_suggester(sayt2_corpus, semantic_weight=1.0)
+if EXTENDED_RUN:
+    suggesters.update(
+        {
+            "Ngrams only": SAYTSuggester(
+                sayt_corpus, retrievers=[NgramRetrieverSpec()]
+            ),
+            "Prefix only": SAYTSuggester(
+                sayt_corpus, retrievers=[PrefixRetrieverSpec()]
+            ),
+            "Semantic only": SAYTSuggester(
+                sayt_corpus, retrievers=[SemanticRetrieverSpec()]
+            ),
+            "Hybrid sem_w=0.5": build_lookup_suggester(
+                sayt_corpus, semantic_weight=0.5
+            ),
+            "Hybrid sem_w=1.5": build_lookup_suggester(
+                sayt_corpus, semantic_weight=1.5
+            ),
+        }
+    )
 
 
 # %%
@@ -156,17 +181,8 @@ def rank_of_correct_code_in_suggestions(
 
 MAX_SUGGESTIONS = 9
 for num_chars in [4, 5, 7, 10]:  # 150]:
-    for suggester_label, suggester in [
-        ("ngrams_only", sayt_only_n_grams),
-        ("prefix_only", sayt_only_prefix),
-        ("semantic_only", sayt_only_semantic),
-        ("without_sem", sayt_suggester_without_sem),
-        ("hybrid_sem05", sayt_suggester_with_sem05),
-        ("hybrid_sem10", sayt_suggester_with_sem10),
-        ("hybrid_sem15", sayt_suggester_with_sem15),
-        ("hybrid_extended_kb", sayt_hybrid_extended_kb),
-    ]:
-        logger.debug(
+    for suggester_label, suggester in suggesters.items():
+        logger.info(
             "Starting SAYT suggesting - one loop",
             num_chars=num_chars,
             suggester_label=suggester_label,
@@ -181,10 +197,10 @@ for num_chars in [4, 5, 7, 10]:  # 150]:
             axis=1,
         )
         elapsed = time.perf_counter() - t_start
-        logger.debug(
+        logger.info(
             "  -> suggestions done",
-            elapsed=elapsed,
-            elapsed_per_row=elapsed / len(test_df) * 1000,
+            elapsed_sec=elapsed,
+            elapsed_per_row_ms=elapsed / len(test_df) * 1000,
         )
         test_df[f"rank_{num_chars}chars_{suggester_label}"] = test_df.apply(
             rank_of_correct_code_in_suggestions,
@@ -220,24 +236,14 @@ results_df = results_df.sort_values(by=["num_chars", "suggester", "rank"]).reset
 
 # %%
 # compare rank histograms for the two suggesters at different num_chars
-suggester_label_map = {
-    "blaise": "Blaise (as reported from SAYT team)",
-    "without sem": "prefix + n_grams (simulating blaise method)",
-    "hybrid sem10": "hybrid method including semantic retriever",
-    "hybrid extended kb": "hybrid method with extended knowledge base",
-}
-# suggester_label_map = {x:x for x in results_df["suggester"].unique()} | suggester_label_map
-plot_df = results_df[results_df["suggester"].isin(suggester_label_map)].copy()
-plot_df["suggester"] = plot_df["suggester"].map(suggester_label_map)
-suggester_list = list(suggester_label_map.values())
 fig = px.histogram(
-    plot_df,
+    results_df,
     x="rank",
     color="suggester",
     facet_col="num_chars",
     category_orders={
         "rank": list(range(0, MAX_SUGGESTIONS + 2)),
-        "suggester": suggester_list,
+        "suggester": sorted(results_df["suggester"].unique().tolist()),
     },
     barmode="group",
     title=(
@@ -267,10 +273,7 @@ fig.show()
 fig.write_html(f"{output_dir}/sayt_eval_100sample_rank_histograms.html")
 
 # %%
-for suggester_name, suggester in [
-    ("hybrid_sayt_kb", sayt_suggester_with_sem10),
-    ("hybrid_extended_kb", sayt_hybrid_extended_kb),
-]:
+for suggester_name, suggester in suggesters.items():
     for configured_retriever in suggester._retrievers:
         name = configured_retriever.name
         retriever = configured_retriever.retriever
