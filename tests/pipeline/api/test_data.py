@@ -1,5 +1,6 @@
 """Unit tests for ApiEvaluator data functionality."""
 
+import datetime
 from contextlib import ExitStack, contextmanager
 from unittest.mock import MagicMock, patch
 
@@ -222,6 +223,27 @@ def get_and_prepare_test_data_mocks(df: pd.DataFrame):
             "get_logger": mock_get_logger,
             "pd.read_parquet": mock_pd_read_parquet
         }
+
+
+@pytest.fixture
+def dummy_cal_eval_perf_data() -> tuple[pd.DataFrame, int, int, int]:
+    """Fixture to provide dummy data for testing calc_eval_perf function.
+
+    Returns:
+        tuple: A tuple containing a DataFrame with dummy data, the number of
+            total records, the number of lookup errors, and the number of
+            classify errors.
+    """
+    data = {
+        "lookup_error": [False, False, True, True, True, False, False],
+        "classify_error": [False, True, False, True, False, True, True],
+    }
+    return (
+        pd.DataFrame(data),
+        len(data["lookup_error"]),  # num records
+        len([e for e in data["lookup_error"] if e]),  # num lookup errors
+        len([e for e in data["classify_error"] if e])  # num classify errors
+    )
 
 
 class TestBuildOrgDescription:
@@ -509,3 +531,95 @@ class TestRecordClassifyResults:
             data_module.record_classify_results(
                 input_df, classify_ids, responses
             )
+
+
+class TestCalcEvalPerf:
+    """Unit tests for the calc_eval_perf function."""
+
+    def test_calc_eval_perf(self, dummy_cal_eval_perf_data):
+        """Test that the function calculates evaluation performance correctly."""
+        input_df, exp_records, exp_lookup_errs, exp_classify_errs = (
+            dummy_cal_eval_perf_data
+        )
+        start = datetime.datetime.now()
+        duration = 10  # seconds
+        end = datetime.timedelta(seconds=duration) + start
+        lookup_request_parallelism = 10
+        classify_request_parallelism = 5
+        perf_metrics = data_module.calc_eval_perf(
+            input_df,
+            start,
+            end,
+            lookup_request_parallelism=lookup_request_parallelism,
+            classify_request_parallelism=classify_request_parallelism,
+        )
+
+        assert perf_metrics["num_records"] == exp_records, (
+            f"Expected {exp_records} records, but got: "
+            f"{perf_metrics['num_records']}"
+        )
+        assert perf_metrics["duration_seconds"] == duration, (
+            f"Expected duration of {duration} seconds, but got: "
+            f"{perf_metrics['duration_seconds']}"
+        )
+        assert perf_metrics["records_per_second"] == exp_records / duration, (
+            f"Expected records per second: {exp_records / duration}, but got: "
+            f"{perf_metrics['records_per_second']}"
+        )
+        assert perf_metrics["num_lookup_errors"] == exp_lookup_errs, (
+            f"Expected {exp_lookup_errs} lookup errors, but got: "
+            f"{perf_metrics['num_lookup_errors']}"
+        )
+        assert (
+            perf_metrics["lookup_parallelism"] == lookup_request_parallelism
+        ), (
+            f"Expected lookup parallelism: {lookup_request_parallelism}, but "
+            f"got: {perf_metrics['lookup_parallelism']}"
+        )
+        assert perf_metrics["lookup_error_rate"] == (
+            exp_lookup_errs / exp_records
+        ), (
+            f"Expected lookup error rate: {exp_lookup_errs / exp_records}, but "
+            f"got: {perf_metrics['lookup_error_rate']}"
+        )
+        assert perf_metrics["num_classify_errors"] == exp_classify_errs, (
+            f"Expected {exp_classify_errs} classify errors, but got: "
+            f"{perf_metrics['num_classify_errors']}"
+        )
+        assert (
+            perf_metrics[
+                "classify_parallelism"
+            ] == classify_request_parallelism
+        ), (
+            f"Expected classify parallelism: {classify_request_parallelism}, "
+            f"but got: {perf_metrics['classify_parallelism']}"
+        )
+        assert perf_metrics["classify_error_rate"] == (
+            exp_classify_errs / exp_records
+        ), (
+            f"Expected classify error rate: {exp_classify_errs / exp_records},"
+            f" but got: {perf_metrics['classify_error_rate']}"
+        )
+
+    def test_calc_eval_perf_with_missing_cols(self, dummy_cal_eval_perf_data):
+        """Test raises KeyError when required columns are missing."""
+        input_df, _, _, _ = dummy_cal_eval_perf_data
+        start = datetime.datetime.now()
+        end = start + datetime.timedelta(seconds=10)
+        for col in ["lookup_error", "classify_error"]:
+            with pytest.raises(
+                KeyError, match=f"DataFrame must contain \'{col}\'"
+            ):
+                # explict typecast to df since removing col reverts to series
+                # and has not attribute columns
+                test_df = pd.DataFrame(input_df.drop(columns=[col]))
+                data_module.calc_eval_perf(test_df, start, end)
+
+    def test_calc_eval_perf_with_no_records(self, dummy_cal_eval_perf_data):
+        """Test raises ValueError when DataFrame has no records."""
+        input_df, _, _, _ = dummy_cal_eval_perf_data
+        start = datetime.datetime.now()
+        end = start + datetime.timedelta(seconds=10)
+        empty_df = pd.DataFrame(columns=input_df.columns)
+        with pytest.raises(ValueError, match="DataFrame is empty."):
+            data_module.calc_eval_perf(empty_df, start, end)
