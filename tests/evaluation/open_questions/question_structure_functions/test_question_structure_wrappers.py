@@ -88,7 +88,7 @@ def test_summarise_question_structure_columns_returns_expected_summary(
     result = summarise_question_structure_columns(
         expected_question_structure_df,
         prefix="follow_up_question_",
-    )
+    ).__dict__
 
     assert result["n_count"] == 4, "Expected n_count to equal the number of rows"
     assert result["pct_is_question"] == pytest.approx(
@@ -136,7 +136,7 @@ def test_summarise_question_structure_columns_uses_prefix():
     result = summarise_question_structure_columns(
         df,
         prefix="test_",
-    )
+    ).__dict__
 
     assert result["n_count"] == 1, (
         "Expected summarise_question_structure_columns to use the supplied "
@@ -164,7 +164,7 @@ def test_summarise_question_structure_columns_returns_nan_when_no_non_zero_count
     result = summarise_question_structure_columns(
         df,
         prefix="question_",
-    )
+    ).__dict__
 
     assert np.isnan(result["mean_instruction_prompt_count_excluding_zero"]), (
         "Expected mean_instruction_prompt_count_excluding_zero to be NaN when "
@@ -192,6 +192,21 @@ def test_summarise_question_structure_columns_missing_column_raises_key_error():
             df,
             prefix="question_",
         )
+
+
+def test_summarise_question_structure_columns_returns_metrics_model(
+    expected_question_structure_df,
+):
+    """Returns a QuestionStructureMetrics model."""
+    result = summarise_question_structure_columns(
+        expected_question_structure_df,
+        prefix="follow_up_question_",
+    )
+
+    assert isinstance(result, QuestionStructureMetrics), (
+        "Expected summarise_question_structure_columns to return a "
+        "QuestionStructureMetrics instance"
+    )
 
 
 # ============================================================================
@@ -303,7 +318,6 @@ def test_compute_question_structure_metrics_returns_metrics_model(
     result = compute_question_structure_metrics(
         question_structure_input_df,
         text_column="follow_up_question",
-        prefix="follow_up_question_",
     )
 
     assert isinstance(result, QuestionStructureMetrics), (
@@ -319,7 +333,6 @@ def test_compute_question_structure_metrics_returns_expected_values(
     result = compute_question_structure_metrics(
         question_structure_input_df,
         text_column="follow_up_question",
-        prefix="follow_up_question_",
     )
 
     assert (
@@ -371,25 +384,6 @@ def test_compute_question_structure_metrics_uses_default_prefix(
     ), "Expected n_count to equal the number of rows when using the default prefix"
 
 
-def test_compute_question_structure_metrics_uses_custom_prefix(
-    question_structure_input_df,
-):
-    """Uses the supplied prefix when computing metrics."""
-    result = compute_question_structure_metrics(
-        question_structure_input_df,
-        text_column="follow_up_question",
-        prefix="question_",
-    )
-
-    assert isinstance(result, QuestionStructureMetrics), (
-        "Expected compute_question_structure_metrics to return metrics when using "
-        "a custom prefix"
-    )
-    assert (
-        result.n_count == 4
-    ), "Expected n_count to equal the number of rows when using a custom prefix"
-
-
 def test_compute_question_structure_metrics_missing_text_column_raises_key_error(
     question_structure_input_df,
 ):
@@ -398,5 +392,4 @@ def test_compute_question_structure_metrics_missing_text_column_raises_key_error
         compute_question_structure_metrics(
             question_structure_input_df,
             text_column="missing_column",
-            prefix="follow_up_question_",
         )

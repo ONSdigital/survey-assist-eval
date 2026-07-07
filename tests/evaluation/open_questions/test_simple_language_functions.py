@@ -426,7 +426,7 @@ def test_summarise_simple_language_columns_returns_expected_summary(
     result = summarise_simple_language_columns(
         expected_simple_language_df,
         prefix="follow_up_question_",
-    )
+    ).__dict__
 
     assert result["n_count"] == 5, "Expected n_count to equal the number of rows"
 
@@ -462,7 +462,7 @@ def test_summarise_simple_language_columns_uses_prefix():
     result = summarise_simple_language_columns(
         df,
         prefix="test_",
-    )
+    ).__dict__
 
     assert result["n_count"] == 2, (
         "Expected summarise_simple_language_columns to use the supplied "
@@ -493,7 +493,7 @@ def test_summarise_simple_language_columns_uses_custom_syllables_threshold(
         expected_simple_language_df,
         prefix="follow_up_question_",
         syllables_threshold=2,
-    )
+    ).__dict__
 
     assert result["pct_with_word_over_syllables_threshold"] == pytest.approx(
         40.0,
@@ -511,7 +511,7 @@ def test_summarise_simple_language_columns_handles_empty_syllable_counts(
     result = summarise_simple_language_columns(
         expected_simple_language_df,
         prefix="follow_up_question_",
-    )
+    ).__dict__
 
     assert result["pct_with_word_over_syllables_threshold"] == pytest.approx(
         20.0,
@@ -525,20 +525,21 @@ def test_summarise_simple_language_columns_handles_empty_syllable_counts(
 def test_summarise_simple_language_columns_returns_expected_index(
     expected_simple_language_df,
 ):
-    """Returns a Series with all expected simple language summary metric names."""
+    """Returns all expected simple language summary metric names."""
     result = summarise_simple_language_columns(
         expected_simple_language_df,
         prefix="follow_up_question_",
-    )
+    ).__dict__
 
-    expected_index = {
+    expected_keys = {
         "n_count",
         "pct_with_acronyms",
         "mean_avg_syllables_per_word",
+        "syllables_threshold",
         "pct_with_word_over_syllables_threshold",
     }
 
-    assert set(result.index) == expected_index, (
+    assert set(result.keys()) == expected_keys, (
         "Expected summarise_simple_language_columns to return all expected "
         "summary metric names"
     )
@@ -578,6 +579,21 @@ def test_summarise_simple_language_columns_missing_column_raises_key_error(
         )
 
 
+def test_summarise_simple_language_columns_returns_metrics_model(
+    expected_simple_language_df,
+):
+    """Returns a QuestionStructureMetrics model."""
+    result = summarise_simple_language_columns(
+        expected_simple_language_df,
+        prefix="follow_up_question_",
+    )
+
+    assert isinstance(result, SimpleLanguageMetrics), (
+        "Expected summarise_simple_language_columns to return a "
+        "SimpleLanguageMetrics instance"
+    )
+
+
 # ============================================================================
 # Test SimpleLanguageMetrics function
 # ============================================================================
@@ -589,6 +605,7 @@ def test_simple_language_metrics_stores_values():
         n_count=5,
         pct_with_acronyms=40.0,
         mean_avg_syllables_per_word=0.92,
+        syllables_threshold=3,
         pct_with_word_over_syllables_threshold=20.0,
     )
 
@@ -597,6 +614,7 @@ def test_simple_language_metrics_stores_values():
     assert (
         metrics.mean_avg_syllables_per_word == 0.92
     ), "Expected mean_avg_syllables_per_word to be stored"
+    assert metrics.syllables_threshold == 3, "Expected syllables_threshold to be stored"
     assert (
         metrics.pct_with_word_over_syllables_threshold == 20.0
     ), "Expected pct_with_word_over_syllables_threshold to be stored"
@@ -608,6 +626,7 @@ def test_simple_language_metrics_report_metrics_returns_expected_text():
         n_count=5,
         pct_with_acronyms=40.0,
         mean_avg_syllables_per_word=0.92,
+        syllables_threshold=3,
         pct_with_word_over_syllables_threshold=20.0,
     )
 
@@ -619,7 +638,7 @@ def test_simple_language_metrics_report_metrics_returns_expected_text():
             " Number of follow-up questions: 5",
             " Percentage with acronyms: 40.00%",
             " Mean average syllables per word: 0.92",
-            " Percentage with words over syllables threshold: 20.00%",
+            " Percentage with words containing more then 3 syllables: 20.00%",
         ]
     )
 
@@ -640,7 +659,6 @@ def test_compute_simple_language_metrics_returns_metrics_model(
     result = compute_simple_language_metrics(
         simple_language_input_df,
         text_column="follow_up_question",
-        prefix="follow_up_question_",
     )
 
     assert isinstance(result, SimpleLanguageMetrics), (
@@ -656,7 +674,6 @@ def test_compute_simple_language_metrics_returns_expected_values(
     result = compute_simple_language_metrics(
         simple_language_input_df,
         text_column="follow_up_question",
-        prefix="follow_up_question_",
     )
 
     assert (

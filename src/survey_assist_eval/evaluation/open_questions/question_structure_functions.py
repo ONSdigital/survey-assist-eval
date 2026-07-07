@@ -50,29 +50,25 @@ class QuestionStructureMetrics(BaseModel):
 
 
 def compute_question_structure_metrics(
-    df,
-    *,
-    text_column: str,
-    prefix: str = "eval_",
+    df, *, text_column: str
 ) -> QuestionStructureMetrics:
     """Evaluate question structure quality for generated follow-up questions.
 
     Args:
         df: DataFrame containing generated questions.
         text_column: Column containing the text responses.
-        prefix: Prefix for generated metric columns.
 
     Returns:
         QuestionStructureMetrics: Structured summary of metrics.
     """
-    df = add_question_structure_columns(df, text_column=text_column, prefix=prefix)
+    df = add_question_structure_columns(df, text_column=text_column, prefix="eval_")
 
     metrics = summarise_question_structure_columns(
         df,
-        prefix=prefix,
+        prefix="eval_",
     )
 
-    return QuestionStructureMetrics(**metrics.to_dict())
+    return metrics
 
 
 def has_question_mark(text: str) -> bool:
@@ -357,7 +353,7 @@ def summarise_question_structure_columns(
     df: pd.DataFrame,
     *,
     prefix: str,
-) -> pd.Series:
+) -> QuestionStructureMetrics:
     """Summarise precomputed question structure metric columns into a Series.
 
     Args:
@@ -366,7 +362,7 @@ def summarise_question_structure_columns(
             (e.g. "<prefix>is_question").
 
     Returns:
-        A Series containing summary statistics.
+        QuestionStructureMetrics: Structured summary of metrics.
 
     Notes:
         This function assumes all required boolean columns already exist:
@@ -401,4 +397,4 @@ def summarise_question_structure_columns(
         ].mean(),
     }
 
-    return pd.Series(summary)
+    return QuestionStructureMetrics(**summary)

@@ -49,7 +49,10 @@ class OpenQuestionEvaluation(BaseModel):
 
 
 def evaluate_open_questions(
-    df: pd.DataFrame, text_column: str, text_statistics_config: dict | None = None
+    df: pd.DataFrame,
+    text_column: str,
+    text_statistics_config: dict | None = None,
+    simple_language_config: dict | None = None,
 ) -> OpenQuestionEvaluation:
     """Evaluate open questions using structure, language, and text-statistics checks.
 
@@ -58,6 +61,8 @@ def evaluate_open_questions(
         text_column: Column containing the open questions.
         text_statistics_config: Optional dictionary of keyword arguments passed to
             `compute_text_statistics` (e.g. thresholds such as word count or sentence count).
+        simple_language_config: Optional dictionary of keyword arguments passed to
+            `compute_simple_language_metrics` (e.g. syllable thresholds).
 
     Returns:
         OpenQuestionEvaluationResult containing text statistics, question structure
@@ -69,6 +74,7 @@ def evaluate_open_questions(
         evaluation functions.
     """
     text_statistics_config = text_statistics_config or {}
+    simple_language_config = simple_language_config or {}
 
     df = filter_nonempty_object_column(df, column=text_column)
 
@@ -81,7 +87,7 @@ def evaluate_open_questions(
     )
 
     simple_language_metrics = compute_simple_language_metrics(
-        df, text_column=text_column
+        df, text_column=text_column, **simple_language_config
     )
 
     return OpenQuestionEvaluation(

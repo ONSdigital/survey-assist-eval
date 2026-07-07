@@ -23,6 +23,9 @@ EVALUATION_FOLDER = "/evaluation-pipeline/two_prompt_pipeline"
 STG_FILE = "2026_03_tlfs_it11_gemini25_europe_west9/STG3.parquet"
 
 # %%
+MAX_SYLLABLES_THRESHOLD = 3
+
+# %%
 load_dotenv()
 bucket_name = os.getenv("EVALUATION_BUCKET_NAME")
 if not bucket_name:

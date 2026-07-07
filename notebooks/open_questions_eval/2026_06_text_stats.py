@@ -76,8 +76,8 @@ stg_text_stat_comparison = compare_text_statistics(
     prefix="followup_question_",
     word_threshold=MAX_WORD_COUNT_THRESHOLD,
     sentence_threshold=MAX_NUM_SENTENCE_THRESHOLD,
-    long_sentence_threshold=MAX_WORD_COUNT_PER_SENTENCE_THRESHOLD,
-    short_word_count_threshold=MIN_WORD_COUNT_THRESHOLD,
+    long_sentence_word_threshold=MAX_WORD_COUNT_PER_SENTENCE_THRESHOLD,
+    short_text_word_threshold=MIN_WORD_COUNT_THRESHOLD,
 )
 
 print(stg_text_stat_comparison)

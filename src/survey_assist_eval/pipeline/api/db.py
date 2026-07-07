@@ -11,6 +11,7 @@ from google.api_core.exceptions import ServiceUnavailable
 from google.api_core.retry import Retry
 from google.cloud.firestore import DocumentSnapshot
 from google.cloud.firestore_v1.base_document import BaseDocumentReference
+
 from survey_assist_utils.logging import get_logger
 
 # firestore client retry config to handle transient errors

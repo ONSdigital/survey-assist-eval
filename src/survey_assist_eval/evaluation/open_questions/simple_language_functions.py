@@ -17,6 +17,7 @@ class SimpleLanguageMetrics(BaseModel):
     n_count: int
     pct_with_acronyms: float
     mean_avg_syllables_per_word: float
+    syllables_threshold: int
     pct_with_word_over_syllables_threshold: float
 
     def report_metrics(self) -> str:
@@ -26,7 +27,7 @@ class SimpleLanguageMetrics(BaseModel):
             f" Number of follow-up questions: {self.n_count:.0f}",
             f" Percentage with acronyms: {self.pct_with_acronyms:.2f}%",
             f" Mean average syllables per word: {self.mean_avg_syllables_per_word:.2f}",
-            " Percentage with words over syllables threshold: "
+            f" Percentage with words containing more then {self.syllables_threshold} syllables: "
             f"{self.pct_with_word_over_syllables_threshold:.2f}%",
         ]
         return "\n".join(lines)
@@ -36,7 +37,6 @@ def compute_simple_language_metrics(
     df,
     *,
     text_column: str,
-    prefix: str = "eval_",
     syllables_threshold: int = 3,
 ) -> SimpleLanguageMetrics:
     """Evaluate simple language quality for generated follow-up questions.
@@ -44,21 +44,20 @@ def compute_simple_language_metrics(
     Args:
         df: DataFrame containing generated questions.
         text_column: Column containing the text responses.
-        prefix: Prefix for generated metric columns.
         syllables_threshold: Threshold for counting words with high syllable counts.
 
     Returns:
         SimpleLanguageMetrics: Structured summary of metrics.
     """
-    df = add_simple_language_columns(df, text_column=text_column, prefix=prefix)
+    df = add_simple_language_columns(df, text_column=text_column, prefix="eval_")
 
     metrics = summarise_simple_language_columns(
         df,
-        prefix=prefix,
+        prefix="eval_",
         syllables_threshold=syllables_threshold,
     )
 
-    return SimpleLanguageMetrics(**metrics.to_dict())
+    return metrics
 
 
 def extract_acronyms(text: str, extended: bool = False) -> list[str]:
@@ -183,7 +182,7 @@ def summarise_simple_language_columns(
     *,
     prefix: str,
     syllables_threshold: int = 3,
-) -> pd.Series:
+) -> SimpleLanguageMetrics:
     """Summarise precomputed simple language metric columns into a Series.
 
     Args:
@@ -193,7 +192,7 @@ def summarise_simple_language_columns(
         syllables_threshold: Threshold for counting words with high syllable counts.
 
     Returns:
-        A Series containing summary statistics.
+        SimpleLanguageMetrics: Structured summary of metrics.
 
     """
     n_acronyms_col = df[f"{prefix}n_acronyms"]
@@ -206,6 +205,7 @@ def summarise_simple_language_columns(
         "n_count": len(df),
         "pct_with_acronyms": (n_acronyms_col > 0).sum() / len(df) * 100,
         "mean_avg_syllables_per_word": avg_syllables_per_word_col.mean(),
+        "syllables_threshold": syllables_threshold,
         "pct_with_word_over_syllables_threshold": (
             max_syllables > syllables_threshold
         ).sum()
@@ -213,4 +213,4 @@ def summarise_simple_language_columns(
         * 100,
     }
 
-    return pd.Series(summary)
+    return SimpleLanguageMetrics(**summary)

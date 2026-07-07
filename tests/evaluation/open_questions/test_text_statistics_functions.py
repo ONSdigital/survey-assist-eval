@@ -148,19 +148,18 @@ def test_summarise_text_stat_columns_computes_summary():
     summary = summarise_text_stat_columns(
         df_with_stats,
         prefix="answer_",
-        long_sentence_threshold=10,
-    )
+        long_sentence_word_threshold=10,
+    ).__dict__
 
     assert summary["n_count"] == 3
-    assert summary["mean_word_count"] == pytest.approx(6.666666666666667)
     assert summary["sd_word_count"] == pytest.approx(5.507570547286102)
     assert summary["median_word_count"] == 4
     assert summary["mean_sentence_count"] == pytest.approx(1.0)
     assert summary["mean_word_count_per_sentence"] == pytest.approx(5)
     assert summary["pct_over_sentence_count_threshold"] == pytest.approx(0.0)
-    assert summary["pct_with_long_sentence_over_word_count_threshold"] == pytest.approx(
-        1 / 3 * 100
-    )
+    assert summary[
+        "pct_with_sentence_over_long_sentence_word_threshold"
+    ] == pytest.approx(1 / 3 * 100)
     assert summary["pct_over_word_count_threshold"] == pytest.approx(0.0)
     assert summary["pct_blank_or_too_short"] == pytest.approx(0.0)
 
@@ -176,15 +175,15 @@ def test_summarise_text_stat_columns_uses_existing_prefix_columns():
         }
     )
 
-    summary = summarise_text_stat_columns(df, prefix="answer_")
+    summary = summarise_text_stat_columns(df, prefix="answer_").__dict__
 
     assert summary["n_count"] == 3
-    assert summary["mean_word_count"] == pytest.approx(12.0)
+    assert summary["mean_word_count_per_sentence"] == pytest.approx(7.2)
     assert summary["pct_over_word_count_threshold"] == pytest.approx(1 / 3 * 100)
     assert summary["pct_over_sentence_count_threshold"] == pytest.approx(1 / 3 * 100)
-    assert summary["pct_with_long_sentence_over_word_count_threshold"] == pytest.approx(
-        1 / 3 * 100
-    )
+    assert summary[
+        "pct_with_sentence_over_long_sentence_word_threshold"
+    ] == pytest.approx(1 / 3 * 100)
 
 
 def test_summarise_text_stat_columns_raises_when_columns_missing():
@@ -193,6 +192,27 @@ def test_summarise_text_stat_columns_raises_when_columns_missing():
 
     with pytest.raises(KeyError):
         summarise_text_stat_columns(df, prefix="text_")
+
+
+def test_summarise_text_stat_columns_columns_returns_metrics_model():
+    """Returns a QuestionStructureMetrics model."""
+    df = pd.DataFrame(
+        {
+            "answer_word_count": [1, 30, 5],
+            "answer_sentence_count": [1, 3, 1],
+            "answer_words_per_sentence": [[1], [3, 21, 6], [5]],
+            "answer_mean_words_per_sentence": [1.0, 25.0, 5.0],
+        }
+    )
+    result = summarise_text_stat_columns(
+        df,
+        prefix="answer_",
+    )
+
+    assert isinstance(result, OpenQuestionTextStatistics), (
+        "Expected summarise_text_stat_columns to return a "
+        "OpenQuestionTextStatistics instance"
+    )
 
 
 # ============================================================================
@@ -210,7 +230,7 @@ def test_compare_text_statistics_dict_input_returns_dataframe():
     )
 
     assert list(result.index) == ["group_a", "group_b"]
-    assert "mean_word_count" in result.columns
+    assert "median_word_count" in result.columns
     assert result.loc["group_a", "n_count"] == 2
     assert result.loc["group_b", "n_count"] == 2
 
@@ -223,8 +243,8 @@ def test_compare_text_statistics_preserves_labels_in_output():
     result = compare_text_statistics({"A": df_a, "B": df_b}, text_column="answer")
 
     assert list(result.index) == ["A", "B"]
-    assert result.loc["A", "mean_word_count"] == pytest.approx(2.0)
-    assert result.loc["B", "mean_word_count"] == pytest.approx(1.0)
+    assert result.loc["A", "median_word_count"] == pytest.approx(2.0)
+    assert result.loc["B", "median_word_count"] == pytest.approx(1.0)
 
 
 def test_compare_text_statistics_raises_when_no_inputs_are_provided():
@@ -281,14 +301,14 @@ def test_compute_text_statistics_returns_metrics_model(sample_text_statistics_df
         text_column="text",
         word_threshold=3,
         sentence_threshold=1,
-        long_sentence_threshold=4,
-        short_word_count_threshold=2,
+        long_sentence_word_threshold=4,
+        short_text_word_threshold=2,
     )
 
     assert isinstance(metrics, OpenQuestionTextStatistics)
     assert metrics.n_count == 3, "Expected the wrapper to count all input rows."
     assert metrics.mean_sentence_count == pytest.approx(1.0)
-    assert metrics.pct_blank_or_too_short == pytest.approx(33.33333333333333)
+    assert metrics.pct_blank_or_too_short == pytest.approx(0)
     assert metrics.pct_over_word_count_threshold == pytest.approx(33.33333333333333)
 
 
@@ -319,9 +339,9 @@ def test_compute_text_statistics_populates_all_metrics(
     assert isinstance(result.mean_sentence_count, float)
     assert isinstance(result.mean_word_count_per_sentence, float)
     assert isinstance(result.pct_over_word_count_threshold, float)
-    assert isinstance(result.pct_over_sentence_count_threshold, float)
+    assert isinstance(result.pct_with_sentence_over_long_sentence_word_threshold, float)
     assert isinstance(
-        result.pct_with_long_sentence_over_word_count_threshold,
+        result.pct_with_sentence_over_long_sentence_word_threshold,
         float,
     )
     assert isinstance(result.pct_blank_or_too_short, float)
@@ -336,8 +356,8 @@ def test_compute_text_statistics_respects_custom_thresholds(
         text_column="text",
         word_threshold=10,
         sentence_threshold=1,
-        long_sentence_threshold=5,
-        short_word_count_threshold=1,
+        long_sentence_word_threshold=5,
+        short_text_word_threshold=1,
     )
 
     assert isinstance(result, OpenQuestionTextStatistics)
@@ -356,9 +376,13 @@ def test_open_question_text_statistics_report_metrics_formats_output():
         sd_word_count=1.5,
         mean_sentence_count=1.0,
         mean_word_count_per_sentence=2.5,
+        word_threshold=25,
         pct_over_word_count_threshold=33.3,
+        sentence_threshold=3,
         pct_over_sentence_count_threshold=0.0,
-        pct_with_long_sentence_over_word_count_threshold=66.7,
+        long_sentence_word_threshold=5,
+        pct_with_sentence_over_long_sentence_word_threshold=66.7,
+        short_text_word_threshold=3,
         pct_blank_or_too_short=33.3,
     )
 
@@ -367,8 +391,8 @@ def test_open_question_text_statistics_report_metrics_formats_output():
     assert "Text statistics:" in report
     assert "Number of follow-up questions: 3" in report
     assert "Median Word Count: 3.00" in report
-    assert "Percent Over Word Threshold Count: 33.30%" in report
-    assert "Percent with Blank or Too Short Sentences: 33.30%" in report
+    assert "Percent with more than 25 words: 33.30%" in report
+    assert "Percent with less than 3 words: 33.30%" in report
 
 
 def test_open_question_text_statistics_report_metrics_returns_string():
@@ -379,9 +403,13 @@ def test_open_question_text_statistics_report_metrics_returns_string():
         sd_word_count=1.0,
         mean_sentence_count=1.5,
         mean_word_count_per_sentence=4.0,
+        word_threshold=25,
+        sentence_threshold=2,
+        long_sentence_word_threshold=20,
+        short_text_word_threshold=3,
         pct_over_word_count_threshold=10.0,
         pct_over_sentence_count_threshold=20.0,
-        pct_with_long_sentence_over_word_count_threshold=30.0,
+        pct_with_sentence_over_long_sentence_word_threshold=30.0,
         pct_blank_or_too_short=5.0,
     )
 
@@ -398,9 +426,13 @@ def test_open_question_text_statistics_report_metrics_contains_metrics():
         sd_word_count=1.0,
         mean_sentence_count=1.5,
         mean_word_count_per_sentence=4.0,
+        word_threshold=25,
+        sentence_threshold=2,
+        long_sentence_word_threshold=20,
+        short_text_word_threshold=3,
         pct_over_word_count_threshold=10.0,
         pct_over_sentence_count_threshold=20.0,
-        pct_with_long_sentence_over_word_count_threshold=30.0,
+        pct_with_sentence_over_long_sentence_word_threshold=30.0,
         pct_blank_or_too_short=5.0,
     )
 
@@ -408,4 +440,4 @@ def test_open_question_text_statistics_report_metrics_contains_metrics():
 
     assert "Number of follow-up questions: 10" in report
     assert "Median Word Count: 5.00" in report
-    assert "Percent with Blank or Too Short Sentences: 5.00%" in report
+    assert "Percent with less than 3 words: 5.00%" in report

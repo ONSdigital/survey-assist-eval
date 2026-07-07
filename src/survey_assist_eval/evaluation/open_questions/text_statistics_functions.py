@@ -20,9 +20,13 @@ class OpenQuestionTextStatistics(BaseModel):
     sd_word_count: float
     mean_sentence_count: float
     mean_word_count_per_sentence: float
+    word_threshold: int
     pct_over_word_count_threshold: float
+    sentence_threshold: int
     pct_over_sentence_count_threshold: float
-    pct_with_long_sentence_over_word_count_threshold: float
+    long_sentence_word_threshold: int
+    pct_with_sentence_over_long_sentence_word_threshold: float
+    short_text_word_threshold: int
     pct_blank_or_too_short: float
 
     def report_metrics(self):
@@ -34,12 +38,14 @@ class OpenQuestionTextStatistics(BaseModel):
             f" Standard Deviation of Word Count: {self.sd_word_count:.2f}",
             f" Mean Sentence Count: {self.mean_sentence_count:.2f}",
             f" Mean Word Count per Sentence: {self.mean_word_count_per_sentence:.2f}",
-            f" Percent Over Word Threshold Count: {self.pct_over_word_count_threshold:.2f}%",
-            " Percent Over sentence Threshold Count: "
+            f" Percent with more than {self.word_threshold} words: "
+            f"{self.pct_over_word_count_threshold:.2f}%",
+            f" Percent with less than {self.short_text_word_threshold} words: "
+            f"{self.pct_blank_or_too_short:.2f}%",
+            f" Percent with more than {self.sentence_threshold} sentences: "
             f"{self.pct_over_sentence_count_threshold:.2f}%",
-            f" Percent with Long Sentences: {
-                self.pct_with_long_sentence_over_word_count_threshold:.2f}%",
-            f" Percent with Blank or Too Short Sentences: {self.pct_blank_or_too_short:.2f}%",
+            f" Percent with more than {self.long_sentence_word_threshold} words in a sentence: "
+            f"{self.pct_with_sentence_over_long_sentence_word_threshold:.2f}%",
         ]
         return "\n".join(lines)
 
@@ -49,8 +55,8 @@ def compute_text_statistics(  # noqa: PLR0913 pylint: disable = R0913, R0917
     text_column: str,
     word_threshold: int = 25,
     sentence_threshold: int = 2,
-    long_sentence_threshold: int = 20,
-    short_word_count_threshold: int = 2,
+    long_sentence_word_threshold: int = 20,
+    short_text_word_threshold: int = 2,
 ) -> OpenQuestionTextStatistics:
     """Evaluate open-ended question responses.
 
@@ -61,24 +67,25 @@ def compute_text_statistics(  # noqa: PLR0913 pylint: disable = R0913, R0917
         text_column: Column containing the text responses.
         word_threshold: Threshold for "long" text (word count).
         sentence_threshold: Threshold for number of sentences.
-        long_sentence_threshold: Threshold for long sentences.
-        short_word_count_threshold: Threshold for "blank or too short".
+        long_sentence_word_threshold: Threshold for long sentences.
+        short_text_word_threshold: Threshold for "blank or too short".
 
     Returns:
-        A Series with summary statistics for the open-ended question.
+        An OpenQuestionTextStatistics object containing summary
+        statistics for the open-ended question responses.
     """
     df = add_text_stats_columns(df, text_column=text_column, prefix="eval_")
 
-    metrics = summarise_text_stat_columns(
+    statistics = summarise_text_stat_columns(
         df,
         prefix="eval_",
         word_threshold=word_threshold,
         sentence_threshold=sentence_threshold,
-        long_sentence_threshold=long_sentence_threshold,
-        short_word_count_threshold=short_word_count_threshold,
+        long_sentence_word_threshold=long_sentence_word_threshold,
+        short_text_word_threshold=short_text_word_threshold,
     )
 
-    return OpenQuestionTextStatistics(**metrics.to_dict())
+    return statistics
 
 
 def word_counts_per_sentence(text: str) -> list[int]:
@@ -154,9 +161,9 @@ def summarise_text_stat_columns(  # noqa: PLR0913, pylint: disable=R0913
     prefix: str,
     word_threshold: int = 25,
     sentence_threshold: int = 2,
-    long_sentence_threshold: int = 20,
-    short_word_count_threshold: int = 2,
-) -> pd.Series:
+    long_sentence_word_threshold: int = 20,
+    short_text_word_threshold: int = 2,
+) -> OpenQuestionTextStatistics:
     """Summarise precomputed text statistic columns into a Series.
 
     Args:
@@ -165,12 +172,13 @@ def summarise_text_stat_columns(  # noqa: PLR0913, pylint: disable=R0913
             (e.g. "<prefix>word_count").
         word_threshold: Threshold for "long" text (word count).
         sentence_threshold: Threshold for number of sentences.
-        long_sentence_threshold: Threshold for long sentences
+        long_sentence_word_threshold: Threshold for long sentences
             (words per sentence).
-        short_word_count_threshold: Threshold for "blank or too short".
+        short_text_word_threshold: Threshold for "blank or too short".
 
     Returns:
-        A Series containing summary statistics.
+        An OpenQuestionTextStatistics object containing summary
+        statistics for the open-ended question responses.
 
     Notes:
         This function assumes all required columns already exist:
@@ -189,20 +197,23 @@ def summarise_text_stat_columns(  # noqa: PLR0913, pylint: disable=R0913
         "sd_word_count": word_count.std(),
         "mean_sentence_count": sentence_count.mean(),
         "mean_word_count_per_sentence": np.mean(words_per_sentence.sum()),
+        "word_threshold": word_threshold,
         "pct_over_word_count_threshold": (word_count > word_threshold).mean() * 100,
+        "sentence_threshold": sentence_threshold,
         "pct_over_sentence_count_threshold": (
             sentence_count > sentence_threshold
         ).mean()
         * 100,
-        "pct_with_long_sentence_over_word_count_threshold": (
-            words_per_sentence.apply(max) > long_sentence_threshold
+        "long_sentence_word_threshold": long_sentence_word_threshold,
+        "pct_with_sentence_over_long_sentence_word_threshold": (
+            words_per_sentence.apply(max) > long_sentence_word_threshold
         ).mean()
         * 100,
-        "pct_blank_or_too_short": (word_count <= short_word_count_threshold).mean()
-        * 100,
+        "short_text_word_threshold": short_text_word_threshold,
+        "pct_blank_or_too_short": (word_count < short_text_word_threshold).mean() * 100,
     }
 
-    return pd.Series(summary)
+    return OpenQuestionTextStatistics(**summary)
 
 
 def compare_text_statistics(  # noqa: PLR0913, pylint: disable=R0913
@@ -212,8 +223,8 @@ def compare_text_statistics(  # noqa: PLR0913, pylint: disable=R0913
     text_column: str | None = None,
     word_threshold: int = 25,
     sentence_threshold: int = 2,
-    long_sentence_threshold: int = 20,
-    short_word_count_threshold: int = 2,
+    long_sentence_word_threshold: int = 20,
+    short_text_word_threshold: int = 3,
 ) -> pd.DataFrame:
     """Compare text statistics across labelled datasets.
 
@@ -223,8 +234,8 @@ def compare_text_statistics(  # noqa: PLR0913, pylint: disable=R0913
         text_column: Column containing raw text (used to compute stats).
         word_threshold: Threshold for "long" text (word count).
         sentence_threshold: Threshold for number of sentences.
-        long_sentence_threshold: Threshold for long sentences.
-        short_word_count_threshold: Threshold for "blank or too short".
+        long_sentence_word_threshold: Threshold for long sentences (word count per sentence).
+        short_text_word_threshold: Threshold for "blank or too short".
 
     Returns:
         A DataFrame of summary statistics, indexed by dataset label.
@@ -241,29 +252,28 @@ def compare_text_statistics(  # noqa: PLR0913, pylint: disable=R0913
 
     for label, df in datasets.items():
         if text_column is not None:
-            local_prefix = prefix or f"{text_column}_"
-            df_with_stats = add_text_stats_columns(
+            text_stats_summary = compute_text_statistics(
                 df.copy(),
                 text_column=text_column,
-                prefix=local_prefix,
+                word_threshold=word_threshold,
+                sentence_threshold=sentence_threshold,
+                long_sentence_word_threshold=long_sentence_word_threshold,
+                short_text_word_threshold=short_text_word_threshold,
             )
         else:
             if prefix is None:
                 raise ValueError("Prefix must be provided when text_column is None.")
-            local_prefix = prefix
-            df_with_stats = df
+            text_stats_summary = summarise_text_stat_columns(
+                df.copy(),
+                prefix=prefix,
+                word_threshold=word_threshold,
+                sentence_threshold=sentence_threshold,
+                long_sentence_word_threshold=long_sentence_word_threshold,
+                short_text_word_threshold=short_text_word_threshold,
+            )
 
-        summary = summarise_text_stat_columns(
-            df_with_stats,
-            prefix=local_prefix,
-            word_threshold=word_threshold,
-            sentence_threshold=sentence_threshold,
-            long_sentence_threshold=long_sentence_threshold,
-            short_word_count_threshold=short_word_count_threshold,
-        )
-
-        summary.name = label
-        summaries.append(summary)
+        text_stats_summary_series = pd.Series(text_stats_summary.__dict__, name=label)
+        summaries.append(text_stats_summary_series)
 
     result = pd.DataFrame(summaries)
     result.index.name = "dataset"

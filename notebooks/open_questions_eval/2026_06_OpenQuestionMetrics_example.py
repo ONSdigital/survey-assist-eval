@@ -19,8 +19,11 @@ STG_FILE = "2026_03_tlfs_it11_gemini25_europe_west9/STG3.parquet"
 # Text statistics configuration
 MAX_WORD_COUNT_THRESHOLD = 15
 MAX_NUM_SENTENCE_THRESHOLD = 1
-MAX_WORD_COUNT_PER_SENTENCE_THRESHOLD = 20
+MAX_WORD_COUNT_PER_SENTENCE_THRESHOLD = 10
 MIN_WORD_COUNT_THRESHOLD = 3
+
+# Simple language confifguration
+MAX_SYLLABLES_THRESHOLD = 3
 # %%
 load_dotenv()
 bucket_name = os.getenv("EVALUATION_BUCKET_NAME")
@@ -32,14 +35,19 @@ stg_df = pd.read_parquet(f"{base_folder}{STG_FILE}")
 text_statistics_config = {
     "word_threshold": MAX_WORD_COUNT_THRESHOLD,
     "sentence_threshold": MAX_NUM_SENTENCE_THRESHOLD,
-    "long_sentence_threshold": MAX_WORD_COUNT_PER_SENTENCE_THRESHOLD,
-    "short_word_count_threshold": MIN_WORD_COUNT_THRESHOLD,
+    "long_sentence_word_threshold": MAX_WORD_COUNT_PER_SENTENCE_THRESHOLD,
+    "short_text_word_threshold": MIN_WORD_COUNT_THRESHOLD,
+}
+
+simple_language_config = {
+    "syllables_threshold": MAX_SYLLABLES_THRESHOLD,
 }
 # %%
 open_question_metrics = evaluate_open_questions(
     stg_df,
     text_column="followup_question",
     text_statistics_config=text_statistics_config,
+    simple_language_config=simple_language_config,
 )
 print(open_question_metrics.report_metrics())
 # %%

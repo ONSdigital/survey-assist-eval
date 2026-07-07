@@ -14,6 +14,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 from pandas._libs.missing import NAType  # pylint: disable=E0611
+
 from survey_assist_utils.logging import get_logger
 
 _RANDOM_SEED = 42
