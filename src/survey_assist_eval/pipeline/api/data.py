@@ -413,29 +413,9 @@ def calc_eval_metrics(
                 "evaluation metrics. Ensure that the lookup and classify"
                 "results have been recorded before calculating metrics."
             )
-    # avoid modifying the original dataFrame when calculating metrics
-    metrics_df = df.copy()
 
-    # create a combined codes column prioritising lookup_code if it was
-    # classified by that means
-    metrics_df["unambiguous_codes"] = metrics_df.apply(
-        lambda row: row["lookup_code"]
-        if row["lookup_classified"] is True
-        else row["classify_code"],
-        axis=1,
-    )
-
-    # exclude records where lookup or classify API endpoints errored
-    metrics_df = metrics_df[
-        metrics_df["lookup_error"].eq(False)
-        & metrics_df["classify_error"].eq(False)
-    ]
-
-    # for records that were classified by lookup, set classify_candidates to
-    # an empty list as no candidates are generated
-    metrics_df.loc[
-        metrics_df["lookup_classified"].eq(True), "classify_candidates"
-    ] = []
+    # prep evaluation results for usage with prep_data/metrics module funcs
+    metrics_df = _prep_df_for_eval(df)
 
     # clean and validate unambiguous_codes for evaluation and recombine
     # no need to prep `clerical_codes` as clean in input data
@@ -474,6 +454,46 @@ def calc_eval_metrics(
     )
 
     return metrics.as_dict()
+
+
+def _prep_df_for_eval(df: pd.DataFrame) -> pd.DataFrame:
+    """Helper function to prep for evaluation metrics calculation.
+
+    Functionality is split into helper to allow for more detailed unit testing.
+    """
+    # avoid modifying the original dataFrame when calculating metrics
+    metrics_df = df.copy()
+
+    # create a combined codes column prioritising lookup_code if it was
+    # classified by that means
+    metrics_df["unambiguous_codes"] = metrics_df.apply(
+        lambda row: row["lookup_code"]
+        if row["lookup_classified"] is True
+        else row["classify_code"],
+        axis=1,
+    )
+
+    # exclude records where lookup or classify API endpoints errored
+    metrics_df = metrics_df[
+        (  # case lookup classified and no error
+            metrics_df["lookup_classified"].eq(True)
+            & metrics_df["lookup_error"].eq(False)
+        ) | (  # case no error in lookup and classify (regarless of classified)
+            metrics_df["lookup_error"].eq(False)
+            & metrics_df["classify_error"].eq(False)
+        )
+    ].reset_index(drop=True)
+
+    # for records that were classified by lookup, set classify_candidates to
+    # an empty list as no candidates are generated
+    mask = metrics_df["lookup_classified"].eq(True)
+    metrics_df.loc[mask, "classify_candidates"] = (
+        metrics_df.loc[
+            mask, "classify_candidates"
+        ].apply(lambda _: [])
+    )
+
+    return metrics_df
 
 
 def calc_eval_perf(
