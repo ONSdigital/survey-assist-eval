@@ -699,10 +699,21 @@ class TestCalcEvalMetrics:
             f"{unambiguous_codes.tolist()}"
         )
         candidate_results = metrics_df["classify_candidates"]
-        print(f"Candidate results: {candidate_results}")
-        print(f"Expected candidate results: {expected_candidate_results}")
         assert candidate_results.equals(expected_candidate_results), (
             f"Expected candidate results: "
             f"{expected_candidate_results.tolist()}, but got: "
             f"{candidate_results.tolist()}"
         )
+
+    @pytest.mark.parametrize("classify_type", ["sic", "soc"])
+    def test_calc_eval_metrics_with_missing_cols(
+        self, dummy_calc_eval_metrics_data, classify_type
+    ):
+        """Test raises KeyError when required columns are missing."""
+        input_df, _, _ = dummy_calc_eval_metrics_data
+        for col in input_df.columns:
+            test_df = pd.DataFrame(input_df.drop(columns=[col]))
+            with pytest.raises(
+                KeyError, match=f"DataFrame must contain \'{col}\'"
+            ):
+                data_module.calc_eval_metrics(test_df, classify_type)
