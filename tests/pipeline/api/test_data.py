@@ -813,6 +813,38 @@ class TestCalcEvalMetrics:
         ) as mocks:
             data_module.calc_eval_metrics(input_df, classify_type)
 
+        assert not mocks["get_logger"].return_value.warning.called, (
+            "Did not expect warning log with valid prepped model codes."
+        )
+        mocks["prep_model_codes"].assert_called_once_with(
+            ANY,
+            codes_col="unambiguous_codes",
+            alt_codes_col="classify_candidates",
+            code_type=classify_type
+        )
+        mocks["calc_simple_metrics"].assert_called_once_with(
+            ANY,
+            truth_col="clerical_codes",
+            initial_model_col="model_codes",
+            final_model_col=None,
+        )
+
+    @pytest.mark.parametrize("classify_type", ["sic", "soc"])
+    def test_calc_eval_metrics_with_invalid_prepped_model_codes(
+        self, dummy_calc_eval_metrics_data, classify_type, caplog
+    ):
+        """Test raises warning log message when prepped model codes invalid."""
+        (
+            input_df, unique_ids, unambiguous_codes, _
+        ) = dummy_calc_eval_metrics_data
+        with get_calc_eval_metrics_mocks(
+            unique_ids, unambiguous_codes, invalid_codes_during_prep=True
+        ) as mocks, caplog.at_level("WARNING"):
+            data_module.calc_eval_metrics(input_df, classify_type)
+
+        assert mocks["get_logger"].return_value.warning.called, (
+            "Expected a warning log message for invalid prepped model codes."
+        )
         mocks["prep_model_codes"].assert_called_once_with(
             ANY,
             codes_col="unambiguous_codes",
