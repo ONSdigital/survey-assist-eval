@@ -29,7 +29,7 @@ from survey_assist_eval.data_cleaning.code_standard import get_clean_n_digit_cod
 # pylint: disable=R0801
 
 # %%
-EXTENDED_RUN = False  # set to True to include more suggesters and debug messages
+EXTENDED_RUN = True  # set to True to include more suggesters and debug messages
 
 if EXTENDED_RUN:
     logging.getLogger("survey_assist_e...").setLevel(logging.DEBUG)
