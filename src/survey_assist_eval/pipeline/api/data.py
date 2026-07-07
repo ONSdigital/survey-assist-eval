@@ -480,6 +480,9 @@ def calc_eval_perf(
     df: pd.DataFrame,
     start_time: datetime.datetime,
     end_time: datetime.datetime,
+    *,
+    loookup_request_parallelism: int = 5,
+    classify_request_parallelism: int = 2,
 ) -> dict[str, float]:
     """Calculate evaluation performance metrics.
 
@@ -488,6 +491,10 @@ def calc_eval_perf(
             classify results.
         start_time: The start time of the evaluation process.
         end_time: The end time of the evaluation process.
+        loookup_request_parallelism: The number of parallel lookup requests
+            made to the API.
+        classify_request_parallelism: The number of parallel classify requests
+            made to the API.
 
     Returns:
         dict: A dictionary containing the evaluation performance metrics.
@@ -517,7 +524,9 @@ def calc_eval_perf(
         "duration_seconds": duration,
         "records_per_second": records_per_second,
         "num_lookup_errors": num_lookup_errors,
+        "lookup_parallelism": loookup_request_parallelism,
         "lookup_error_rate": num_lookup_errors / num_records,
         "num_classify_errors": num_classify_errors,
+        "classify_parallelism": classify_request_parallelism,
         "classify_error_rate": num_classify_errors / num_records,
     }

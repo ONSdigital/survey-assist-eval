@@ -118,7 +118,13 @@ def main(classify_type: Literal["sic", "soc"]) -> None:
 
     # calculate performance metrics for evaluation metadata purposes
     end_time = datetime.datetime.now(tz=datetime.UTC)
-    perf_metrics = calc_eval_perf(df, start_time, end_time)
+    perf_metrics = calc_eval_perf(
+        df,
+        start_time,
+        end_time,
+        loookup_request_parallelism=LOOKUP_SEMAPHORE_LIMIT,
+        classify_request_parallelism=CLASSIFY_SEMAPHORE_LIMIT,
+    )
     logger.info(
         f"API evaluation completed in {perf_metrics['duration_seconds']}s."
     )
