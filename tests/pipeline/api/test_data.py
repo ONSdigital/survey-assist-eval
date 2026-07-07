@@ -811,8 +811,12 @@ class TestCalcEvalMetrics:
         with get_calc_eval_metrics_mocks(
             unique_ids, unambiguous_codes, invalid_codes_during_prep=False
         ) as mocks:
-            data_module.calc_eval_metrics(input_df, classify_type)
+            metrics = data_module.calc_eval_metrics(input_df, classify_type)
 
+        assert not metrics["invalid_model_codes_detected"], (
+            "Expected invalid_model_codes_detected to be False when all "
+            "prepped model codes are valid."
+        )
         assert not mocks["get_logger"].return_value.warning.called, (
             "Did not expect warning log with valid prepped model codes."
         )
@@ -840,8 +844,12 @@ class TestCalcEvalMetrics:
         with get_calc_eval_metrics_mocks(
             unique_ids, unambiguous_codes, invalid_codes_during_prep=True
         ) as mocks, caplog.at_level("WARNING"):
-            data_module.calc_eval_metrics(input_df, classify_type)
+            metrics = data_module.calc_eval_metrics(input_df, classify_type)
 
+        assert metrics["invalid_model_codes_detected"], (
+            "Expected invalid_model_codes_detected to be True when invalid "
+            "prepped model codes are present."
+        )
         assert mocks["get_logger"].return_value.warning.called, (
             "Expected a warning log message for invalid prepped model codes."
         )
