@@ -226,6 +226,55 @@ def get_and_prepare_test_data_mocks(df: pd.DataFrame):
 
 
 @pytest.fixture
+def dummy_calc_eval_metrics_data() -> tuple[
+    pd.DataFrame, pd.Series, pd.Series
+]:
+    """Fixture to provide dummy data for testing calc_eval_metrics function.
+
+    Returns:
+        tuple: A tuple containing a DataFrame with dummy data for evaluation
+        metrics, a Series with expected model results, and a Series with
+        expected candidate results.
+    """
+    dummy_candidate_data = [
+        {"code": "C4a", "description": "desc 4a", "likelihood": 0.9},
+        {"code": "C5b", "description": "desc 5b", "likelihood": 0.8},
+    ]
+    data = {
+        "unique_id": [1, 2, 3, 4, 5, 6],
+        "lookup_classified": [True, pd.NA, True, False, False, False],
+        "lookup_code": ["L1", pd.NA, "L3", pd.NA, pd.NA, pd.NA],
+        "lookup_error": [False, True, False, False, False, False],
+        "classify_classified": [pd.NA, pd.NA, pd.NA, True, False, pd.NA],
+        "classify_error": [pd.NA, pd.NA, pd.NA, False, False, True],
+        "classify_code": [pd.NA, pd.NA, pd.NA, "C4", pd.NA, pd.NA],
+        "classify_candidates": [
+            pd.NA,
+            pd.NA,
+            pd.NA,
+            [dummy_candidate_data[0]],
+            [dummy_candidate_data[1]],
+            pd.NA,
+        ],
+    }
+    # ensure errored cases are excluded from metrics_df
+    expected_unambiguous_codes = pd.Series(["L1", "L3", "C4", pd.NA])
+    expected_candidate_results = pd.Series(
+        [
+            [],  # ensures lookup candidates are empty
+            [],
+            [dummy_candidate_data[0]],
+            [dummy_candidate_data[1]],
+        ]
+    )
+    return (
+        pd.DataFrame(data),
+        expected_unambiguous_codes,
+        expected_candidate_results,
+    )
+
+
+@pytest.fixture
 def dummy_cal_eval_perf_data() -> tuple[pd.DataFrame, int, int, int]:
     """Fixture to provide dummy data for testing calc_eval_perf function.
 
@@ -623,3 +672,37 @@ class TestCalcEvalPerf:
         empty_df = pd.DataFrame(columns=input_df.columns)
         with pytest.raises(ValueError, match="DataFrame is empty."):
             data_module.calc_eval_perf(empty_df, start, end)
+
+
+class TestCalcEvalMetrics:
+    """Unit tests for the calc_eval_metrics function."""
+
+    # required pylint ignore for unit testing purposes
+    # pylint: disable=W0212
+    def test_calc_eval_metrics_prep(self, dummy_calc_eval_metrics_data):
+        """Test that the function prepares data correctly for evaluation."""
+        input_df, expected_unambiguous_codes, expected_candidate_results = (
+            dummy_calc_eval_metrics_data
+        )
+        metrics_df = data_module._prep_df_for_eval(
+            input_df
+        )
+
+        assert isinstance(metrics_df, pd.DataFrame), (
+            f"Expected prep return to be a DataFrame, but got: "
+            f"{type(metrics_df)}"
+        )
+        unambiguous_codes = metrics_df["unambiguous_codes"]
+        assert unambiguous_codes.equals(expected_unambiguous_codes), (
+            "Expected unambiguous codes: "
+            f"{expected_unambiguous_codes.tolist()}, but got: "
+            f"{unambiguous_codes.tolist()}"
+        )
+        candidate_results = metrics_df["classify_candidates"]
+        print(f"Candidate results: {candidate_results}")
+        print(f"Expected candidate results: {expected_candidate_results}")
+        assert candidate_results.equals(expected_candidate_results), (
+            f"Expected candidate results: "
+            f"{expected_candidate_results.tolist()}, but got: "
+            f"{candidate_results.tolist()}"
+        )
