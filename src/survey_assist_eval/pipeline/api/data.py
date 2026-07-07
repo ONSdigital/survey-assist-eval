@@ -399,6 +399,7 @@ def calc_eval_metrics(
     logger = get_logger(__name__, level=log_level)
     # defence against not running lookup/classify calls first
     for required_col in [
+        "unique_id",
         "lookup_classified",
         "lookup_code",
         "lookup_error",
