@@ -122,7 +122,7 @@ def main(classify_type: Literal["sic", "soc"]) -> None:
         df,
         start_time,
         end_time,
-        loookup_request_parallelism=LOOKUP_SEMAPHORE_LIMIT,
+        lookup_request_parallelism=LOOKUP_SEMAPHORE_LIMIT,
         classify_request_parallelism=CLASSIFY_SEMAPHORE_LIMIT,
     )
     logger.info(
