@@ -4,6 +4,7 @@
 # for improved readability
 # fmt: off
 
+import datetime
 import os
 import re
 from typing import Any
@@ -473,3 +474,50 @@ def calc_eval_metrics(
     )
 
     return metrics.as_dict()
+
+
+def calc_eval_perf(
+    df: pd.DataFrame,
+    start_time: datetime.datetime,
+    end_time: datetime.datetime,
+) -> dict[str, float]:
+    """Calculate evaluation performance metrics.
+
+    Args:
+        df: DataFrame containing the input test data with recorded lookup and
+            classify results.
+        start_time: The start time of the evaluation process.
+        end_time: The end time of the evaluation process.
+
+    Returns:
+        dict: A dictionary containing the evaluation performance metrics.
+    """
+    # defend against not running lookup/classify calls first
+    for required_col in ["lookup_error", "classify_error"]:
+        if required_col not in df.columns:
+            raise KeyError(
+                f"DataFrame must contain '{required_col}' to calculate "
+                "performance metrics. Ensure that the lookup and classify"
+                "results have been recorded before calculating."
+            )
+    duration = (end_time - start_time).total_seconds()
+    num_records = len(df)
+    if num_records == 0:
+        raise ValueError(
+            "DataFrame is empty. Cannot calculate evaluation performance "
+            "metrics on an empty DataFrame."
+        )
+    records_per_second = num_records / duration
+
+    num_lookup_errors = int(df["lookup_error"].sum())
+    num_classify_errors = int(df["classify_error"].sum())
+
+    return {
+        "num_records": num_records,
+        "duration_seconds": duration,
+        "records_per_second": records_per_second,
+        "num_lookup_errors": num_lookup_errors,
+        "lookup_error_rate": num_lookup_errors / num_records,
+        "num_classify_errors": num_classify_errors,
+        "classify_error_rate": num_classify_errors / num_records,
+    }
