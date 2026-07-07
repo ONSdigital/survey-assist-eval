@@ -16,6 +16,9 @@ import pandas as pd
 from pandas._libs.missing import NAType  # pylint: disable=E0611
 from survey_assist_utils.logging import get_logger
 
+from survey_assist_eval.data_cleaning.prep_data import prep_model_codes
+from survey_assist_eval.evaluation.metrics import calc_simple_metrics
+
 _RANDOM_SEED = 42
 _REQUIRED_FIELDS_MAP = {
     "unique_id": "unique_id",
@@ -372,3 +375,101 @@ def record_classify_results(
     ].map(lambda x: pd.NA if x is None else x)
 
     return output_df
+
+
+def calc_eval_metrics(
+    df: pd.DataFrame, classify_type: str, log_level: str = "INFO"
+) -> dict[str, dict[str, int | float] | None]:
+    """Calculate evaluation metrics using the API call results.
+
+    Args:
+        df: DataFrame containing the input test data with recorded lookup and
+            classify results.
+        classify_type: The type of classification being evaluated, either
+            "sic" or "soc".
+        log_level: Log level for logging within this function, must be one of
+            "DEBUG", "INFO", "WARNING", "ERROR", or "CRITICAL".
+
+    Returns:
+        dict: A dictionary containing the evaluation metrics (see
+        `survey_assist_eval.evaluation.metrics` and `calc_simple_metrics()
+        for further details).
+    """
+    logger = get_logger(__name__, level=log_level)
+    # defence against not running lookup/classify calls first
+    for required_col in [
+        "lookup_classified",
+        "lookup_code",
+        "lookup_error",
+        "classify_classified",
+        "classify_code",
+        "classify_error",
+        "classify_candidates",
+    ]:
+        if required_col not in df.columns:
+            raise KeyError(
+                f"DataFrame must contain '{required_col}' to calculate "
+                "evaluation metrics. Ensure that the lookup and classify"
+                "results have been recorded before calculating metrics."
+            )
+    # avoid modifying the original dataFrame when calculating metrics
+    metrics_df = df.copy()
+
+    # create a combined codes column prioritising lookup_code if it was
+    # classified by that means
+    metrics_df["unambiguous_codes"] = metrics_df.apply(
+        lambda row: row["lookup_code"]
+        if row["lookup_classified"] is True
+        else row["classify_code"],
+        axis=1,
+    )
+
+    # exclude records where lookup or classify API endpoints errored
+    metrics_df = metrics_df[
+        metrics_df["lookup_error"].eq(False)
+        & metrics_df["classify_error"].eq(False)
+    ]
+
+    # for records that were classified by lookup, set classify_candidates to
+    # an empty list as no candidates are generated
+    metrics_df.loc[
+        metrics_df["lookup_classified"].eq(True), "classify_candidates"
+    ] = []
+
+    # clean and validate unambiguous_codes for evaluation and recombine
+    # no need to prep `clerical_codes` as clean in input data
+    prepped_codes = prep_model_codes(
+        metrics_df,
+        codes_col="unambiguous_codes",
+        alt_codes_col="classify_candidates",
+        code_type=classify_type,
+    )
+    metrics_df = metrics_df.merge(
+        prepped_codes,
+        on="unique_id",
+        how="left",
+        validate="one_to_one",
+    )
+
+    # catch and log unique invalid model codes for indication purposes
+    invalid_codes = prepped_codes[
+        prepped_codes["model_codes_invalid"] != {}
+    ]["model_codes_invalid"].tolist()
+    unique_invalid_codes = set().union(*invalid_codes)
+    num_unique_invalid_codes = len(unique_invalid_codes)
+    if num_unique_invalid_codes > 0:
+        logger.warning(
+            f"Found {num_unique_invalid_codes} unique invalid {classify_type}"
+            f" codes during evaluation metrics calculation: {invalid_codes}"
+        )
+
+    # calculate evaluation metrics using the cleaned model codes and the
+    # clerical codes as the ground truth
+    metrics = calc_simple_metrics(
+        metrics_df,
+        truth_col="clerical_codes",
+        initial_model_col="model_codes",
+        final_model_col=None,  # no final code in API eval pipeline
+    )
+
+    return metrics.as_dict()
