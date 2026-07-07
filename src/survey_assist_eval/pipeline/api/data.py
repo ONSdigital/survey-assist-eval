@@ -439,11 +439,13 @@ def calc_eval_metrics(
     ]["model_codes_invalid"].tolist()
     unique_invalid_codes = set().union(*invalid_codes)
     num_unique_invalid_codes = len(unique_invalid_codes)
+    model_codes_invalid = False
     if num_unique_invalid_codes > 0:
         logger.warning(
             f"Found {num_unique_invalid_codes} unique invalid {classify_type}"
             f" codes during evaluation metrics calculation: {invalid_codes}"
         )
+        model_codes_invalid = True
 
     # calculate evaluation metrics using the cleaned model codes and the
     # clerical codes as the ground truth
@@ -454,7 +456,11 @@ def calc_eval_metrics(
         final_model_col=None,  # no final code in API eval pipeline
     )
 
-    return metrics.as_dict()
+    # add model_codes_invalid to the output metrics for indication purposes
+    output_metrics = metrics.as_dict()
+    output_metrics["invalid_model_codes_detected"] = model_codes_invalid
+
+    return output_metrics
 
 
 def _prep_df_for_eval(df: pd.DataFrame) -> pd.DataFrame:
