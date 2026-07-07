@@ -2,12 +2,18 @@
 
 import datetime
 from contextlib import ExitStack, contextmanager
-from unittest.mock import MagicMock, patch
+from unittest.mock import ANY, MagicMock, patch
 
 import pandas as pd
 import pytest
 from pandas.testing import assert_frame_equal
 
+from survey_assist_eval.evaluation.metrics import (
+    AccuracyMetrics,
+    AmbiguityMetrics,
+    CodabilityMetrics,
+    SimpleMetrics,
+)
 from survey_assist_eval.pipeline.api import data as data_module
 
 # turning off black for this file: set max line length to match PEP8 (79 chars)
@@ -227,14 +233,14 @@ def get_and_prepare_test_data_mocks(df: pd.DataFrame):
 
 @pytest.fixture
 def dummy_calc_eval_metrics_data() -> tuple[
-    pd.DataFrame, pd.Series, pd.Series
+    pd.DataFrame, pd.Series, pd.Series, pd.Series
 ]:
     """Fixture to provide dummy data for testing calc_eval_metrics function.
 
     Returns:
         tuple: A tuple containing a DataFrame with dummy data for evaluation
-        metrics, a Series with expected model results, and a Series with
-        expected candidate results.
+            metrics, a Series with unique_ids, expected model results, and
+            expected candidate results.
     """
     dummy_candidate_data = [
         {"code": "C4a", "description": "desc 4a", "likelihood": 0.9},
@@ -258,6 +264,7 @@ def dummy_calc_eval_metrics_data() -> tuple[
         ],
     }
     # ensure errored cases are excluded from metrics_df
+    expected_ids = pd.Series([1, 3, 4, 5])
     expected_unambiguous_codes = pd.Series(["L1", "L3", "C4", pd.NA])
     expected_candidate_results = pd.Series(
         [
@@ -269,9 +276,75 @@ def dummy_calc_eval_metrics_data() -> tuple[
     )
     return (
         pd.DataFrame(data),
+        expected_ids,
         expected_unambiguous_codes,
         expected_candidate_results,
     )
+
+
+@contextmanager
+def get_calc_eval_metrics_mocks(
+    unique_ids: pd.Series,
+    unambiguous_codes: pd.Series,
+    invalid_codes_during_prep: bool = False
+):
+    """Context manager to mock calc_eval_metrics function."""
+    if not invalid_codes_during_prep:
+        data = {
+            "unique_id": unique_ids.tolist(),
+            "model_codes": unambiguous_codes.tolist(),
+            "model_codes_invalid": [set() for _ in range(len(unique_ids))],
+
+        }
+    else:
+        data = {
+            "unique_id": unique_ids.tolist(),
+            "model_codes": unambiguous_codes.tolist(),
+            "model_codes_invalid": [
+                {"invalid_code"} for _ in range(len(unique_ids))
+            ],
+        }
+    prepped_codes = pd.DataFrame(data)
+    with ExitStack() as stack:
+        mock_get_logger = stack.enter_context(
+            patch(
+                "survey_assist_eval.pipeline.api.data.get_logger",
+                return_value=MagicMock()
+            )
+        )
+        mock_prepped_codes = stack.enter_context(
+            patch(
+                "survey_assist_eval.pipeline.api.data.prep_model_codes",
+                return_value=prepped_codes
+            )
+        )
+        mock_calc_simple_metrics = stack.enter_context(
+            patch(
+                "survey_assist_eval.pipeline.api.data.calc_simple_metrics",
+                return_value=SimpleMetrics(
+                    ambiguity_metrics=AmbiguityMetrics(
+                        precision=0.0,
+                        recall=0.0,
+                        f1=0.0,
+                        accuracy=0.0,
+                        TP=0,
+                        FP=0,
+                        FN=0,
+                        TN=0
+                    ),
+                    codability_metrics=CodabilityMetrics(
+                        initial_codable_prop=0.0, initial_codable_count=0
+                    ),
+                    initial_accuracy_metrics=AccuracyMetrics(),
+                    final_accuracy_metrics=None,
+                )
+            )
+        )
+        yield {
+            "get_logger": mock_get_logger,
+            "prep_model_codes": mock_prepped_codes,
+            "calc_simple_metrics": mock_calc_simple_metrics,
+        }
 
 
 @pytest.fixture
@@ -681,9 +754,13 @@ class TestCalcEvalMetrics:
     # pylint: disable=W0212
     def test_calc_eval_metrics_prep(self, dummy_calc_eval_metrics_data):
         """Test that the function prepares data correctly for evaluation."""
-        input_df, expected_unambiguous_codes, expected_candidate_results = (
-            dummy_calc_eval_metrics_data
-        )
+        (
+            input_df,
+            expected_ids,
+            expected_unambiguous_codes,
+            expected_candidate_results
+        ) = dummy_calc_eval_metrics_data
+
         metrics_df = data_module._prep_df_for_eval(
             input_df
         )
@@ -691,6 +768,11 @@ class TestCalcEvalMetrics:
         assert isinstance(metrics_df, pd.DataFrame), (
             f"Expected prep return to be a DataFrame, but got: "
             f"{type(metrics_df)}"
+        )
+        unique_ids = metrics_df["unique_id"]
+        assert unique_ids.equals(expected_ids), (
+            f"Expected unique IDs: {expected_ids.tolist()}, but got: "
+            f"{unique_ids.tolist()}"
         )
         unambiguous_codes = metrics_df["unambiguous_codes"]
         assert unambiguous_codes.equals(expected_unambiguous_codes), (
@@ -710,10 +792,36 @@ class TestCalcEvalMetrics:
         self, dummy_calc_eval_metrics_data, classify_type
     ):
         """Test raises KeyError when required columns are missing."""
-        input_df, _, _ = dummy_calc_eval_metrics_data
+        input_df, _, _, _ = dummy_calc_eval_metrics_data
         for col in input_df.columns:
             test_df = pd.DataFrame(input_df.drop(columns=[col]))
             with pytest.raises(
                 KeyError, match=f"DataFrame must contain \'{col}\'"
             ):
                 data_module.calc_eval_metrics(test_df, classify_type)
+
+    @pytest.mark.parametrize("classify_type", ["sic", "soc"])
+    def test_calc_eval_metrics_all_prepped_model_codes_valid(
+        self, dummy_calc_eval_metrics_data, classify_type
+    ):
+        """Test function succeeds when all prepped model codes are valid."""
+        (
+            input_df, unique_ids, unambiguous_codes, _
+        ) = dummy_calc_eval_metrics_data
+        with get_calc_eval_metrics_mocks(
+            unique_ids, unambiguous_codes, invalid_codes_during_prep=False
+        ) as mocks:
+            data_module.calc_eval_metrics(input_df, classify_type)
+
+        mocks["prep_model_codes"].assert_called_once_with(
+            ANY,
+            codes_col="unambiguous_codes",
+            alt_codes_col="classify_candidates",
+            code_type=classify_type
+        )
+        mocks["calc_simple_metrics"].assert_called_once_with(
+            ANY,
+            truth_col="clerical_codes",
+            initial_model_col="model_codes",
+            final_model_col=None,
+        )
