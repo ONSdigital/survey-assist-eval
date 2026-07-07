@@ -22,7 +22,13 @@ from survey_assist_eval.pipeline.api.core import (
     ApiEvaluator,
     ApiEvaluatorConfig,
 )
-from survey_assist_eval.pipeline.api.data import get_and_prepare_test_data
+from survey_assist_eval.pipeline.api.data import (
+    get_and_prepare_test_data,
+    prep_data_for_classify,
+    prep_data_for_lookup,
+    record_classify_results,
+    record_lookup_results,
+)
 
 load_dotenv()
 GCP_PROJECT_ID = os.getenv("PROJECT_ID")
@@ -34,46 +40,14 @@ FIRESTORE_COLLECTION_ID = os.getenv("API_EVAL_FIRESTORE_COLLECTION_ID")
 ENVIRONMENT = os.getenv("API_EVAL_ENVIRONMENT")
 EXECUTION_ID = os.getenv("CLOUD_RUN_EXECUTION")
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+LOOKUP_SEMAPHORE_LIMIT = int(
+    os.getenv("API_EVAL_LOOKUP_SEMAPHORE_LIMIT", "5")
+)
+CLASSIFY_SEMAPHORE_LIMIT = int(
+    os.getenv("API_EVAL_CLASSIFY_SEMAPHORE_LIMIT", "2")
+)
 
 logger = get_logger("api_e2e", level=LOG_LEVEL)
-test_data = [
-    {
-        "job_title": "Data Scientist",
-        "job_description": (
-            "Use machine learning, statistical analysis, and data"
-            "visualisation to extract insights from data and inform business"
-            "decisions."
-        ),
-        "org_description": (
-            "A technology company specialising in e-commerce and cloud"
-            "computing services."
-        ),
-    },
-    {
-        "job_title": "Secondary school mathematics teacher",
-        "job_description": (
-            "Teach mathematics to secondary school students, develop lesson "
-            "plans, and assessing student progress."
-        ),
-        "org_description": (
-            "A public secondary school providing education to children in the"
-            "local community."
-        ),
-    },
-    {
-        "job_title": "Nursery assistant",
-        "job_description": (
-            "Care for plants and assist with gardening tasks. Provide advice"
-            " on plant care and maintenance."
-        ),
-        "org_description": "Garden centre and plant care services.",
-    },
-    {  # flex soc vector store match (expect no 404)
-        "job_title": "Chief executives and senior officials",
-        "job_description": "Overlord of a company.",
-        "org_description": "Technology and consulting company."
-    }
-]
 
 
 def main(classify_type: Literal["sic", "soc"]) -> None:
@@ -96,6 +70,8 @@ def main(classify_type: Literal["sic", "soc"]) -> None:
         execution_id=EXECUTION_ID,
         environment=ENVIRONMENT,
         log_level=LOG_LEVEL,
+        lookup_semaphore_limit=LOOKUP_SEMAPHORE_LIMIT,
+        classify_semaphore_limit=CLASSIFY_SEMAPHORE_LIMIT,
     )
     api_evaluator = ApiEvaluator(api_evaluator_cfg)
 
@@ -103,7 +79,6 @@ def main(classify_type: Literal["sic", "soc"]) -> None:
     logger.info("Collecting API configuration for evaluation metadata...")
     api_config = api_evaluator.get_api_config()
 
-    # TODO: implement data collection and preparation steps once implemented
     logger.info("Collecting and preparing input data...")
     # temp usage of internal parameter during developmend only, see top TODO
     df = get_and_prepare_test_data(
@@ -111,28 +86,29 @@ def main(classify_type: Literal["sic", "soc"]) -> None:
     )
     logger.info(f"Input data collected and prepared: {len(df)} records.")
 
-    # TODO: add post-processing of lookup responses before classify
     logger.info("Performing lookup calls to API...")
-    lookup_responses = api_evaluator.call_api_endpoint("lookup", test_data)
+    lookup_ids, lookup_payloads = prep_data_for_lookup(df)
+    logger.debug(
+        f"Prepared {len(lookup_payloads)} lookup payloads for API calls."
+    )
+    lookup_responses = api_evaluator.call_api_endpoint(
+        "lookup", lookup_payloads
+    )
+    logger.info("Lookup API calls completed. Analysing lookup responses...")
+    df = record_lookup_results(df, lookup_ids, lookup_responses)
 
-    # TODO: add post-processing of classify responses before metrics calc
     logger.info("Performing classify calls to API...")
-    classify_responses = api_evaluator.call_api_endpoint("classify", test_data)
-
-    # TODO: remove, used for early dev and debugging only
-    if classify_type == "soc":
-        logger.debug(
-            f"Expected 404 from lookup (i.e. none): {lookup_responses[1]}"
-        )
-        logger.debug(
-            f"Expected non-404 (i.e. a response): {lookup_responses[3]}"
-        )
-        logger.debug(
-            f"Expected classifed: {classify_responses[0]}"
-        )
-        logger.debug(
-            f"Expected follow-up Q post classify: {classify_responses[2]}"
-        )
+    classify_ids, classify_payloads = prep_data_for_classify(df)
+    logger.debug(
+        f"Prepared {len(classify_payloads)} classify payloads for API calls."
+    )
+    classify_responses = api_evaluator.call_api_endpoint(
+        "classify", classify_payloads
+    )
+    logger.info(
+        "Classify API calls completed. Analysing classify responses..."
+    )
+    df = record_classify_results(df, classify_ids, classify_responses)
 
     # TODO: update with results of metrics calculation once implemented
     logger.info("Calculating evaluation metrics...")
