@@ -18,7 +18,9 @@ import pandas as pd
 from industrial_classification_utils.embed.embedding import EmbeddingHandler
 from tqdm import tqdm
 
-from survey_assist_eval.data_cleaning.constants import LEVEL_OF_EDUCATION
+from survey_assist_eval.data_cleaning.level_of_education_constants import (
+    expand_level_of_education,
+)
 from survey_assist_eval.pipeline.shared_components import (
     parse_args,
     persist_results,
@@ -118,22 +120,6 @@ def make_merged_industry_desc(row: pd.Series) -> str:
     )
 
     return f"{ind_desc}{self_emp_desc}"
-
-
-def expand_level_of_education(row: pd.Series) -> str:
-    """Expands the level of education to the qualification description.
-
-    Args:
-        row (pd.Series): A row from the input DataFrame containing level of education.
-
-    Returns:
-        description (str): The expanded descriptions.
-
-    """
-    education_coded = str(row["level_of_education"])
-    if education_coded in LEVEL_OF_EDUCATION:
-        return LEVEL_OF_EDUCATION[education_coded]
-    return education_coded
 
 
 def _make_embedding_handler(in_metadata: dict) -> EmbeddingHandler:
