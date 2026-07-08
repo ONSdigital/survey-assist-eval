@@ -231,11 +231,22 @@ def get_and_prepare_test_data_mocks(df: pd.DataFrame):
         }
 
 
+@pytest.fixture(params=[True, False])
+def keep_errors(request) -> bool:
+    """Factor fixture to handle paramertisation for dummy_calc_eval_..."""
+    return request.param
+
+
 @pytest.fixture
-def dummy_calc_eval_metrics_data() -> tuple[
+def dummy_calc_eval_metrics_data(keep_errors: bool) -> tuple[
     pd.DataFrame, pd.Series, pd.Series, pd.Series
 ]:
     """Fixture to provide dummy data for testing calc_eval_metrics function.
+
+    Parameters:
+        keep_errors (bool): Whether to keep API error cases in the expected
+            results. If True, errored cases are included; if False, they are
+            excluded.
 
     Returns:
         tuple: A tuple containing a DataFrame with dummy data for evaluation
@@ -263,17 +274,33 @@ def dummy_calc_eval_metrics_data() -> tuple[
             pd.NA,
         ],
     }
-    # ensure errored cases are excluded from metrics_df
-    expected_ids = pd.Series([1, 3, 4, 5])
-    expected_unambiguous_codes = pd.Series(["L1", "L3", "C4", pd.NA])
-    expected_candidate_results = pd.Series(
-        [
-            [],  # ensures lookup candidates are empty
-            [],
-            [dummy_candidate_data[0]],
-            [dummy_candidate_data[1]],
-        ]
-    )
+    if keep_errors:
+        expected_ids = pd.Series(data["unique_id"])
+        expected_unambiguous_codes = pd.Series(
+            ["L1", pd.NA, "L3", "C4", pd.NA, pd.NA]
+        )
+        expected_candidate_results = pd.Series(
+            [
+                [],  # ensures lookup classifys are empty
+                [],  # ensures lookup errors are empty
+                [],  # ensures lookup classifys are empty, again
+                [dummy_candidate_data[0]],
+                [dummy_candidate_data[1]],
+                [],  # ensure classify errors are empty
+            ]
+        )
+    else:
+        # ensure errored cases are excluded from metrics_df
+        expected_ids = pd.Series([1, 3, 4, 5])
+        expected_unambiguous_codes = pd.Series(["L1", "L3", "C4", pd.NA])
+        expected_candidate_results = pd.Series(
+            [
+                [],  # ensures lookup classifies are empty
+                [],
+                [dummy_candidate_data[0]],
+                [dummy_candidate_data[1]],
+            ]
+        )
     return (
         pd.DataFrame(data),
         expected_ids,
@@ -752,7 +779,9 @@ class TestCalcEvalMetrics:
 
     # required pylint ignore for unit testing purposes
     # pylint: disable=W0212
-    def test_calc_eval_metrics_prep(self, dummy_calc_eval_metrics_data):
+    def test_calc_eval_metrics_prep(
+        self, dummy_calc_eval_metrics_data, keep_errors
+    ):
         """Test that the function prepares data correctly for evaluation."""
         (
             input_df,
@@ -762,7 +791,7 @@ class TestCalcEvalMetrics:
         ) = dummy_calc_eval_metrics_data
 
         metrics_df = data_module._prep_df_for_eval(
-            input_df
+            input_df, keep_api_errors=keep_errors
         )
 
         assert isinstance(metrics_df, pd.DataFrame), (
@@ -792,6 +821,7 @@ class TestCalcEvalMetrics:
         self, dummy_calc_eval_metrics_data, classify_type
     ):
         """Test raises KeyError when required columns are missing."""
+        # don't need to vary keep_errors here as only col checks
         input_df, _, _, _ = dummy_calc_eval_metrics_data
         for col in input_df.columns:
             test_df = pd.DataFrame(input_df.drop(columns=[col]))
@@ -802,7 +832,7 @@ class TestCalcEvalMetrics:
 
     @pytest.mark.parametrize("classify_type", ["sic", "soc"])
     def test_calc_eval_metrics_all_prepped_model_codes_valid(
-        self, dummy_calc_eval_metrics_data, classify_type
+        self, dummy_calc_eval_metrics_data, classify_type, keep_errors
     ):
         """Test function succeeds when all prepped model codes are valid."""
         (
@@ -811,7 +841,9 @@ class TestCalcEvalMetrics:
         with get_calc_eval_metrics_mocks(
             unique_ids, unambiguous_codes, invalid_codes_during_prep=False
         ) as mocks:
-            metrics = data_module.calc_eval_metrics(input_df, classify_type)
+            metrics = data_module.calc_eval_metrics(
+                input_df, classify_type, keep_api_errors=keep_errors
+            )
 
         assert not metrics["invalid_model_codes_detected"], (
             "Expected invalid_model_codes_detected to be False when all "
@@ -835,7 +867,7 @@ class TestCalcEvalMetrics:
 
     @pytest.mark.parametrize("classify_type", ["sic", "soc"])
     def test_calc_eval_metrics_with_invalid_prepped_model_codes(
-        self, dummy_calc_eval_metrics_data, classify_type, caplog
+        self, dummy_calc_eval_metrics_data, classify_type, keep_errors, caplog
     ):
         """Test raises warning log message when prepped model codes invalid."""
         (
@@ -844,7 +876,9 @@ class TestCalcEvalMetrics:
         with get_calc_eval_metrics_mocks(
             unique_ids, unambiguous_codes, invalid_codes_during_prep=True
         ) as mocks, caplog.at_level("WARNING"):
-            metrics = data_module.calc_eval_metrics(input_df, classify_type)
+            metrics = data_module.calc_eval_metrics(
+                input_df, classify_type, keep_api_errors=keep_errors
+            )
 
         assert metrics["invalid_model_codes_detected"], (
             "Expected invalid_model_codes_detected to be True when invalid "
