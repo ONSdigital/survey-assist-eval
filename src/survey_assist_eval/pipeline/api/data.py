@@ -379,7 +379,11 @@ def record_classify_results(
 
 
 def calc_eval_metrics(
-    df: pd.DataFrame, classify_type: str, log_level: str = "INFO"
+    df: pd.DataFrame,
+    classify_type: str,
+    *,
+    keep_api_errors: bool = True,
+    log_level: str = "INFO"
 ) -> dict[str, dict[str, int | float] | None]:
     """Calculate evaluation metrics using the API call results.
 
@@ -388,6 +392,11 @@ def calc_eval_metrics(
             classify results.
         classify_type: The type of classification being evaluated, either
             "sic" or "soc".
+        keep_api_errors: Whether to keep records with API errors in the
+            evaluation metrics calculation. If False, records with API errors
+            will be excluded from the evaluation metrics calculation. When
+            True, the records with API errors remain which effectively
+            penalises the evaluation metrics. Default is True.
         log_level: Log level for logging within this function, must be one of
             "DEBUG", "INFO", "WARNING", "ERROR", or "CRITICAL".
 
@@ -416,7 +425,7 @@ def calc_eval_metrics(
             )
 
     # prep evaluation results for usage with prep_data/metrics module funcs
-    metrics_df = _prep_df_for_eval(df)
+    metrics_df = _prep_df_for_eval(df, keep_api_errors=keep_api_errors)
 
     # clean and validate unambiguous_codes for evaluation and recombine
     # no need to prep `clerical_codes` as clean in input data
@@ -463,7 +472,9 @@ def calc_eval_metrics(
     return output_metrics
 
 
-def _prep_df_for_eval(df: pd.DataFrame) -> pd.DataFrame:
+def _prep_df_for_eval(
+    df: pd.DataFrame, keep_api_errors: bool = True
+) -> pd.DataFrame:
     """Helper function to prep for evaluation metrics calculation.
 
     Functionality is split into helper to allow for more detailed unit testing.
@@ -480,25 +491,33 @@ def _prep_df_for_eval(df: pd.DataFrame) -> pd.DataFrame:
         axis=1,
     )
 
-    # exclude records where lookup or classify API endpoints errored
-    metrics_df = metrics_df[
-        (  # case lookup classified and no error
-            metrics_df["lookup_classified"].eq(True)
-            & metrics_df["lookup_error"].eq(False)
-        ) | (  # case no error in lookup and classify (regarless of classified)
-            metrics_df["lookup_error"].eq(False)
-            & metrics_df["classify_error"].eq(False)
-        )
-    ].reset_index(drop=True)
+    if keep_api_errors:
+        # fill missing classify_candidates (due to error or classified by
+        # lookup) with an empty list to signify no candidates to
+        # prep_model_codes
+        metrics_df["classify_candidates"] = metrics_df[
+            "classify_candidates"
+        ].apply(lambda x: [] if isinstance(x, NAType) else x)
+    else:
+        # exclude records where lookup or classify API endpoints errored
+        metrics_df = metrics_df[
+            (  # case lookup classified and no error
+                metrics_df["lookup_classified"].eq(True)
+                & metrics_df["lookup_error"].eq(False)
+            ) | (  # case no error in lookup and classify (regardless)
+                metrics_df["lookup_error"].eq(False)
+                & metrics_df["classify_error"].eq(False)
+            )
+        ].reset_index(drop=True)
 
-    # for records that were classified by lookup, set classify_candidates to
-    # an empty list as no candidates are generated
-    mask = metrics_df["lookup_classified"].eq(True)
-    metrics_df.loc[mask, "classify_candidates"] = (
-        metrics_df.loc[
-            mask, "classify_candidates"
-        ].apply(lambda _: [])
-    )
+        # for records that were classified by lookup, set classify_candidates
+        # to an empty list as no candidates are generated
+        mask = metrics_df["lookup_classified"].eq(True)
+        metrics_df.loc[mask, "classify_candidates"] = (
+            metrics_df.loc[
+                mask, "classify_candidates"
+            ].apply(lambda _: [])
+        )
 
     return metrics_df
 
