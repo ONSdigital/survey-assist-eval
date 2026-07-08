@@ -48,6 +48,8 @@ LOOKUP_SEMAPHORE_LIMIT = int(
 CLASSIFY_SEMAPHORE_LIMIT = int(
     os.getenv("API_EVAL_CLASSIFY_SEMAPHORE_LIMIT", "2")
 )
+# set to anything other than "True" to avoid default behaviour
+KEEP_API_ERRORS = os.getenv("API_EVAL_KEEP_API_ERRORS", "True") == "True"
 
 logger = get_logger("api_e2e", level=LOG_LEVEL)
 
@@ -113,7 +115,12 @@ def main(classify_type: Literal["sic", "soc"]) -> None:
     df = record_classify_results(df, classify_ids, classify_responses)
 
     logger.info("Calculating evaluation metrics...")
-    eval_metrics = calc_eval_metrics(df, classify_type, log_level=LOG_LEVEL)
+    eval_metrics = calc_eval_metrics(
+        df,
+        classify_type,
+        keep_api_errors=KEEP_API_ERRORS,
+        log_level=LOG_LEVEL
+    )
     logger.info("Evaluation metrics calculated successfully.")
 
     # calculate performance metrics for evaluation metadata purposes
