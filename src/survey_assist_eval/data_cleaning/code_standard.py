@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 
 INVALID_VALUES = (
     "-9",
+    "-8",
     "4+",
     "",
     ".",
