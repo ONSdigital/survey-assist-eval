@@ -8,13 +8,18 @@ and JSON metadata files in a user-specified output folder.
 
 See README_evaluation_pipeline.md for more details on how to run.
 """
+
+# pylint: disable=duplicate-code, redefined-outer-name
+
 from re import sub as regex_sub
 
 import numpy as np
 import pandas as pd
 from survey_assist_embed_core import EmbeddingHandler, build_embedding_index
+from survey_assist_embed_core.sayt.indexes import _silence_classifai_tqdm
 from tqdm import tqdm
 
+from survey_assist_eval.data_cleaning.code_standard import INVALID_VALUES
 from survey_assist_eval.pipeline.shared_components import (
     parse_args,
     persist_results,
@@ -40,6 +45,50 @@ OUTPUT_COL_FINAL = "second_semantic_search_results"
 tqdm.pandas()
 
 
+def _prep_columns(df: pd.DataFrame, second_run_flag: bool) -> pd.DataFrame:
+    """Prepares the DataFrame for semantic search by ensuring that the necessary
+    output columns exist. If the columns do not exist, they are created with default values.
+
+    Args:
+        df (pd.DataFrame): The input DataFrame containing survey responses.
+        second_run_flag (bool): Flag indicating whether this is the second run (final codes)
+            or not, which determines which column to use for the search query.
+
+    Returns:
+        pd.DataFrame: The modified DataFrame with the necessary output columns.
+    """
+    output_col = OUTPUT_COL_FINAL if second_run_flag else OUTPUT_COL_INITIAL
+    if output_col in df.columns:
+        return df  # Output column already exists, no need to modify
+
+    df[output_col] = pd.Series([[] for _ in range(len(df))], index=df.index)
+
+    # Clean the Survey Response columns:
+    if second_run_flag:
+        df[MERGED_INDUSTRY_DESC_COL_FINAL] = (
+            df[MERGED_INDUSTRY_DESC_COL_FINAL]
+            .apply(clean_text)
+            .replace(
+                "- followup",
+                """
+- Followup""",
+            )
+        )
+        msk = df["unambiguously_codable"]
+        df.loc[msk, OUTPUT_COL_FINAL] = df.loc[msk, OUTPUT_COL_INITIAL]
+    else:
+        df[JOB_DESCRIPTION_COL] = df[JOB_DESCRIPTION_COL].apply(clean_text)
+        df[JOB_TITLE_COL] = df[JOB_TITLE_COL].apply(clean_text)
+        df[INDUSTRY_DESCR_COL] = df[INDUSTRY_DESCR_COL].apply(clean_text)
+        df[SELF_EMPLOYED_DESC_COL] = df[SELF_EMPLOYED_DESC_COL].apply(clean_text)
+        df[MERGED_INDUSTRY_DESC_COL] = (
+            df[INDUSTRY_DESCR_COL] + df[SELF_EMPLOYED_DESC_COL]
+        )
+        df[MERGED_INDUSTRY_DESC_COL] = df[MERGED_INDUSTRY_DESC_COL].apply(clean_text)
+
+    return df
+
+
 def clean_text(text: str) -> str:
     """Cleans a text string by removing newlines, converting arbitrary
     whitespace to a single space, removing -9's and standardizing case.
@@ -50,57 +99,11 @@ def clean_text(text: str) -> str:
     Returns:
         str: The cleaned string.
     """
-    if isinstance(text, float):
+    if not isinstance(text, str) or text in INVALID_VALUES:
         text = ""
     text = text.replace("\n", " ")
     text = regex_sub(r"\s+", " ", text)
-    text = text.lower()
-    text = text.capitalize()
-    return text
-
-
-def make_merged_industry_desc(row: pd.Series) -> str:
-    """Merges the main industry description column with the self-employed description column.
-
-    Args:
-        row (pd.Series): A row from the input DataFrame containing industry description,
-                         self employed description.
-
-    Returns:
-        description (str): The merged descriptions.
-    """
-    ind_desc = (
-        row[INDUSTRY_DESCR_COL] if isinstance(row[INDUSTRY_DESCR_COL], str) else ""
-    )
-    self_emp_desc = (
-        row[SELF_EMPLOYED_DESC_COL]
-        if isinstance(row[SELF_EMPLOYED_DESC_COL], str)
-        else ""
-    )
-
-    return f"{ind_desc}{self_emp_desc}"
-
-
-def clean_text_industry(text: str) -> str:
-    """Cleans a text string by removing newlines, converting arbitrary
-    whitespace to a single space, removing -9's and standardizing case.
-
-    Args:
-        text (str): The input string to clean.
-
-    Returns:
-        str: The cleaned string.
-    """
-    text = text.replace("\n", " ")
-    text = text.replace("-9", "")
-    text = regex_sub(r"\s+", " ", text)
-    text = text.lower()
-    text = text.capitalize()
-    text = text.replace(
-        "- followup",
-        """
-- Followup""",
-    )
+    text = text.lower().strip().capitalize()
     return text
 
 
@@ -141,18 +144,11 @@ def _get_semantic_search_results(
         if second_run_flag
         else row[MERGED_INDUSTRY_DESC_COL]
     )
-    industry_descr = industry_descr if isinstance(industry_descr, str) else ""
 
-    job_title = row[JOB_TITLE_COL] if isinstance(row.get(JOB_TITLE_COL), str) else ""
-    job_description = (
-        row[JOB_DESCRIPTION_COL]
-        if isinstance(row.get(JOB_DESCRIPTION_COL), str)
-        else ""
-    )
-
-    results = one_embedding_handler.search_index_multi(
-        [industry_descr, job_title, job_description]
-    )
+    with _silence_classifai_tqdm():
+        results = one_embedding_handler.search_index_multi(
+            [industry_descr, row[JOB_TITLE_COL], row[JOB_DESCRIPTION_COL]],
+        )
 
     reduced_results = [r.model_dump() for r in results.results]
     return reduced_results
@@ -163,28 +159,12 @@ if __name__ == "__main__":
 
     df, metadata, start_batch_id = set_up_initial_state(args)
 
-    embedding_handler = _make_embedding_handler(metadata)
-
-    # Clean the Survey Response columns:
-    df[JOB_DESCRIPTION_COL] = df[JOB_DESCRIPTION_COL].apply(clean_text)
-    df[JOB_TITLE_COL] = df[JOB_TITLE_COL].apply(clean_text)
-    # Make a merged industry description column:
-    if args.second_run:
-        df[MERGED_INDUSTRY_DESC_COL_FINAL] = df[MERGED_INDUSTRY_DESC_COL_FINAL].apply(
-            clean_text_industry
-        )
-    else:
-        df[INDUSTRY_DESCR_COL] = df[INDUSTRY_DESCR_COL].apply(clean_text)
-        df[SELF_EMPLOYED_DESC_COL] = df[SELF_EMPLOYED_DESC_COL].apply(clean_text)
-        df[MERGED_INDUSTRY_DESC_COL] = df.apply(make_merged_industry_desc, axis=1)
-        df[MERGED_INDUSTRY_DESC_COL] = df[MERGED_INDUSTRY_DESC_COL].apply(
-            clean_text_industry
-        )
+    df = _prep_columns(df, args.second_run)
     print("Input loaded")
 
+    embedding_handler = _make_embedding_handler(metadata)
+
     OUTPUT_COL = OUTPUT_COL_FINAL if args.second_run else OUTPUT_COL_INITIAL
-    if OUTPUT_COL not in df:
-        df[OUTPUT_COL] = np.empty((len(df), 0)).tolist()
 
     print("running semantic search...")
     for batch_id, batch in tqdm(

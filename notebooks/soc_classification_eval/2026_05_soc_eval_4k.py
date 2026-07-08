@@ -31,10 +31,9 @@ input_data_file = (
 
 # %%
 # call evaluation pipeline if needed
-work_folder = "data/pipeline/soc_4k"
-os.makedirs(work_folder, exist_ok=True)
+work_folder = "data/pipeline/soc_4k_unambiguous_prompt"
 
-if not os.path.exists(f"{work_folder}/STG4.parquet"):  # this doesn't work with GCS
+if not os.path.exists(f"{work_folder}/STG2.parquet"):  # this doesn't work with GCS
     print("Running evaluation pipeline...")
     os.system(
         f"./scripts/soc_pipeline/run_full_pipeline.sh -p 2 -i {input_data_file} -o {work_folder}"
@@ -43,7 +42,12 @@ else:
     print("Evaluation pipeline already run, loading results...")
 
 # %%
-df = pd.read_parquet(f"{work_folder}/STG4.parquet")
+try:
+    df = pd.read_parquet(f"{work_folder}/STG7.parquet")
+except FileNotFoundError as e:
+    print(f"Error loading STG7, falling back to STG2: {e}")
+    df = pd.read_parquet(f"{work_folder}/STG2.parquet")
+
 print(df.head())
 
 # %%
@@ -77,16 +81,24 @@ print(metrics_summary.report_metrics())
 work_folder = "data/pipeline/soc_4k_top_one"
 os.makedirs(work_folder, exist_ok=True)
 
-print("Running evaluation pipeline...")
-os.system(
-    f"./scripts/soc_pipeline/run_full_pipeline.sh -p 1 -i {input_data_file} -o {work_folder}"
-)
+if not os.path.exists(f"{work_folder}/STG2.parquet"):
+    print("Running evaluation pipeline...")
+    os.system(
+        f"./scripts/soc_pipeline/run_full_pipeline.sh -p 1 -i {input_data_file} -o {work_folder}"
+    )
 
 # %%
-df = pd.read_parquet(f"{work_folder}/STG7.parquet")
+try:
+    df = pd.read_parquet(f"{work_folder}/STG7.parquet")
+except FileNotFoundError as e:
+    print(f"Error loading STG7, falling back to STG2: {e}")
+    df = pd.read_parquet(f"{work_folder}/STG2.parquet")
 
 for stage in ["initial", "final"]:
     # subset when working with intermediate outputs
+    if f"{stage}_reasoning" not in df.columns:
+        print(f"Skipping {stage} stage, reasoning column not found.")
+        continue
     df_sub = df[df[f"{stage}_reasoning"].notna()]
     df_sub["match"] = df_sub.soc2020_code == df_sub[f"{stage}_code"]
 
@@ -101,10 +113,10 @@ for stage in ["initial", "final"]:
         print("-" * 20)
 
 # %%
-df_sub["distance"] = df_sub.apply(
+df["distance"] = df.apply(
     lambda row: row["semantic_search_results"][0]["distance"], axis=1
 )
-df_sub["sem_match"] = df_sub.apply(
+df["sem_match"] = df.apply(
     lambda row: row["semantic_search_results"][0]["code"] == row["soc2020_code"], axis=1
 )
 for label, dd in [
@@ -115,8 +127,8 @@ for label, dd in [
     ("Very High", 0.05),
 ]:
     print(f"Confidence level: {label} ({dd})")
-    print(f"Codability: {(df_sub.distance <= dd).mean():.0%}")
-    print(f"Accuracy: {(df_sub[df_sub.distance <= dd].sem_match).mean():.0%}")
+    print(f"Codability: {(df.distance <= dd).mean():.0%}")
+    print(f"Accuracy: {(df[df.distance <= dd].sem_match).mean():.0%}")
     print("-" * 20)
 
 # %%

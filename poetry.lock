@@ -8820,8 +8820,8 @@ transformers = ">=4.52.4,<5.0.0"
 [package.source]
 type = "git"
 url = "https://github.com/ONSdigital/soc-classification-utils.git"
-reference = "cc2b49a"
-resolved_reference = "cc2b49a74658ba62537e1ff8e41d73820ef48f66"
+reference = "v0.1.6"
+resolved_reference = "0fcc37d2998314b15313095f35a555aca2825fd2"
 
 [[package]]
 name = "sqlalchemy"
@@ -8973,7 +8973,7 @@ files = [
 
 [[package]]
 name = "survey-assist-embed-core"
-version = "0.1.0"
+version = "0.2.0"
 description = ""
 optional = false
 python-versions = ">=3.12,<4.0"
@@ -8995,8 +8995,8 @@ survey-assist-utils = {git = "https://github.com/ONSdigital/survey-assist-utils.
 [package.source]
 type = "git"
 url = "https://github.com/ONSdigital/survey-assist-embed-core.git"
-reference = "f869d91"
-resolved_reference = "f869d9197d6b4f0a9af99b009486754afa442f4e"
+reference = "v0.2.0"
+resolved_reference = "4889059aa39c3cc4a49caa211fb069fdda701e0c"
 
 [[package]]
 name = "survey-assist-utils"
@@ -10285,4 +10285,4 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<4.0"
-content-hash = "0874615dee3b1c05b37636497521d37de0c627dfd7f7aaa05c6a41f8220fb391"
+content-hash = "54edd94471f598314e457a0de2758cce13bcc7335bf78db4b5c7dee211fb2d16"
