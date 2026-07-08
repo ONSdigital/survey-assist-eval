@@ -1,4 +1,4 @@
-# Configuration for SIC Evaluation 
+# Configuration for SIC Evaluation
 
 [paths]
 batch_filepath = "gs://<insert-location>/evaluation_data/TLFS_evaluation_data_IT2.csv"
@@ -21,4 +21,3 @@ sic_ind_occ1 = "sic_ind_occ1"         # Analysis SIC code column
 sic_ind_occ2 = "sic_ind_occ2"         # Analysis SIC code column
 sic_ind_occ3 = "sic_ind_occ3"         # Analysis SIC code column
 coding_flag = "sic_ind_code_flag"   # Analysis column for KB/CC/MC flag
-

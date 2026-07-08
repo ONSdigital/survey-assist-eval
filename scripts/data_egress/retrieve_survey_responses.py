@@ -14,7 +14,6 @@ from datetime import datetime
 import pandas as pd
 from firebase_admin import firestore, initialize_app
 from google.cloud import storage
-
 from survey_assist_utils import get_logger
 
 LOG_LEVEL = os.getenv("LOG_LEVEL", "DEBUG")
