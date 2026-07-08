@@ -1,7 +1,5 @@
 """Record latency of a web request to BigQuery."""
 
-# pylint: disable=C0411
-
 import argparse
 import datetime
 import os
@@ -12,7 +10,7 @@ import requests
 from dotenv import load_dotenv
 
 from survey_assist_utils import get_logger
-from survey_assist_utils.api_token.jwt_utils import (
+from survey_assist_utils.api_token.jwt_utils import (  # pylint: disable=C0411
     generate_jwt,
 )
 
