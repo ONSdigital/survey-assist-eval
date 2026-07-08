@@ -235,7 +235,7 @@ def test_contains_multiple_asks_true_multiple_instruction_prompts(text):
     [
         pytest.param(
             "What is your name and where do you live",
-            id="wh_with_and",
+            id="wh_twice",
         ),
         pytest.param(
             "Can you explain this or give an example",
