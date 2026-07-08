@@ -465,9 +465,12 @@ def calc_eval_metrics(
         final_model_col=None,  # no final code in API eval pipeline
     )
 
-    # add model_codes_invalid to the output metrics for indication purposes
+    # add add misc config to the output metrics for indication purposes
     output_metrics = metrics.as_dict()
-    output_metrics["invalid_model_codes_detected"] = model_codes_invalid
+    output_metrics["misc"] = {
+        "invalid_model_codes_detected": model_codes_invalid,
+        "api_errors_in_metrics_calc": keep_api_errors,
+    }
 
     return output_metrics
 

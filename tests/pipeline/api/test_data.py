@@ -845,9 +845,17 @@ class TestCalcEvalMetrics:
                 input_df, classify_type, keep_api_errors=keep_errors
             )
 
-        assert not metrics["invalid_model_codes_detected"], (
+        assert not metrics["misc"]["invalid_model_codes_detected"], (
             "Expected invalid_model_codes_detected to be False when all "
             "prepped model codes are valid."
+        )
+        api_errors_in_metrics_calc = metrics["misc"][
+            "api_errors_in_metrics_calc"
+        ]
+        assert api_errors_in_metrics_calc == keep_errors, (
+            "Expected api_errors_in_metrics_calc to match keep_api_errors "
+            f"parameter. Got {api_errors_in_metrics_calc} but expected "
+            f"{keep_errors}."
         )
         assert not mocks["get_logger"].return_value.warning.called, (
             "Did not expect warning log with valid prepped model codes."
@@ -880,9 +888,17 @@ class TestCalcEvalMetrics:
                 input_df, classify_type, keep_api_errors=keep_errors
             )
 
-        assert metrics["invalid_model_codes_detected"], (
+        assert metrics["misc"]["invalid_model_codes_detected"], (
             "Expected invalid_model_codes_detected to be True when invalid "
             "prepped model codes are present."
+        )
+        api_errors_in_metrics_calc = metrics["misc"][
+            "api_errors_in_metrics_calc"
+        ]
+        assert api_errors_in_metrics_calc == keep_errors, (
+            "Expected api_errors_in_metrics_calc to match keep_api_errors "
+            f"parameter. Got {api_errors_in_metrics_calc} but expected "
+            f"{keep_errors}."
         )
         assert mocks["get_logger"].return_value.warning.called, (
             "Expected a warning log message for invalid prepped model codes."
