@@ -47,7 +47,7 @@ open_question_metrics = evaluate_open_questions(
     stg_df,
     text_column="followup_question",
     text_statistics_config=text_statistics_config,
-    simple_language_cogitnfig=simple_language_config,
+    simple_language_config=simple_language_config,
 )
 print(open_question_metrics.report_metrics())
 # %%
