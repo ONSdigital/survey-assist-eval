@@ -13,19 +13,17 @@ def has_explicit_example_marker(text: str) -> bool:
         True if explicit markers such as "for example" are present,
         otherwise False.
     """
-    markers = [
-        "for example",
-        "e.g.",
-        "e.g",
-        "i.e.",
-        "i.e",
-        "such as",
-        "like",
+    patterns = [
+        r"\bfor example\b",
+        r"\be\.g\.?\b",
+        r"\bi\.e\.?\b",
+        r"\bsuch as\b",
+        r"(?:,|\()\s*like\b",
     ]
 
     text = text.lower()
 
-    return any(marker in text for marker in markers)
+    return any(re.search(pattern, text) for pattern in patterns)
 
 
 def has_including_example_phrase(text: str) -> bool:
@@ -38,15 +36,15 @@ def has_including_example_phrase(text: str) -> bool:
         True if phrases such as "including" are present,
         otherwise False.
     """
-    phrases = [
-        "including",
-        "includes",
-        "for instance",
+    patterns = [
+        r"\bincluding\b",
+        r"\bfor instance\b",
+        r"\b(?:do|does|did)\b[^?]*\binclude\b",
     ]
 
     text = text.lower()
 
-    return any(phrase in text for phrase in phrases)
+    return any(re.search(pattern, text) for pattern in patterns)
 
 
 def has_definition_example_wording(text: str) -> bool:
@@ -99,16 +97,12 @@ def has_follow_on_examples(text: str) -> bool:
         True if the final non-question sentence contains an example,
         otherwise False.
     """
-    sentences = re.findall(r"[^.!?]+[.!?]?", text)
+    question_text, separator, follow_on_text = text.rpartition("?")
 
-    non_question_sentences = [
-        sentence for sentence in sentences if not sentence.strip().endswith("?")
-    ]
-
-    if not non_question_sentences:
+    if not separator or not question_text.strip():
         return False
 
-    return has_examples(non_question_sentences[-1])
+    return has_examples(follow_on_text.strip())
 
 
 def has_closed_category_options(text: str) -> bool:
@@ -139,3 +133,16 @@ def has_closed_category_options(text: str) -> bool:
             "pick the one" in text,
         ]
     )
+
+
+def has_closed_category_without_examples(text: str) -> bool:
+    """Check whether text provides closed-category options without examples.
+
+    Args:
+        text: Question text to evaluate.
+
+    Returns:
+        True if closed-category wording is detected and no examples are present,
+        otherwise False.
+    """
+    return has_closed_category_options(text) and not has_examples(text)
