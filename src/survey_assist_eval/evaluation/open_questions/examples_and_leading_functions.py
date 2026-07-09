@@ -1,5 +1,7 @@
 """Functions for detecting examples and leading wording in open questions."""
 
+import re
+
 
 def has_explicit_example_marker(text: str) -> bool:
     """Check whether text contains explicit example markers.
@@ -87,6 +89,28 @@ def has_examples(text: str) -> bool:
     )
 
 
+def has_follow_on_examples(text: str) -> bool:
+    """Check whether the final non-question sentence contains an example.
+
+    Args:
+        text: Question text to evaluate.
+
+    Returns:
+        True if the final non-question sentence contains an example,
+        otherwise False.
+    """
+    sentences = re.findall(r"[^.!?]+[.!?]?", text)
+
+    non_question_sentences = [
+        sentence for sentence in sentences if not sentence.strip().endswith("?")
+    ]
+
+    if not non_question_sentences:
+        return False
+
+    return has_examples(non_question_sentences[-1])
+
+
 def has_closed_category_options(text: str) -> bool:
     """Check whether text provides predefined response categories.
 
@@ -101,11 +125,17 @@ def has_closed_category_options(text: str) -> bool:
 
     return any(
         [
-            (" either " in text and " or " in text),
-            (":" in text and " or " in text),
-            (text.count(",") >= 1 and " or " in text),
-            ("/" in text),
-            ("which of the following" in text),
-            ("which of these" in text),
+            " either " in text and " or " in text,
+            " or " in text,
+            ":" in text and (" or " in text or "," in text),
+            "/" in text,
+            "which of the following" in text,
+            "which of these" in text,
+            "select one" in text,
+            "select the one" in text,
+            "choose one" in text,
+            "choose the one" in text,
+            "pick one" in text,
+            "pick the one" in text,
         ]
     )
