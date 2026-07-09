@@ -372,6 +372,7 @@ def test_open_question_text_statistics_report_metrics_formats_output():
     """Ensure the report helper renders the expected metric labels."""
     metrics = OpenQuestionTextStatistics(
         n_count=3,
+        mean_word_count=3.0,
         median_word_count=3.0,
         sd_word_count=1.5,
         mean_sentence_count=1.0,
@@ -399,6 +400,7 @@ def test_open_question_text_statistics_report_metrics_returns_string():
     """Report metrics returns a formatted string."""
     metrics = OpenQuestionTextStatistics(
         n_count=10,
+        mean_word_count=3.0,
         median_word_count=5.0,
         sd_word_count=1.0,
         mean_sentence_count=1.5,
@@ -422,6 +424,7 @@ def test_open_question_text_statistics_report_metrics_contains_metrics():
     """Report output contains key metric values."""
     metrics = OpenQuestionTextStatistics(
         n_count=10,
+        mean_word_count=3.0,
         median_word_count=5.0,
         sd_word_count=1.0,
         mean_sentence_count=1.5,
