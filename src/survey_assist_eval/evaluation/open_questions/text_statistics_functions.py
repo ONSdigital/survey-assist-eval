@@ -16,6 +16,7 @@ class OpenQuestionTextStatistics(BaseModel):
     """Container for all open question evaluation metrics."""
 
     n_count: int
+    mean_word_count: float
     median_word_count: float
     sd_word_count: float
     mean_sentence_count: float
@@ -37,6 +38,7 @@ class OpenQuestionTextStatistics(BaseModel):
             f" Median Word Count: {self.median_word_count:.2f}",
             f" Standard Deviation of Word Count: {self.sd_word_count:.2f}",
             f" Mean Sentence Count: {self.mean_sentence_count:.2f}",
+            f" Mean Word Count: {self.mean_word_count:.2f}",
             f" Mean Word Count per Sentence: {self.mean_word_count_per_sentence:.2f}",
             f" Percent with more than {self.word_threshold} words: "
             f"{self.pct_over_word_count_threshold:.2f}%",
