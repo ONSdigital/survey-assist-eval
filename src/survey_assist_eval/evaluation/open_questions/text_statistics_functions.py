@@ -90,6 +90,23 @@ def compute_text_statistics(  # noqa: PLR0913 pylint: disable = R0913, R0917
     return statistics
 
 
+def word_count_hyph_contract_split(text: str) -> int:
+    """Return the number of words in the input text.
+
+    Word counts are calculated using textstat, counting
+    contractions and hyphenated words as separate words.
+
+    Args:
+        text: Input text.
+
+    Returns:
+        The word count as an integer.
+    """
+    return textstat.lexicon_count(
+        text, removepunct=True, split_contractions=True, split_hyphens=True
+    )
+
+
 def word_counts_per_sentence(text: str) -> list[int]:
     """Return the number of words in each sentence of the input text.
 
@@ -105,9 +122,7 @@ def word_counts_per_sentence(text: str) -> list[int]:
     sentences = re.split(r"[.!?]+", text)
     sentences = [s.strip() for s in sentences if s.strip()]
 
-    return [
-        textstat.lexicon_count(sentence, removepunct=True) for sentence in sentences
-    ]
+    return [word_count_hyph_contract_split(sentence) for sentence in sentences]
 
 
 def get_text_stats(text: str) -> dict[str, int | float | list[int]]:
@@ -125,7 +140,7 @@ def get_text_stats(text: str) -> dict[str, int | float | list[int]]:
         with two words or fewer may not be counted.
     """
     return {
-        "word_count": textstat.lexicon_count(text, removepunct=True),
+        "word_count": word_count_hyph_contract_split(text),
         "sentence_count": textstat.sentence_count(text),
         "character_count": textstat.char_count(text),
         "letter_count": textstat.letter_count(text),

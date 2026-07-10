@@ -12,6 +12,7 @@ from survey_assist_eval.evaluation.open_questions.text_statistics_functions impo
     compute_text_statistics,
     get_text_stats,
     summarise_text_stat_columns,
+    word_count_hyph_contract_split,
     word_counts_per_sentence,
 )
 
@@ -32,6 +33,45 @@ def sample_text_statistics_df():
             ]
         }
     )
+
+
+# ============================================================================
+# Test word_count function
+# ============================================================================
+
+
+def test_word_count_hyph_contract_split_simple_text():
+    """Verify the basic word count for plain text."""
+    text = "Hello world this is a test"
+
+    assert word_count_hyph_contract_split(text) == 6
+
+
+def test_word_count_hyph_contract_split_splits_contractions_and_hyphens():
+    """Ensure contractions and hyphenated words are split into separate words."""
+    text = "Don't re-enter high-quality data."
+
+    assert word_count_hyph_contract_split(text) == 7
+
+
+@pytest.mark.parametrize("text", ["", "   \n\t  "])
+def test_word_count_hyph_contract_split_empty_or_whitespace_only_returns_zero(text):
+    """Empty and whitespace-only strings should have zero words."""
+    assert word_count_hyph_contract_split(text) == 0
+
+
+def test_word_count_hyph_contract_split_punctuation_only_returns_zero():
+    """Punctuation-only strings should not contribute to word count."""
+    text = "... !!! --- ???"
+
+    assert word_count_hyph_contract_split(text) == 0
+
+
+def test_word_count_hyph_contract_split_counts_alphanumeric_tokens():
+    """Numbers are counted when they appear as tokens in the text."""
+    text = "Version 2.0 has 3 parts"
+
+    assert word_count_hyph_contract_split(text) == 5
 
 
 # ============================================================================
@@ -85,6 +125,14 @@ def test_word_counts_per_sentence_empty_string():
     result = word_counts_per_sentence(text)
 
     assert result == []
+
+
+def test_word_counts_per_sentence_handles_punctuation_heavy_input():
+    """Punctuation should not inflate counts in sentence-level word counting."""
+    text = "Wait---what?! Re-enter this, now!!!"
+    result = word_counts_per_sentence(text)
+
+    assert result == [2, 4]
 
 
 # ============================================================================

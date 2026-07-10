@@ -155,3 +155,25 @@ def test_evaluate_open_questions_uses_custom_text_statistics_config():
 
     assert result.text_statistics.pct_over_word_count_threshold == 100.0
     assert result.simple_language.n_count == 1
+
+
+def test_evaluate_open_questions_counts_contractions_and_hyphens_end_to_end():
+    """Contractions and hyphenated words should count as split tokens end-to-end."""
+    df = pd.DataFrame(
+        {
+            "question": [
+                "Don't re-enter high-quality data.",
+            ]
+        }
+    )
+
+    result = evaluate_open_questions(
+        df,
+        text_column="question",
+        text_statistics_config={"word_threshold": 6},
+    )
+
+    assert result.text_statistics.n_count == 1
+    assert result.text_statistics.mean_word_count == 7.0
+    assert result.text_statistics.median_word_count == 7.0
+    assert result.text_statistics.pct_over_word_count_threshold == 100.0
