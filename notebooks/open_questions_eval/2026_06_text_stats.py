@@ -19,7 +19,7 @@ from notebooks.plotting_functions.plotting_helpers import (
 from notebooks.plotting_functions.standard_plots import (
     build_histogram,
 )
-from survey_assist_eval.data_cleaning.open_questions_eval_prep import (
+from survey_assist_eval.evaluation.open_questions.open_questions_evaluation import (
     filter_nonempty_object_column,
 )
 from survey_assist_eval.evaluation.open_questions.text_statistics_functions import (

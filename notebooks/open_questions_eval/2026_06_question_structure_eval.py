@@ -9,7 +9,7 @@ import os
 import pandas as pd
 from dotenv import load_dotenv
 
-from survey_assist_eval.data_cleaning.open_questions_eval_prep import (
+from survey_assist_eval.evaluation.open_questions.open_questions_evaluation import (
     filter_nonempty_object_column,
 )
 from survey_assist_eval.evaluation.open_questions.question_structure_functions import (

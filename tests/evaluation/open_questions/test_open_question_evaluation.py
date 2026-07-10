@@ -5,6 +5,7 @@ import pandas as pd
 from survey_assist_eval.evaluation.open_questions.open_questions_evaluation import (
     OpenQuestionEvaluation,
     evaluate_open_questions,
+    filter_nonempty_object_column,
 )
 from survey_assist_eval.evaluation.open_questions.question_structure_functions import (
     QuestionStructureMetrics,
@@ -177,3 +178,23 @@ def test_evaluate_open_questions_counts_contractions_and_hyphens_end_to_end():
     assert result.text_statistics.mean_word_count == 7.0
     assert result.text_statistics.median_word_count == 7.0
     assert result.text_statistics.pct_over_word_count_threshold == 100.0
+
+
+# ============================================================================
+# Test filter_nonempty_object_column function
+# ============================================================================
+
+
+def test_filter_nonempty_object_column_removes_empty_and_null_values():
+    """Verify that empty and null text values are filtered out."""
+    df = pd.DataFrame(
+        {
+            "text": ["hello", "", None, "world"],
+            "other": [1, 2, 3, 4],
+        }
+    )
+
+    filtered = filter_nonempty_object_column(df, "text")
+
+    assert list(filtered["text"]) == ["hello", "world"]
+    assert list(filtered["other"]) == [1, 4]
