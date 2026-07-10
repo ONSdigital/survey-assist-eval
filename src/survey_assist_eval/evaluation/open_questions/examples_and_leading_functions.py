@@ -20,7 +20,6 @@ def has_explicit_example_marker(text: str) -> bool:
         "i.e.",
         "i.e",
         "such as",
-        "like",
     ]
 
     text = text.lower()
