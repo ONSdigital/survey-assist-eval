@@ -8,7 +8,6 @@ from survey_assist_eval.evaluation.open_questions.examples_and_leading_functions
     has_definition_example_wording,
     has_examples,
     has_explicit_example_marker,
-    has_follow_on_examples,
     has_including_example_phrase,
 )
 
@@ -58,17 +57,6 @@ DEFINITION_EXAMPLE_WORDING_CASES = [
     "Do you work in healthcare, that is nursing or physiotherapy?",
 ]
 
-FOLLOW_ON_EXAMPLE_CASES = [
-    "Do you consider your job to be in retail? E.g. selling goods in a shop.",
-    "Do you work in manufacturing? E.g. making furniture or clothing.",
-    "Are you self-employed? I.e. you run your own business.",
-    "Do you work full time? I.e. 35 or more hours per week.",
-    "What services does your organisation provide? For example, teaching or training.",
-    "What products does your employer make? For instance, bicycles or clothing.",
-    "What type of work do you do? Such as bookkeeping.",
-    "What industry do you work in? E.g. retail.",
-]
-
 CLOSED_CATEGORY_OPTION_CASES = [
     "What is your employer's main activity: teaching or research?",
     "Are you a student or a worker?",
@@ -110,12 +98,6 @@ NON_EXAMPLE_CASES = [
     "What would you like to do next?",
     "The organisation's activities are mainly retail focused.",
     "Customer service is included within the role description.",
-]
-
-NON_FOLLOW_ON_EXAMPLE_CASES = [
-    "What is your employer's main activity, for example, providing finance or retail services?",
-    "What services do you provide, such as accounting or bookkeeping?",
-    "Do you work in healthcare, including nursing roles?",
 ]
 
 NON_CLOSED_CATEGORY_CASES = [
@@ -193,27 +175,6 @@ def test_has_examples_detects_supported_example_patterns(text: str):
 def test_has_examples_ignores_non_example_wording(text: str):
     """Avoid flagging ordinary statements and similar wording as examples."""
     assert not has_examples(text), f"Did not expect example wording in: {text}"
-
-
-# ============================================================================
-# Test has_follow_on_examples function
-# ============================================================================
-
-
-@pytest.mark.parametrize("text", FOLLOW_ON_EXAMPLE_CASES)
-def test_has_follow_on_examples_detects_examples_after_a_question(text: str):
-    """Detect example text that follows a question sentence."""
-    assert has_follow_on_examples(
-        text
-    ), f"Expected a follow-on example to be detected for: {text}"
-
-
-@pytest.mark.parametrize("text", NON_FOLLOW_ON_EXAMPLE_CASES)
-def test_has_follow_on_examples_ignores_embedded_examples(text: str):
-    """Avoid treating embedded example wording as a follow-on example."""
-    assert not has_follow_on_examples(
-        text
-    ), f"Did not expect a follow-on example to be detected for: {text}"
 
 
 # ============================================================================

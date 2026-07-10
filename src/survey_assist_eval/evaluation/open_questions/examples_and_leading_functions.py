@@ -1,7 +1,5 @@
 """Functions for detecting examples and leading wording in open questions."""
 
-import re
-
 
 def has_explicit_example_marker(text: str) -> bool:
     """Check whether text contains explicit example markers.
@@ -86,28 +84,6 @@ def has_examples(text: str) -> bool:
             has_definition_example_wording(text),
         ]
     )
-
-
-def has_follow_on_examples(text: str) -> bool:
-    """Check whether the final non-question sentence contains an example.
-
-    Args:
-        text: Question text to evaluate.
-
-    Returns:
-        True if the final non-question sentence contains an example,
-        otherwise False.
-    """
-    sentences = re.findall(r"[^.!?]+[.!?]?", text)
-
-    non_question_sentences = [
-        sentence for sentence in sentences if not sentence.strip().endswith("?")
-    ]
-
-    if not non_question_sentences:
-        return False
-
-    return has_examples(non_question_sentences[-1])
 
 
 def has_closed_category_options(text: str) -> bool:
