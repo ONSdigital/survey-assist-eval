@@ -11,10 +11,29 @@ from survey_assist_eval.evaluation.open_questions.examples_and_leading_functions
     has_including_example_phrase,
 )
 
+# ============================================================================
+# Test Data - Shared between tests
+# ============================================================================
+
 
 def unique_texts(*groups: list[str]) -> list[str]:
     """Return unique texts while preserving their original order."""
     return list(dict.fromkeys(text for group in groups for text in group))
+
+
+NON_STRING_INPUTS = [
+    pytest.param(None, id="none_input"),
+    pytest.param(123, id="integer_input"),
+    pytest.param(12.5, id="float_input"),
+    pytest.param([], id="list_input"),
+    pytest.param({}, id="dict_input"),
+    pytest.param(True, id="bool_input"),
+]
+
+EMPTY_TEXT_INPUTS = [
+    pytest.param("", id="empty_string"),
+    pytest.param("   ", id="whitespace_only"),
+]
 
 
 EXPLICIT_EXAMPLE_MARKER_CASES = [
@@ -132,6 +151,22 @@ def test_has_explicit_example_marker_detects_explicit_examples(text: str):
     ), f"Expected explicit example marker to be detected for: {text}"
 
 
+@pytest.mark.parametrize("text", EMPTY_TEXT_INPUTS)
+def test_has_explicit_example_marker_empty_text(text):
+    """Returns False for empty text inputs."""
+    assert (
+        has_explicit_example_marker(text) is False
+    ), f"Expected False for empty text input: {text!r}"
+
+
+@pytest.mark.parametrize("text", NON_STRING_INPUTS)
+def test_has_explicit_example_marker_non_string_inputs(text):
+    """Returns False for non-string inputs."""
+    assert (
+        has_explicit_example_marker(text) is False
+    ), f"Expected False for non-string input: {text!r}"
+
+
 # ============================================================================
 # Test has_including_example_phrase function
 # ============================================================================
@@ -143,6 +178,22 @@ def test_has_including_example_phrase_detects_including_style_examples(text: str
     assert has_including_example_phrase(
         text
     ), f"Expected including-style example wording to be detected for: {text}"
+
+
+@pytest.mark.parametrize("text", EMPTY_TEXT_INPUTS)
+def test_has_including_example_phrase_empty_text(text):
+    """Returns False for empty text inputs."""
+    assert (
+        has_including_example_phrase(text) is False
+    ), f"Expected False for empty text input: {text!r}"
+
+
+@pytest.mark.parametrize("text", NON_STRING_INPUTS)
+def test_has_including_example_phrase_non_string_inputs(text):
+    """Returns False for non-string inputs."""
+    assert (
+        has_including_example_phrase(text) is False
+    ), f"Expected False for non-string input: {text!r}"
 
 
 # ============================================================================
@@ -160,6 +211,22 @@ def test_has_definition_example_wording_detects_definition_style_examples(
     ), f"Expected definition-style example wording to be detected for: {text}"
 
 
+@pytest.mark.parametrize("text", EMPTY_TEXT_INPUTS)
+def test_has_definition_example_wording_empty_text(text):
+    """Returns False for empty text inputs."""
+    assert (
+        has_definition_example_wording(text) is False
+    ), f"Expected False for empty text input: {text!r}"
+
+
+@pytest.mark.parametrize("text", NON_STRING_INPUTS)
+def test_has_definition_example_wording_non_string_inputs(text):
+    """Returns False for non-string inputs."""
+    assert (
+        has_definition_example_wording(text) is False
+    ), f"Expected False for non-string input: {text!r}"
+
+
 # ============================================================================
 # Test has_examples function
 # ============================================================================
@@ -175,6 +242,18 @@ def test_has_examples_detects_supported_example_patterns(text: str):
 def test_has_examples_ignores_non_example_wording(text: str):
     """Avoid flagging ordinary statements and similar wording as examples."""
     assert not has_examples(text), f"Did not expect example wording in: {text}"
+
+
+@pytest.mark.parametrize("text", EMPTY_TEXT_INPUTS)
+def test_has_examples_empty_text(text):
+    """Returns False for empty text inputs."""
+    assert has_examples(text) is False, f"Expected False for empty text input: {text!r}"
+
+
+@pytest.mark.parametrize("text", NON_STRING_INPUTS)
+def test_has_examples_non_string_inputs(text):
+    """Returns False for non-string inputs."""
+    assert has_examples(text) is False, f"Expected False for non-string input: {text!r}"
 
 
 # ============================================================================
@@ -196,6 +275,22 @@ def test_has_closed_category_options_ignores_open_questions(text: str):
     assert not has_closed_category_options(
         text
     ), f"Did not expect closed-category wording to be detected for: {text}"
+
+
+@pytest.mark.parametrize("text", EMPTY_TEXT_INPUTS)
+def test_has_closed_category_options_empty_text(text):
+    """Returns False for empty text inputs."""
+    assert (
+        has_closed_category_options(text) is False
+    ), f"Expected False for empty text input: {text!r}"
+
+
+@pytest.mark.parametrize("text", NON_STRING_INPUTS)
+def test_has_closed_category_options_non_string_inputs(text):
+    """Returns False for non-string inputs."""
+    assert (
+        has_closed_category_options(text) is False
+    ), f"Expected False for non-string input: {text!r}"
 
 
 # ============================================================================
@@ -222,3 +317,19 @@ def test_has_closed_category_without_examples_rejects_examples_or_open_text(
     assert not has_closed_category_without_examples(text), (
         "Did not expect pure closed-category wording without examples for: " f"{text}"
     )
+
+
+@pytest.mark.parametrize("text", EMPTY_TEXT_INPUTS)
+def test_has_closed_category_without_examples_empty_text(text):
+    """Returns False for empty text inputs."""
+    assert (
+        has_closed_category_without_examples(text) is False
+    ), f"Expected False for empty text input: {text!r}"
+
+
+@pytest.mark.parametrize("text", NON_STRING_INPUTS)
+def test_has_closed_category_without_examples_non_string_inputs(text):
+    """Returns False for non-string inputs."""
+    assert (
+        has_closed_category_without_examples(text) is False
+    ), f"Expected False for non-string input: {text!r}"
