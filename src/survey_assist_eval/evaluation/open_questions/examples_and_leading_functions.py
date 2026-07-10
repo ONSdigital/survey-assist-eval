@@ -13,17 +13,19 @@ def has_explicit_example_marker(text: str) -> bool:
         True if explicit markers such as "for example" are present,
         otherwise False.
     """
-    patterns = [
-        r"\bfor example\b",
-        r"\be\.g\.?\b",
-        r"\bi\.e\.?\b",
-        r"\bsuch as\b",
-        r"(?:,|\()\s*like\b",
+    markers = [
+        "for example",
+        "e.g.",
+        "e.g",
+        "i.e.",
+        "i.e",
+        "such as",
+        "like",
     ]
 
     text = text.lower()
 
-    return any(re.search(pattern, text) for pattern in patterns)
+    return any(marker in text for marker in markers)
 
 
 def has_including_example_phrase(text: str) -> bool:
@@ -36,15 +38,15 @@ def has_including_example_phrase(text: str) -> bool:
         True if phrases such as "including" are present,
         otherwise False.
     """
-    patterns = [
-        r"\bincluding\b",
-        r"\bfor instance\b",
-        r"\b(?:do|does|did)\b[^?]*\binclude\b",
+    phrases = [
+        "including",
+        "includes",
+        "for instance",
     ]
 
     text = text.lower()
 
-    return any(re.search(pattern, text) for pattern in patterns)
+    return any(phrase in text for phrase in phrases)
 
 
 def has_definition_example_wording(text: str) -> bool:
@@ -97,12 +99,16 @@ def has_follow_on_examples(text: str) -> bool:
         True if the final non-question sentence contains an example,
         otherwise False.
     """
-    question_text, separator, follow_on_text = text.rpartition("?")
+    sentences = re.findall(r"[^.!?]+[.!?]?", text)
 
-    if not separator or not question_text.strip():
+    non_question_sentences = [
+        sentence for sentence in sentences if not sentence.strip().endswith("?")
+    ]
+
+    if not non_question_sentences:
         return False
 
-    return has_examples(follow_on_text.strip())
+    return has_examples(non_question_sentences[-1])
 
 
 def has_closed_category_options(text: str) -> bool:
