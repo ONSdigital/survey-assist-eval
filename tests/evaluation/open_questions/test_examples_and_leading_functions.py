@@ -35,7 +35,6 @@ EMPTY_TEXT_INPUTS = [
     pytest.param("   ", id="whitespace_only"),
 ]
 
-
 EXPLICIT_EXAMPLE_MARKER_CASES = [
     "What is your employer's main activity, for example, "
     " providing finance, retail or social services?",
@@ -54,88 +53,329 @@ EXPLICIT_EXAMPLE_MARKER_CASES = [
     "What products do you make (such as furniture)?",
 ]
 
-INCLUDING_EXAMPLE_PHRASE_CASES = [
-    "Are you a student or a worker, including a lecturer as a worker?",
-    "Do you work in healthcare, including nursing roles?",
-    "Does your role involve administration, including scheduling meetings?",
-    "Do you work in manufacturing, for instance, producing furniture?",
-    "What services do you provide, for instance, accounting or payroll support?",
-    "What products does your employer make, for instance, bicycles or clothing?",
-    "What services do you provide (for instance, accounting)?",
+EXPLICIT_EXAMPLE_MARKER_CASES = [
+    pytest.param(
+        "What is your employer's main activity, for example, "
+        "providing finance, retail or social services?",
+        id="explicit_for_example_comma_list",
+    ),
+    pytest.param(
+        "What products does your company make, for example, furniture or toys?",
+        id="explicit_for_example_or_list",
+    ),
+    pytest.param(
+        "What services does your organisation provide, for example, teaching or training?",
+        id="explicit_for_example_activity_examples",
+    ),
+    pytest.param(
+        "Do you consider your job to be in retail? E.g. selling goods in a shop.",
+        id="explicit_eg_follow_on_sentence",
+    ),
+    pytest.param(
+        "Do you work in manufacturing? E.g. making furniture or clothing.",
+        id="explicit_eg_follow_on_or_list",
+    ),
+    pytest.param(
+        "Are you self-employed? I.e. you run your own business.",
+        id="explicit_ie_follow_on_definition",
+    ),
+    pytest.param(
+        "Do you work full time? I.e. 35 or more hours per week.",
+        id="explicit_ie_follow_on_hours_definition",
+    ),
+    pytest.param(
+        "What is your employer's main activity, such as hair cutting or teeth cleaning?",
+        id="explicit_such_as_or_list",
+    ),
+    pytest.param(
+        "What services do you provide, such as accounting or bookkeeping?",
+        id="explicit_such_as_service_examples",
+    ),
+    pytest.param(
+        "What products does your employer manufacture (e.g. bicycles)?",
+        id="explicit_parenthetical_eg",
+    ),
+    pytest.param(
+        "What service does your organisation provide (for example, hairdressing)?",
+        id="explicit_parenthetical_for_example",
+    ),
+    pytest.param(
+        "What type of work do you do (such as bookkeeping)?",
+        id="explicit_parenthetical_such_as",
+    ),
+    pytest.param(
+        "What industry do you work in (e.g. retail)?",
+        id="explicit_parenthetical_eg_single_example",
+    ),
+    pytest.param(
+        "What products do you make (such as furniture)?",
+        id="explicit_parenthetical_such_as_single_example",
+    ),
 ]
+
+
+INCLUDING_EXAMPLE_PHRASE_CASES = [
+    pytest.param(
+        "Are you a student or a worker, including a lecturer as a worker?",
+        id="including_example_phrase_with_or",
+    ),
+    pytest.param(
+        "Do you work in healthcare, including nursing roles?",
+        id="including_example_phrase_single_role",
+    ),
+    pytest.param(
+        "Does your role involve administration, including scheduling meetings?",
+        id="including_example_phrase_activity",
+    ),
+    pytest.param(
+        "Do you work in manufacturing, for instance, producing furniture?",
+        id="for_instance_example_phrase_activity",
+    ),
+    pytest.param(
+        "What services do you provide, for instance, accounting or payroll support?",
+        id="for_instance_example_phrase_or_list",
+    ),
+    pytest.param(
+        "What products does your employer make, for instance, bicycles or clothing?",
+        id="for_instance_example_phrase_product_list",
+    ),
+    pytest.param(
+        "What services do you provide (for instance, accounting)?",
+        id="parenthetical_for_instance_example_phrase",
+    ),
+]
+
 
 DEFINITION_EXAMPLE_WORDING_CASES = [
-    "Do you work in retail, meaning you sell goods directly to customers?",
-    "Are you self-employed, meaning you run your own business?",
-    "Do you work in education, meaning you teach or train people?",
-    "Are you self-employed, which means you run your own business?",
-    "Do you work in retail, which means selling goods to customers?",
-    "Do you work in healthcare, namely nursing or physiotherapy?",
-    "Do you provide professional services, namely accounting or legal advice?",
-    "Do you work in education, that is teaching or training?",
-    "Do you work in healthcare, that is nursing or physiotherapy?",
+    pytest.param(
+        "Do you work in retail, meaning you sell goods directly to customers?",
+        id="definition_meaning_retail",
+    ),
+    pytest.param(
+        "Are you self-employed, meaning you run your own business?",
+        id="definition_meaning_self_employed",
+    ),
+    pytest.param(
+        "Do you work in education, meaning you teach or train people?",
+        id="definition_meaning_education",
+    ),
+    pytest.param(
+        "Are you self-employed, which means you run your own business?",
+        id="definition_which_means_self_employed",
+    ),
+    pytest.param(
+        "Do you work in retail, which means selling goods to customers?",
+        id="definition_which_means_retail",
+    ),
+    pytest.param(
+        "Do you work in healthcare, namely nursing or physiotherapy?",
+        id="definition_namely_healthcare_or_list",
+    ),
+    pytest.param(
+        "Do you provide professional services, namely accounting or legal advice?",
+        id="definition_namely_professional_services",
+    ),
+    pytest.param(
+        "Do you work in education, that is teaching or training?",
+        id="definition_that_is_education",
+    ),
+    pytest.param(
+        "Do you work in healthcare, that is nursing or physiotherapy?",
+        id="definition_that_is_healthcare",
+    ),
 ]
+
 
 CLOSED_CATEGORY_OPTION_CASES = [
-    "What is your employer's main activity: teaching or research?",
-    "Are you a student or a worker?",
-    "Is your organisation mainly public or private?",
-    "Are you employed in retail or manufacturing?",
-    "Do you mainly provide products or services?",
-    "Are you a manager or a supervisor?",
-    "Do you work in the public or private sector?",
-    "Are you involved in teaching or administration?",
-    "What type of organisation do you work for: school, hospital or university?",
-    "What kind of teacher are you: primary, secondary or college?",
-    "Are you employed either full-time or part-time?",
-    "Are you a manager/supervisor?",
-    "Which of the following best describes your role?",
-    "Which of these sectors do you work in?",
-    "Select one of the following options.",
-    "Select the one that best describes your role.",
-    "Choose one of the following categories.",
-    "Choose the one that best describes your organisation.",
-    "Pick one of the following options.",
-    "Pick the one that best matches your role.",
+    pytest.param(
+        "What is your employer's main activity: teaching or research?",
+        id="closed_category_colon_with_or",
+    ),
+    pytest.param(
+        "Are you a student or a worker?",
+        id="closed_category_simple_or",
+    ),
+    pytest.param(
+        "Is your organisation mainly public or private?",
+        id="closed_category_public_or_private",
+    ),
+    pytest.param(
+        "Are you employed in retail or manufacturing?",
+        id="closed_category_sector_or",
+    ),
+    pytest.param(
+        "Do you mainly provide products or services?",
+        id="closed_category_products_or_services",
+    ),
+    pytest.param(
+        "Are you a manager or a supervisor?",
+        id="closed_category_role_or",
+    ),
+    pytest.param(
+        "Do you work in the public or private sector?",
+        id="closed_category_sector_phrase",
+    ),
+    pytest.param(
+        "Are you involved in teaching or administration?",
+        id="closed_category_activity_or",
+    ),
+    pytest.param(
+        "What type of organisation do you work for: school, hospital or university?",
+        id="closed_category_colon_comma_or_list",
+    ),
+    pytest.param(
+        "What kind of teacher are you: primary, secondary or college?",
+        id="closed_category_colon_teacher_options",
+    ),
+    pytest.param(
+        "Are you employed either full-time or part-time?",
+        id="closed_category_either_or",
+    ),
+    pytest.param(
+        "Are you a manager/supervisor?",
+        id="closed_category_slash_options",
+    ),
+    pytest.param(
+        "Which of the following best describes your role?",
+        id="closed_category_which_of_the_following",
+    ),
+    pytest.param(
+        "Which of these sectors do you work in?",
+        id="closed_category_which_of_these",
+    ),
+    pytest.param(
+        "Select one of the following options.",
+        id="closed_category_select_one",
+    ),
+    pytest.param(
+        "Select the one that best describes your role.",
+        id="closed_category_select_the_one",
+    ),
+    pytest.param(
+        "Choose one of the following categories.",
+        id="closed_category_choose_one",
+    ),
+    pytest.param(
+        "Choose the one that best describes your organisation.",
+        id="closed_category_choose_the_one",
+    ),
+    pytest.param(
+        "Pick one of the following options.",
+        id="closed_category_pick_one",
+    ),
+    pytest.param(
+        "Pick the one that best matches your role.",
+        id="closed_category_pick_the_one",
+    ),
 ]
+
 
 CLOSED_CATEGORY_WITH_EXAMPLE_CASES = [
-    "What is your employer's main activity, for example, "
-    "providing finance, retail or social services?",
-    "What is your employer's main activity, such as hair cutting or teeth cleaning?",
-    "Are you a student or a worker, including a lecturer as a worker?",
-    "Do you see yourself as teenager or adult? I.e. 13-19 years old or 20+ years old.",
+    pytest.param(
+        "What is your employer's main activity, for example, "
+        "providing finance, retail or social services?",
+        id="closed_category_with_example_for_example_or_list",
+    ),
+    pytest.param(
+        "What is your employer's main activity, such as hair cutting or teeth cleaning?",
+        id="closed_category_with_example_such_as_or_list",
+    ),
+    pytest.param(
+        "Are you a student or a worker, including a lecturer as a worker?",
+        id="closed_category_with_example_including_and_or",
+    ),
+    pytest.param(
+        "Do you see yourself as teenager or adult? I.e. 13-19 years old or 20+ years old.",
+        id="closed_category_with_example_ie_follow_on_or_list",
+    ),
 ]
+
 
 NON_EXAMPLE_CASES = [
-    "I work in retail.",
-    "The organisation provides healthcare services.",
-    "Customer service activities form part of the role.",
-    "The company manufactures furniture.",
-    "Teaching apprentices is a key responsibility.",
-    "The organisation mainly supports local businesses.",
-    "What would you like to do next?",
-    "The organisation's activities are mainly retail focused.",
-    "Customer service is included within the role description.",
+    pytest.param(
+        "I work in retail.",
+        id="non_example_simple_statement",
+    ),
+    pytest.param(
+        "The organisation provides healthcare services.",
+        id="non_example_healthcare_statement",
+    ),
+    pytest.param(
+        "Customer service activities form part of the role.",
+        id="non_example_customer_service_statement",
+    ),
+    pytest.param(
+        "The company manufactures furniture.",
+        id="non_example_manufacturing_statement",
+    ),
+    pytest.param(
+        "Teaching apprentices is a key responsibility.",
+        id="non_example_teaching_statement",
+    ),
+    pytest.param(
+        "The organisation mainly supports local businesses.",
+        id="non_example_local_business_statement",
+    ),
+    pytest.param(
+        "What would you like to do next?",
+        id="non_example_open_question",
+    ),
+    pytest.param(
+        "The organisation's activities are mainly retail focused.",
+        id="non_example_retail_focused_statement",
+    ),
+    pytest.param(
+        "Customer service is included within the role description.",
+        id="non_example_included_not_including",
+    ),
 ]
+
 
 NON_CLOSED_CATEGORY_CASES = [
-    "What services does your organisation provide?",
-    "What products does your employer manufacture?",
-    "Please describe your main duties.",
-    "What is your job title?",
-    "What type of work do you do?",
-    "What products does your employer manufacture, for example bicycles?",
-    "What services do you provide, such as accounting?",
-    "Do you work in healthcare, like a nurse?",
-    "Are you self-employed? I.e. you run your own business.",
+    pytest.param(
+        "What services does your organisation provide?",
+        id="non_closed_open_services_question",
+    ),
+    pytest.param(
+        "What products does your employer manufacture?",
+        id="non_closed_open_products_question",
+    ),
+    pytest.param(
+        "Please describe your main duties.",
+        id="non_closed_describe_main_duties",
+    ),
+    pytest.param(
+        "What is your job title?",
+        id="non_closed_job_title_question",
+    ),
+    pytest.param(
+        "What type of work do you do?",
+        id="non_closed_open_type_of_work_question",
+    ),
+    pytest.param(
+        "What products does your employer manufacture, for example bicycles?",
+        id="non_closed_example_without_category_options",
+    ),
+    pytest.param(
+        "What services do you provide, such as accounting?",
+        id="non_closed_such_as_single_example",
+    ),
+    pytest.param(
+        "Do you work in healthcare, like a nurse?",
+        id="non_closed_like_example_not_supported",
+    ),
+    pytest.param(
+        "Are you self-employed? I.e. you run your own business.",
+        id="non_closed_definition_example_without_options",
+    ),
 ]
 
-ALL_EXAMPLE_CASES = unique_texts(
-    EXPLICIT_EXAMPLE_MARKER_CASES,
-    INCLUDING_EXAMPLE_PHRASE_CASES,
-    DEFINITION_EXAMPLE_WORDING_CASES,
-)
+
+ALL_EXAMPLE_CASES = [
+    *EXPLICIT_EXAMPLE_MARKER_CASES,
+    *INCLUDING_EXAMPLE_PHRASE_CASES,
+    *DEFINITION_EXAMPLE_WORDING_CASES,
+]
 
 
 # ============================================================================

@@ -51,6 +51,15 @@ def compute_example_and_leading_metrics(
     return metrics
 
 
+def _normalise_text(text: object) -> str | None:
+    """Normalise text for matching, returning None for unsupported inputs."""
+    if not isinstance(text, str):
+        return None
+
+    normalised = text.strip().lower()
+    return normalised or None
+
+
 def has_explicit_example_marker(text: str) -> bool:
     """Check whether text contains explicit example markers.
 
@@ -70,9 +79,11 @@ def has_explicit_example_marker(text: str) -> bool:
         "such as",
     ]
 
-    text = text.lower()
+    normalised_text = _normalise_text(text)
+    if normalised_text is None:
+        return False
 
-    return any(marker in text for marker in markers)
+    return any(marker in normalised_text for marker in markers)
 
 
 def has_including_example_phrase(text: str) -> bool:
@@ -91,9 +102,11 @@ def has_including_example_phrase(text: str) -> bool:
         "for instance",
     ]
 
-    text = text.lower()
+    normalised_text = _normalise_text(text)
+    if normalised_text is None:
+        return False
 
-    return any(phrase in text for phrase in phrases)
+    return any(phrase in normalised_text for phrase in phrases)
 
 
 def has_definition_example_wording(text: str) -> bool:
@@ -113,9 +126,11 @@ def has_definition_example_wording(text: str) -> bool:
         "that is",
     ]
 
-    text = text.lower()
+    normalised_text = _normalise_text(text)
+    if normalised_text is None:
+        return False
 
-    return any(phrase in text for phrase in phrases)
+    return any(phrase in normalised_text for phrase in phrases)
 
 
 def has_examples(text: str) -> bool:
@@ -146,22 +161,25 @@ def has_closed_category_options(text: str) -> bool:
         True if closed-category wording is detected,
         otherwise False.
     """
-    text = text.lower()
+    normalised_text = _normalise_text(text)
+    if normalised_text is None:
+        return False
 
     return any(
         [
-            " either " in text and " or " in text,
-            " or " in text,
-            ":" in text and (" or " in text or "," in text),
-            "/" in text,
-            "which of the following" in text,
-            "which of these" in text,
-            "select one" in text,
-            "select the one" in text,
-            "choose one" in text,
-            "choose the one" in text,
-            "pick one" in text,
-            "pick the one" in text,
+            " either " in normalised_text and " or " in normalised_text,
+            " or " in normalised_text,
+            ":" in normalised_text
+            and (" or " in normalised_text or "," in normalised_text),
+            "/" in normalised_text,
+            "which of the following" in normalised_text,
+            "which of these" in normalised_text,
+            "select one" in normalised_text,
+            "select the one" in normalised_text,
+            "choose one" in normalised_text,
+            "choose the one" in normalised_text,
+            "pick one" in normalised_text,
+            "pick the one" in normalised_text,
         ]
     )
 
