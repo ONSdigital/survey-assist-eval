@@ -15,9 +15,14 @@ from re import sub as regex_sub
 
 import numpy as np
 import pandas as pd
-from industrial_classification_utils.embed.embedding import EmbeddingHandler
+from survey_assist_embed_core import EmbeddingHandler, build_embedding_index
+from survey_assist_embed_core.sayt.indexes import _silence_classifai_tqdm
 from tqdm import tqdm
 
+from survey_assist_eval.data_cleaning.code_standard import INVALID_VALUES
+from survey_assist_eval.data_cleaning.level_of_education_constants import (
+    expand_level_of_education,
+)
 from survey_assist_eval.pipeline.shared_components import (
     parse_args,
     persist_results,
@@ -72,8 +77,11 @@ def _prep_columns(df: pd.DataFrame, second_run_flag: bool) -> pd.DataFrame:
         df[JOB_TITLE_COL] = df[JOB_TITLE_COL].apply(clean_text)
         df[INDUSTRY_DESCR_COL] = df[INDUSTRY_DESCR_COL].apply(clean_text)
         df[SELF_EMPLOYED_DESC_COL] = df[SELF_EMPLOYED_DESC_COL].apply(clean_text)
-        df[MERGED_INDUSTRY_DESC_COL] = df.apply(make_merged_industry_desc, axis=1)
+        df[MERGED_INDUSTRY_DESC_COL] = (
+            df[INDUSTRY_DESCR_COL] + df[SELF_EMPLOYED_DESC_COL]
+        )
         df[MERGED_INDUSTRY_DESC_COL] = df[MERGED_INDUSTRY_DESC_COL].apply(clean_text)
+        df[EDUCATION_COL] = df.apply(expand_level_of_education, axis=1)
 
     return df
 
@@ -88,7 +96,7 @@ def clean_text(text: str) -> str:
     Returns:
         str: The cleaned string.
     """
-    if not isinstance(text, str) or text == "-9":
+    if not isinstance(text, str) or text in INVALID_VALUES:
         text = ""
     text = text.replace("\n", " ")
     text = regex_sub(r"\s+", " ", text)
@@ -96,35 +104,16 @@ def clean_text(text: str) -> str:
     return text
 
 
-def make_merged_industry_desc(row: pd.Series) -> str:
-    """Merges the main industry description column with the self-employed description column.
-
-    Args:
-        row (pd.Series): A row from the input DataFrame containing industry description,
-                         self employed description.
-
-    Returns:
-        description (str): The merged descriptions.
-    """
-    ind_desc = (
-        row[INDUSTRY_DESCR_COL] if isinstance(row[INDUSTRY_DESCR_COL], str) else ""
-    )
-    self_emp_desc = (
-        row[SELF_EMPLOYED_DESC_COL]
-        if isinstance(row[SELF_EMPLOYED_DESC_COL], str)
-        else ""
-    )
-
-    return f"{ind_desc}{self_emp_desc}"
-
-
 def _make_embedding_handler(in_metadata: dict) -> EmbeddingHandler:
     """Create an :class:`EmbeddingHandler` using settings from metadata where possible."""
-    new_embedding_handler = EmbeddingHandler(
+    build_embedding_index(
         embedding_model_name=in_metadata["embedding_model_name"],
+        output_dir=in_metadata["embedding_db_dir"],
+        index_source_file=in_metadata["soc_embed_source_file"],
+    )
+    new_embedding_handler = EmbeddingHandler(
         db_dir=in_metadata["embedding_db_dir"],
         k_matches=in_metadata["embedding_k_matches"],
-        index_source_file=in_metadata["soc_embed_source_file"],
     )
 
     return new_embedding_handler
@@ -152,9 +141,10 @@ def _get_semantic_search_results(
 
     search_terms += [row[JOB_DESCRIPTION_COL], row[MERGED_INDUSTRY_DESC_COL]]
 
-    results = one_embedding_handler.search_index_multi(
-        search_terms,
-    )
+    with _silence_classifai_tqdm():
+        results = one_embedding_handler.search_index_multi(
+            search_terms,
+        )
 
     reduced_results = [r.model_dump() for r in results.results]
     return reduced_results
