@@ -414,11 +414,6 @@ def test_add_simple_language_columns_returns_expected_dataframe(
 # ============================================================================
 
 
-# ============================================================================
-# Test summarise_simple_language_columns function
-# ============================================================================
-
-
 def test_summarise_simple_language_columns_returns_expected_summary(
     expected_simple_language_df,
 ):

@@ -68,6 +68,8 @@ PUNCTUATION_WITH_INSTRUCTION_START = [
     pytest.param("Tell me what happened!", id="exclamation_start"),
     pytest.param("Describe your role.", id="period_start"),
     pytest.param("Explain this clearly?", id="question_mark_start"),
+    pytest.param("Please describe it?!", id="double_punctuation_start"),
+    pytest.param("Tell me what do you want??", id="double_question_mark_start"),
 ]
 
 PUNCTUATION_WITH_INSTRUCTION_NOT_START = [
