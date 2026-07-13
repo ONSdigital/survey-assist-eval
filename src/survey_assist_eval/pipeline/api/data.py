@@ -444,7 +444,7 @@ def calc_eval_metrics(
 
     # catch and log unique invalid model codes for indication purposes
     invalid_codes = prepped_codes[
-        prepped_codes["model_codes_invalid"] != {}
+        prepped_codes["model_codes_invalid"] != set()
     ]["model_codes_invalid"].tolist()
     unique_invalid_codes = set().union(*invalid_codes)
     num_unique_invalid_codes = len(unique_invalid_codes)
