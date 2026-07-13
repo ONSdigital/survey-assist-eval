@@ -443,16 +443,14 @@ def calc_eval_metrics(
     )
 
     # catch and log unique invalid model codes for indication purposes
-    invalid_codes = prepped_codes[
-        prepped_codes["model_codes_invalid"] != set()
-    ]["model_codes_invalid"].tolist()
-    unique_invalid_codes = set().union(*invalid_codes)
+    unique_invalid_codes = set().union(*prepped_codes["model_codes_invalid"])
     num_unique_invalid_codes = len(unique_invalid_codes)
     model_codes_invalid = False
     if num_unique_invalid_codes > 0:
         logger.warning(
             f"Found {num_unique_invalid_codes} unique invalid {classify_type}"
-            f" codes during evaluation metrics calculation: {invalid_codes}"
+            " codes during evaluation metrics calculation: "
+            f"{prepped_codes['model_codes_invalid']}"
         )
         model_codes_invalid = True
 
