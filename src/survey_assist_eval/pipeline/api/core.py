@@ -24,8 +24,12 @@ from survey_assist_eval.pipeline.api.db import (
 
 HTTP_STATUS_OK = 200
 HTTP_STATUS_NOT_FOUND = 404
-SIC_TEST_FILE = "sic_2k/sic_2k_test_data.parquet"
-SOC_TEST_FILE = "soc_4k/soc_4k_test_data.parquet"
+SIC_TEST_FILE = (
+    "evaluation-pipeline/original_datasets/sic_2k/sic_2k_test_data.parquet"
+)
+SOC_TEST_FILE = (
+    "evaluation-pipeline/original_datasets/soc_4k/soc_4k_test_data.parquet"
+)
 
 
 # ignore pylint as parameters are required to configure API evaluation

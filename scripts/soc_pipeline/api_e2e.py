@@ -34,7 +34,7 @@ from survey_assist_eval.pipeline.api.data import (
 
 load_dotenv()
 GCP_PROJECT_ID = os.getenv("PROJECT_ID")
-GCP_TEST_DATA_BUCKET_PATH = os.getenv("EVALUATION_BUCKET_NAME")
+GCP_TEST_DATA_BUCKET_PATH = f"gs://{os.getenv("EVALUATION_BUCKET_NAME")}"
 API_GW_URL = f"https://{os.getenv('API_GATEWAY')}"
 API_GW_SA_EMAIL = os.getenv("SA_EMAIL")
 FIRESTORE_DB_ID = os.getenv("API_EVAL_FIRESTORE_DB_ID")
