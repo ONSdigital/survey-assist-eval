@@ -73,6 +73,32 @@ def test_open_question_evaluation_report_metrics_returns_string():
     assert "Open Question Evaluation metrics summary:" in report
 
 
+def test_open_question_evaluation_report_metrics_by_section_returns_expected_mapping():
+    """Return per-section metric reports keyed by evaluation component."""
+    df = pd.DataFrame(
+        {
+            "question": [
+                "What do you do?",
+                "Describe your role.",
+            ]
+        }
+    )
+
+    evaluation = evaluate_open_questions(
+        df,
+        text_column="question",
+    )
+
+    report = evaluation.report_metrics_by_section()
+
+    assert report == {
+        "text_statistics": evaluation.text_statistics.report_metrics(),
+        "question_structure": evaluation.question_structure.report_metrics(),
+        "simple_language": evaluation.simple_language.report_metrics(),
+        "example_and_leading": evaluation.example_and_leading.report_metrics(),
+    }
+
+
 # ============================================================================
 # Test evaluate_open_questions function
 # ============================================================================
