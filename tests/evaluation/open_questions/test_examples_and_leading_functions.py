@@ -1,6 +1,7 @@
 """Tests for example and leading question helper functions."""
 
 # pylint: disable=redefined-outer-name
+# pylint: disable=duplicate-code
 
 import pandas as pd
 import pytest

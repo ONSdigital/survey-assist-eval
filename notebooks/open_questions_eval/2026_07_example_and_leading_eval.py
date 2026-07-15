@@ -14,7 +14,7 @@ from survey_assist_eval.evaluation.open_questions.examples_and_leading_functions
     compute_example_and_leading_metrics,
     summarise_example_and_leading_columns,
 )
-from survey_assist_eval.evaluation.open_questions_metrics import (
+from survey_assist_eval.evaluation.open_questions.open_questions_evaluation import (
     filter_nonempty_object_column,
 )
 

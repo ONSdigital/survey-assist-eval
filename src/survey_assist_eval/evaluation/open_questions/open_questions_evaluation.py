@@ -5,6 +5,10 @@ combining structure, language, and text-based checks.
 import pandas as pd
 from pydantic import BaseModel
 
+from survey_assist_eval.evaluation.open_questions.examples_and_leading_functions import (
+    ExampleLeadingQuestionMetrics,
+    compute_example_and_leading_metrics,
+)
 from survey_assist_eval.evaluation.open_questions.question_structure_functions import (
     QuestionStructureMetrics,
     compute_question_structure_metrics,
@@ -25,6 +29,7 @@ class OpenQuestionEvaluation(BaseModel):
     text_statistics: OpenQuestionTextStatistics
     question_structure: QuestionStructureMetrics
     simple_language: SimpleLanguageMetrics
+    example_and_leading: ExampleLeadingQuestionMetrics
 
     def report_metrics(self):
         """Pretty print all simple metrics."""
@@ -33,6 +38,7 @@ class OpenQuestionEvaluation(BaseModel):
             self.text_statistics.report_metrics(),
             self.question_structure.report_metrics(),
             self.simple_language.report_metrics(),
+            self.example_and_leading.report_metrics(),
         ]
         return "\n".join(lines)
 
@@ -42,6 +48,7 @@ class OpenQuestionEvaluation(BaseModel):
             "text_statistics": self.text_statistics.__dict__,
             "question_structure": self.question_structure.__dict__,
             "simple_language": self.simple_language.__dict__,
+            "example_and_leading": self.example_and_leading.__dict__,
         }
 
 
@@ -87,10 +94,15 @@ def evaluate_open_questions(
         df, text_column=text_column, **simple_language_config
     )
 
+    example_and_leading_metrics = compute_example_and_leading_metrics(
+        df, text_column=text_column
+    )
+
     return OpenQuestionEvaluation(
         text_statistics=text_stats,
         question_structure=question_struct_metrics,
         simple_language=simple_language_metrics,
+        example_and_leading=example_and_leading_metrics,
     )
 
 
