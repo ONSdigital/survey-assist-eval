@@ -3,18 +3,16 @@
 #########
 # Build #
 #########
-# using sha256 digest to ensure reproducible builds and prevent supply chain attacks
+# using sha256 to ensure reproducible builds and prevent supply chain attacks
 FROM python:3.12-slim@sha256:c3d81d25b3154142b0b42eb1e61300024426268edeb5b5a26dd7ddf64d9daf28 AS builder
 
-# build configuration arguments
 ARG POETRY_VERSION=2.4.1
 # pre-verified SHA256 checksum for the poetry installer script, to prevent supply chain attacks
 # see https://docs.docker.com/build/policies/
 ARG POETRY_INSTALLER_SHA256=75745ca71373a7b22fa150953543f03d826a52f8e4bc4350328a33bddd668026
 
-# poetry environment variables, requiring no interaction, creating local
-# virtual environment, and setting cache directory. Also, add poetry to PATH
-# so that it can be used in the Dockerfile.
+# Poetry build defaults (non-interactive, local .venv, cache directory).
+# Add Poetry and project venv executables to PATH.
 ENV POETRY_HOME="/opt/poetry" \
     POETRY_VERSION=${POETRY_VERSION} \
     POETRY_NO_INTERACTION=1 \
@@ -36,11 +34,8 @@ RUN apt-get update && \
 
 WORKDIR /app
 
-# copy dependency files and install dependencies, --only main to only install
-# main dependencies, --sync to remove any dependencies not specified in
-# pyproject.toml (improve reproducibility), and --no-ansi to disable ANSI
-# output (clearer build logs). Finally, remove poetry and pip cache to reduce
-# image size.
+# copy dev dependencies and install them (separate docker layers to improve caching)
+# install only required dependencies only and clear cache to reduce image size
 COPY pyproject.toml poetry.lock ./
 RUN poetry install --no-root --only main --sync --no-ansi && \
     rm -rf "$POETRY_CACHE_DIR" /root/.cache/pip
@@ -60,9 +55,8 @@ COPY scripts/api_evaluation/run.py ./run.py
 # using sha256 digest to ensure reproducible builds and prevent supply chain attacks
 FROM python:3.12-slim@sha256:c3d81d25b3154142b0b42eb1e61300024426268edeb5b5a26dd7ddf64d9daf28 AS runtime
 
-# set environment variables to prevent Python from writing .pyc files,
-# buffering stdout/stderr, and enabling optimisations. Also, add the virtual
-# environment to PATH so that the installed packages can be used.
+# Set runtime Python behavior (no bytecode, unbuffered output, optimized mode)
+# and expose the project virtualenv on PATH.
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONOPTIMIZE=1 \
@@ -73,12 +67,10 @@ RUN useradd -m appuser
 
 WORKDIR /app
 
-# copy the virtual environment and application code from the builder stage,
-# setting ownership to the non-root user
+# copy venv and source code from builder, setting ownership to the non-root user
 COPY --from=builder --chown=appuser:appuser /app /app
 
 # switch to the non-root user before entrypoint call
 USER appuser
 
-# execute the source script when the container starts
 ENTRYPOINT ["python", "run.py"]
