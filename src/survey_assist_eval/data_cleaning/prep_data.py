@@ -202,6 +202,11 @@ def prep_model_codes(
 
     if alt_codes_col is not None:
         miss_msk = out_df[out_col].apply(lambda x: not x)
+        # when miss_msk is all False, we can skip the alternative extraction
+        # step
+        if miss_msk.sum() == 0:
+            logger.info("No missing initial codes to fill from alternatives.")
+            return out_df[[ID_COL, out_col, invalid_col]]
         logger.info(
             "Filling initial codes from alternatives for %d rows.",
             miss_msk.sum(),

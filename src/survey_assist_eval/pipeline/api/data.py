@@ -4,6 +4,7 @@
 # for improved readability
 # fmt: off
 
+import datetime
 import os
 import re
 from typing import Any
@@ -15,6 +16,9 @@ import numpy as np
 import pandas as pd
 from pandas._libs.missing import NAType  # pylint: disable=E0611
 from survey_assist_utils.logging import get_logger
+
+from survey_assist_eval.data_cleaning.prep_data import prep_model_codes
+from survey_assist_eval.evaluation.metrics import calc_simple_metrics
 
 _RANDOM_SEED = 42
 _REQUIRED_FIELDS_MAP = {
@@ -372,3 +376,204 @@ def record_classify_results(
     ].map(lambda x: pd.NA if x is None else x)
 
     return output_df
+
+
+def calc_eval_metrics(
+    df: pd.DataFrame,
+    classify_type: str,
+    *,
+    keep_api_errors: bool = True,
+    log_level: str = "INFO"
+) -> dict[str, dict[str, int | float] | None]:
+    """Calculate evaluation metrics using the API call results.
+
+    Args:
+        df: DataFrame containing the input test data with recorded lookup and
+            classify results.
+        classify_type: The type of classification being evaluated, either
+            "sic" or "soc".
+        keep_api_errors: Whether to keep records with API errors in the
+            evaluation metrics calculation. If False, records with API errors
+            will be excluded from the evaluation metrics calculation. When
+            True, the records with API errors remain which effectively
+            penalises the evaluation metrics. Default is True.
+        log_level: Log level for logging within this function, must be one of
+            "DEBUG", "INFO", "WARNING", "ERROR", or "CRITICAL".
+
+    Returns:
+        dict: A dictionary containing the evaluation metrics (see
+        `survey_assist_eval.evaluation.metrics` and `calc_simple_metrics()
+        for further details).
+    """
+    logger = get_logger(__name__, level=log_level)
+    # defence against not running lookup/classify calls first
+    for required_col in [
+        "unique_id",
+        "lookup_classified",
+        "lookup_code",
+        "lookup_error",
+        "classify_classified",
+        "classify_code",
+        "classify_error",
+        "classify_candidates",
+    ]:
+        if required_col not in df.columns:
+            raise KeyError(
+                f"DataFrame must contain '{required_col}' to calculate "
+                "evaluation metrics. Ensure that the lookup and classify"
+                "results have been recorded before calculating metrics."
+            )
+
+    # prep evaluation results for usage with prep_data/metrics module funcs
+    metrics_df = _prep_df_for_eval(df, keep_api_errors=keep_api_errors)
+
+    # clean and validate unambiguous_codes for evaluation and recombine
+    # no need to prep `clerical_codes` as clean in input data
+    prepped_codes = prep_model_codes(
+        metrics_df,
+        codes_col="unambiguous_codes",
+        alt_codes_col="classify_candidates",
+        code_type=classify_type,
+    )
+    metrics_df = metrics_df.merge(
+        prepped_codes,
+        on="unique_id",
+        how="left",
+        validate="one_to_one",
+    )
+
+    # catch and log unique invalid model codes for indication purposes
+    unique_invalid_codes = set().union(*prepped_codes["model_codes_invalid"])
+    num_unique_invalid_codes = len(unique_invalid_codes)
+    model_codes_invalid = False
+    if num_unique_invalid_codes > 0:
+        logger.warning(
+            f"Found {num_unique_invalid_codes} unique invalid {classify_type}"
+            " codes during evaluation metrics calculation: "
+            f"{prepped_codes['model_codes_invalid']}"
+        )
+        model_codes_invalid = True
+
+    # calculate evaluation metrics using the cleaned model codes and the
+    # clerical codes as the ground truth
+    metrics = calc_simple_metrics(
+        metrics_df,
+        truth_col="clerical_codes",
+        initial_model_col="model_codes",
+        final_model_col=None,  # no final code in API eval pipeline
+    )
+
+    # add add misc config to the output metrics for indication purposes
+    output_metrics = metrics.as_dict()
+    output_metrics["misc"] = {
+        "invalid_model_codes_detected": model_codes_invalid,
+        "api_errors_in_metrics_calc": keep_api_errors,
+    }
+
+    return output_metrics
+
+
+def _prep_df_for_eval(
+    df: pd.DataFrame, keep_api_errors: bool = True
+) -> pd.DataFrame:
+    """Helper function to prep for evaluation metrics calculation.
+
+    Functionality is split into helper to allow for more detailed unit testing.
+    """
+    # avoid modifying the original dataFrame when calculating metrics
+    metrics_df = df.copy()
+
+    # create a combined codes column prioritising lookup_code if it was
+    # classified by that means
+    metrics_df["unambiguous_codes"] = metrics_df.apply(
+        lambda row: row["lookup_code"]
+        if row["lookup_classified"] is True
+        else row["classify_code"],
+        axis=1,
+    )
+
+    if keep_api_errors:
+        # fill missing classify_candidates (due to error or classified by
+        # lookup) with an empty list to signify no candidates to
+        # prep_model_codes
+        metrics_df["classify_candidates"] = metrics_df[
+            "classify_candidates"
+        ].apply(lambda x: [] if isinstance(x, NAType) else x)
+    else:
+        # exclude records where lookup or classify API endpoints errored
+        metrics_df = metrics_df[
+            (  # case lookup classified and no error
+                metrics_df["lookup_classified"].eq(True)
+                & metrics_df["lookup_error"].eq(False)
+            ) | (  # case no error in lookup and classify (regardless)
+                metrics_df["lookup_error"].eq(False)
+                & metrics_df["classify_error"].eq(False)
+            )
+        ].reset_index(drop=True)
+
+        # for records that were classified by lookup, set classify_candidates
+        # to an empty list as no candidates are generated
+        mask = metrics_df["lookup_classified"].eq(True)
+        metrics_df.loc[mask, "classify_candidates"] = (
+            metrics_df.loc[
+                mask, "classify_candidates"
+            ].apply(lambda _: [])
+        )
+
+    return metrics_df
+
+
+def calc_eval_perf(
+    df: pd.DataFrame,
+    start_time: datetime.datetime,
+    end_time: datetime.datetime,
+    *,
+    lookup_request_parallelism: int = 5,
+    classify_request_parallelism: int = 2,
+) -> dict[str, float]:
+    """Calculate evaluation performance metrics.
+
+    Args:
+        df: DataFrame containing the input test data with recorded lookup and
+            classify results.
+        start_time: The start time of the evaluation process.
+        end_time: The end time of the evaluation process.
+        lookup_request_parallelism: The number of parallel lookup requests
+            made to the API.
+        classify_request_parallelism: The number of parallel classify requests
+            made to the API.
+
+    Returns:
+        dict: A dictionary containing the evaluation performance metrics.
+    """
+    # defend against not running lookup/classify calls first
+    for required_col in ["lookup_error", "classify_error"]:
+        if required_col not in df.columns:
+            raise KeyError(
+                f"DataFrame must contain '{required_col}' to calculate "
+                "performance metrics. Ensure that the lookup and classify"
+                "results have been recorded before calculating."
+            )
+    duration = (end_time - start_time).total_seconds()
+    num_records = len(df)
+    if num_records == 0:
+        raise ValueError(
+            "DataFrame is empty. Cannot calculate evaluation performance "
+            "metrics on an empty DataFrame."
+        )
+    records_per_second = num_records / duration
+
+    num_lookup_errors = int(df["lookup_error"].sum())
+    num_classify_errors = int(df["classify_error"].sum())
+
+    return {
+        "num_records": num_records,
+        "duration_seconds": duration,
+        "records_per_second": records_per_second,
+        "num_lookup_errors": num_lookup_errors,
+        "lookup_parallelism": lookup_request_parallelism,
+        "lookup_error_rate": num_lookup_errors / num_records,
+        "num_classify_errors": num_classify_errors,
+        "classify_parallelism": classify_request_parallelism,
+        "classify_error_rate": num_classify_errors / num_records,
+    }

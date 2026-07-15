@@ -24,8 +24,12 @@ from survey_assist_eval.pipeline.api.db import (
 
 HTTP_STATUS_OK = 200
 HTTP_STATUS_NOT_FOUND = 404
-SIC_TEST_FILE = "sic_2k/sic_2k_test_data.parquet"
-SOC_TEST_FILE = "soc_4k/soc_4k_test_data.parquet"
+SIC_TEST_FILE = (
+    "evaluation-pipeline/original_datasets/sic_2k/sic_2k_test_data.parquet"
+)
+SOC_TEST_FILE = (
+    "evaluation-pipeline/original_datasets/soc_4k/soc_4k_test_data.parquet"
+)
 
 
 # ignore pylint as parameters are required to configure API evaluation
@@ -405,18 +409,18 @@ class ApiEvaluator:
         self,
         start_time: datetime.datetime,
         end_time: datetime.datetime,
-        duration_s: float,
         api_config: dict,
-        metrics: dict,
+        api_eval_metrics: dict,
+        api_perf_metrics: dict,
     ) -> None:
         """Collect and store the results of an evaluation.
 
         Args:
             start_time: The start time of the evaluation.
             end_time: The end time of the evaluation.
-            duration_s: The duration of the evaluation in seconds.
             api_config: The API configuration used for the evaluation.
-            metrics: The evaluation metrics.
+            api_eval_metrics: The evaluation metrics.
+            api_perf_metrics: The performance metrics.
         """
         eval_results = {
             "gcp_project_id": self._gcp["project_id"],
@@ -425,9 +429,9 @@ class ApiEvaluator:
             "classify_type": self._classify_type,
             "start_time": start_time,
             "end_time": end_time,
-            "duration_s": duration_s,
             "api_config": api_config,
-            "metrics": metrics,
+            "api_eval_metrics": api_eval_metrics,
+            "api_perf_metrics": api_perf_metrics,
         }
         self._logger.debug(f"Evaluation results: {eval_results}")
 

@@ -3,6 +3,8 @@
 # ignore pylint warnings about missing function docstrings and redefined outer names (fixtures)
 # pylint: disable=C0116,W0621
 
+import logging
+
 import pandas as pd
 import pytest
 
@@ -178,6 +180,45 @@ def test_prep_model_codes_alt_only():
     result = prep_model_codes(df, codes_col=None, alt_codes_col="alt_sic_candidates")
     assert result[MODEL_COL].apply(lambda x: isinstance(x, set)).all()
     assert result[MODEL_COL].all()
+
+
+@pytest.mark.parametrize(
+    # any valid SIC/SOC code is testable here
+    "code_type, code",
+    [("SOC", "5232"), ("SIC", "86101")],
+)
+def test_prep_model_codes_all_initial_codes_valid(code_type, code, caplog):
+    """Test corner case where all initial codes are valid.
+
+    Ensures no alternatives are set when `miss_msk` is all False.
+    """
+    df = pd.DataFrame(
+        {
+            "unique_id": ["A1"],
+            "initial_code": [code],
+            "alt_sic_candidates": [
+                [{"code": code, "likelihood": 0.9}],
+            ],
+        }
+    )
+    with caplog.at_level(logging.INFO):
+        result = prep_model_codes(df, code_type=code_type)
+
+    assert (
+        result[MODEL_COL].apply(lambda x: isinstance(x, set)).all()
+    ), "All output codes should be sets."
+    assert result[MODEL_COL].iloc[0] == {
+        code
+    }, "Expected initial code to be retained in the output."
+    assert (
+        result[INVALID_MODEL_COL].iloc[0] == set()
+    ), "Expected no invalid codes when initial code is valid."
+
+    # Ensure that expected log message is raised
+    logs = [r.message for r in caplog.records]
+    assert (
+        "No missing initial codes to fill from alternatives." in logs
+    ), f"Expected log message not found in output, got: {logs}"
 
 
 def test_prep_model_codes_missing_id():
