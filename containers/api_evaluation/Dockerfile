@@ -12,8 +12,8 @@ ARG POETRY_VERSION=2.4.1
 # see https://docs.docker.com/build/policies/
 ARG POETRY_INSTALLER_SHA256=75745ca71373a7b22fa150953543f03d826a52f8e4bc4350328a33bddd668026
 
-# poetry environment variables, requiring no interaction, disabling
-# virtualenv creation, and setting cache directory. Also, add poetry to PATH
+# poetry environment variables, requiring no interaction, creating local
+# virtual environment, and setting cache directory. Also, add poetry to PATH
 # so that it can be used in the Dockerfile.
 ENV POETRY_HOME="/opt/poetry" \
     POETRY_VERSION=${POETRY_VERSION} \
@@ -61,7 +61,8 @@ COPY scripts/api_evaluation/run.py ./run.py
 FROM python:3.12-slim@sha256:c3d81d25b3154142b0b42eb1e61300024426268edeb5b5a26dd7ddf64d9daf28 AS runtime
 
 # set environment variables to prevent Python from writing .pyc files,
-# buffering stdout/stderr, and enabling optimizations
+# buffering stdout/stderr, and enabling optimisations. Also, add the virtual
+# environment to PATH so that the installed packages can be used.
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONOPTIMIZE=1 \
