@@ -15,7 +15,6 @@ import datetime
 import os
 from typing import Literal
 
-from dotenv import load_dotenv
 from survey_assist_utils.logging import get_logger
 
 from survey_assist_eval.pipeline.api.core import (
@@ -32,7 +31,6 @@ from survey_assist_eval.pipeline.api.data import (
     record_lookup_results,
 )
 
-load_dotenv()
 GCP_PROJECT_ID = os.getenv("PROJECT_ID")
 GCP_TEST_DATA_BUCKET_PATH = f"gs://{os.getenv("EVALUATION_BUCKET_NAME")}"
 API_GW_URL = f"https://{os.getenv('API_GATEWAY')}"
