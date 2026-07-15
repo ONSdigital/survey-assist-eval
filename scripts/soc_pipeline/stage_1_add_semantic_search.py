@@ -20,6 +20,9 @@ from survey_assist_embed_core.sayt.indexes import _silence_classifai_tqdm
 from tqdm import tqdm
 
 from survey_assist_eval.data_cleaning.code_standard import INVALID_VALUES
+from survey_assist_eval.data_cleaning.level_of_education_constants import (
+    expand_level_of_education,
+)
 from survey_assist_eval.pipeline.shared_components import (
     parse_args,
     persist_results,
@@ -78,6 +81,7 @@ def _prep_columns(df: pd.DataFrame, second_run_flag: bool) -> pd.DataFrame:
             df[INDUSTRY_DESCR_COL] + df[SELF_EMPLOYED_DESC_COL]
         )
         df[MERGED_INDUSTRY_DESC_COL] = df[MERGED_INDUSTRY_DESC_COL].apply(clean_text)
+        df[EDUCATION_COL] = df.apply(expand_level_of_education, axis=1)
 
     return df
 

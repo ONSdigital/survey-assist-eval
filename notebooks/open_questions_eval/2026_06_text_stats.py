@@ -1,4 +1,4 @@
-"""A script to evaluate the open questions."""
+"""A script to show question text statistics."""
 
 # pylint: disable=C0103
 
@@ -9,20 +9,22 @@ import pandas as pd
 import plotly.graph_objects as go
 from dotenv import load_dotenv
 
-from survey_assist_eval.evaluation.open_questions_metrics import (
-    add_text_stats_columns,
-    compare_text_stats,
-    filter_nonempty_object_column,
-)
-from survey_assist_eval.plotting.filterable_plots import (
+from notebooks.plotting_functions.filterable_plots import (
     build_filterable_dashboard,
     build_filterable_plot,
 )
-from survey_assist_eval.plotting.plotting_helpers import (
+from notebooks.plotting_functions.plotting_helpers import (
     get_trace_colour_map,
 )
-from survey_assist_eval.plotting.standard_plots import (
+from notebooks.plotting_functions.standard_plots import (
     build_histogram,
+)
+from survey_assist_eval.evaluation.open_questions.open_questions_evaluation import (
+    filter_nonempty_object_column,
+)
+from survey_assist_eval.evaluation.open_questions.text_statistics_functions import (
+    add_text_stats_columns,
+    compare_text_statistics,
 )
 
 # %%
@@ -69,13 +71,13 @@ for label, df in stg_dfs_dict.items():
         text_column="followup_question",
     )
 
-stg_text_stat_comparison = compare_text_stats(
+stg_text_stat_comparison = compare_text_statistics(
     stg_dfs_followup_dict,
     prefix="followup_question_",
     word_threshold=MAX_WORD_COUNT_THRESHOLD,
     sentence_threshold=MAX_NUM_SENTENCE_THRESHOLD,
-    long_sentence_threshold=MAX_WORD_COUNT_PER_SENTENCE_THRESHOLD,
-    short_word_count_threshold=MIN_WORD_COUNT_THRESHOLD,
+    long_sentence_word_threshold=MAX_WORD_COUNT_PER_SENTENCE_THRESHOLD,
+    short_text_word_threshold=MIN_WORD_COUNT_THRESHOLD,
 )
 
 print(stg_text_stat_comparison)

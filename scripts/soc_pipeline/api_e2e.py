@@ -23,6 +23,8 @@ from survey_assist_eval.pipeline.api.core import (
     ApiEvaluatorConfig,
 )
 from survey_assist_eval.pipeline.api.data import (
+    calc_eval_metrics,
+    calc_eval_perf,
     get_and_prepare_test_data,
     prep_data_for_classify,
     prep_data_for_lookup,
@@ -32,7 +34,7 @@ from survey_assist_eval.pipeline.api.data import (
 
 load_dotenv()
 GCP_PROJECT_ID = os.getenv("PROJECT_ID")
-GCP_TEST_DATA_BUCKET_PATH = os.getenv("EVALUATION_BUCKET_NAME")
+GCP_TEST_DATA_BUCKET_PATH = f"gs://{os.getenv("EVALUATION_BUCKET_NAME")}"
 API_GW_URL = f"https://{os.getenv('API_GATEWAY')}"
 API_GW_SA_EMAIL = os.getenv("SA_EMAIL")
 FIRESTORE_DB_ID = os.getenv("API_EVAL_FIRESTORE_DB_ID")
@@ -46,6 +48,8 @@ LOOKUP_SEMAPHORE_LIMIT = int(
 CLASSIFY_SEMAPHORE_LIMIT = int(
     os.getenv("API_EVAL_CLASSIFY_SEMAPHORE_LIMIT", "2")
 )
+# set to anything other than "True" to avoid default behaviour
+KEEP_API_ERRORS = os.getenv("API_EVAL_KEEP_API_ERRORS", "True") == "True"
 
 logger = get_logger("api_e2e", level=LOG_LEVEL)
 
@@ -110,23 +114,36 @@ def main(classify_type: Literal["sic", "soc"]) -> None:
     )
     df = record_classify_results(df, classify_ids, classify_responses)
 
-    # TODO: update with results of metrics calculation once implemented
     logger.info("Calculating evaluation metrics...")
-    metrics = {}
+    eval_metrics = calc_eval_metrics(
+        df,
+        classify_type,
+        keep_api_errors=KEEP_API_ERRORS,
+        log_level=LOG_LEVEL
+    )
+    logger.info("Evaluation metrics calculated successfully.")
 
-    # record for evaluation metadata purposes
+    # calculate performance metrics for evaluation metadata purposes
     end_time = datetime.datetime.now(tz=datetime.UTC)
-    duration = (end_time - start_time).total_seconds()
-    logger.info(f"API evaluation completed in {duration}s.")
+    perf_metrics = calc_eval_perf(
+        df,
+        start_time,
+        end_time,
+        lookup_request_parallelism=LOOKUP_SEMAPHORE_LIMIT,
+        classify_request_parallelism=CLASSIFY_SEMAPHORE_LIMIT,
+    )
+    logger.info(
+        f"API evaluation completed in {perf_metrics['duration_seconds']}s."
+    )
 
     # write evaluation results to firestore for future analysis
     logger.info("Storing evaluation results in firestore...")
     api_evaluator.store_eval_results(
         start_time,
         end_time,
-        duration,
         api_config,
-        metrics,
+        eval_metrics,
+        perf_metrics,
     )
     logger.info("Evaluation results stored successfully.")
 

@@ -1,0 +1,56 @@
+"""A script to show simple language metrics."""
+
+# pylint: disable=C0103
+# pylint: disable=duplicate-code
+
+# %%
+import os
+
+import pandas as pd
+from dotenv import load_dotenv
+
+from survey_assist_eval.evaluation.open_questions.open_questions_evaluation import (
+    filter_nonempty_object_column,
+)
+from survey_assist_eval.evaluation.open_questions.simple_language_functions import (
+    add_simple_language_columns,
+    compute_simple_language_metrics,
+    summarise_simple_language_columns,
+)
+
+# %%
+EVALUATION_FOLDER = "/evaluation-pipeline/two_prompt_pipeline"
+STG_FILE = "2026_03_tlfs_it11_gemini25_europe_west9/STG3.parquet"
+
+# %%
+MAX_SYLLABLES_THRESHOLD = 3
+
+# %%
+load_dotenv()
+bucket_name = os.getenv("EVALUATION_BUCKET_NAME")
+if not bucket_name:
+    raise ValueError("EVALUATION_BUCKET_NAME environment variable not set")
+base_folder = f"gs://{bucket_name}{EVALUATION_FOLDER}/"
+stg_df = pd.read_parquet(f"{base_folder}{STG_FILE}")
+# %%
+stg_df_followup = add_simple_language_columns(
+    df=filter_nonempty_object_column(stg_df, column="followup_question"),
+    text_column="followup_question",
+)
+
+stg_df_followup_question_quality_summary = summarise_simple_language_columns(
+    df=stg_df_followup,
+    prefix="followup_question_",
+)
+
+print(stg_df_followup_question_quality_summary)
+# %%
+
+print(
+    compute_simple_language_metrics(
+        df=stg_df_followup, text_column="followup_question"
+    ).report_metrics()
+)
+
+
+# %%

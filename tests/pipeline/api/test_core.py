@@ -794,12 +794,12 @@ class TestApiEvaluator:
         # test setup parameters
         start_time = datetime.datetime.now(tz=datetime.UTC)
         end_time = start_time + datetime.timedelta(seconds=5)
-        duration_s = (end_time - start_time).total_seconds()
         api_config = {
             "llm_model": "test-llm-model",
             "embedding_model": "test-embedding-model",
         }
-        metrics = {}
+        api_eval_metrics = {}  # dummy eval metrics for testing
+        api_perf_metrics = {}  # dummy performance metrics for testing
 
         with (
             api_eval_init_mocks() as init_mock,
@@ -809,9 +809,9 @@ class TestApiEvaluator:
             ae.store_eval_results(
                 start_time,
                 end_time,
-                duration_s,
                 api_config,
-                metrics,
+                api_eval_metrics,
+                api_perf_metrics,
             )
 
         # verify eval_results_to firestore call
