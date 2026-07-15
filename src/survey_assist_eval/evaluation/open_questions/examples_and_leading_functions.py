@@ -167,7 +167,6 @@ def has_closed_category_options(text: str) -> bool:
 
     return any(
         [
-            " either " in normalised_text and " or " in normalised_text,
             " or " in normalised_text,
             ":" in normalised_text
             and (" or " in normalised_text or "," in normalised_text),
