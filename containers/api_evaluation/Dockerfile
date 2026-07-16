@@ -3,15 +3,14 @@
 #########
 # Build #
 #########
-# using sha256 to ensure reproducible builds and prevent supply chain attacks
+# using sha to ensure reproducible builds and prevent supply chain attacks
 FROM python:3.12-slim@sha256:c3d81d25b3154142b0b42eb1e61300024426268edeb5b5a26dd7ddf64d9daf28 AS builder
 
 ARG POETRY_VERSION=2.4.1
-# pre-verified SHA256 checksum for the poetry installer script, to prevent supply chain attacks
-# see https://docs.docker.com/build/policies/
+# pre-verified sha checksum for the poetry installer script to prevent supply chain attacks
 ARG POETRY_INSTALLER_SHA256=75745ca71373a7b22fa150953543f03d826a52f8e4bc4350328a33bddd668026
 
-# Poetry build defaults (non-interactive, local .venv, cache directory).
+# poetry build defaults (non-interactive, local .venv, cache directory).
 # Add Poetry and project venv executables to PATH.
 ENV POETRY_HOME="/opt/poetry" \
     POETRY_VERSION=${POETRY_VERSION} \
@@ -21,7 +20,7 @@ ENV POETRY_HOME="/opt/poetry" \
     POETRY_CACHE_DIR="/var/cache/pypoetry" \
     PATH=/app/.venv/bin:/opt/poetry/bin:$PATH
 
-# install poetry, verifying SHA checksum to prevent supply chain attacks
+# install poetry, verifying sha checksum
 RUN apt-get update && \
     apt-get install -y --no-install-recommends curl ca-certificates build-essential && \
     curl -fL -o /tmp/install-poetry.py https://install.python-poetry.org && \
@@ -52,10 +51,10 @@ COPY scripts/api_evaluation/run.py ./run.py
 ###########
 # Runtime #
 ###########
-# using sha256 digest to ensure reproducible builds and prevent supply chain attacks
+# using sha to ensure reproducible builds and prevent supply chain attacks
 FROM python:3.12-slim@sha256:c3d81d25b3154142b0b42eb1e61300024426268edeb5b5a26dd7ddf64d9daf28 AS runtime
 
-# Set runtime Python behavior (no bytecode, unbuffered output, optimized mode)
+# set runtime Python behavior (no bytecode, unbuffered output, optimised mode)
 # and expose the project virtualenv on PATH.
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
