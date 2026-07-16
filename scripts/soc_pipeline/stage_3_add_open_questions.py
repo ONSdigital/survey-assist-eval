@@ -15,6 +15,9 @@ import pandas as pd
 from occupational_classification_utils.llm.llm import ClassificationLLM
 from tqdm import tqdm
 
+from survey_assist_eval.data_cleaning.prep_respondent_data import (
+    respondent_data_to_dict,
+)
 from survey_assist_eval.pipeline.shared_components import (
     parse_args,
     persist_results,
@@ -23,11 +26,6 @@ from survey_assist_eval.pipeline.shared_components import (
 
 #####################################################
 # Default values and constants:
-JOB_TITLE_COL = "soc2020_job_title"
-JOB_DESCRIPTION_COL = "soc2020_job_description"
-EDUCATION_COL = "level_of_education"
-MERGED_INDUSTRY_DESC_COL = "merged_industry_desc"
-EDUCATION_COL = "level_of_education"
 
 CANDIDATE_SOC_COL = "alt_soc_candidates"
 OUTPUT_COL = "followup_question"
@@ -54,11 +52,10 @@ async def get_open_question_batch_async(
 
     async def _run_row(row: pd.Series):
         async with semaphore:
+            respondent_data = respondent_data_to_dict(row)
+
             return await c_llm.formulate_open_question(
-                industry_descr=row[MERGED_INDUSTRY_DESC_COL],
-                job_title=row[JOB_TITLE_COL],
-                job_description=row[JOB_DESCRIPTION_COL],
-                level_of_education=row.get(EDUCATION_COL, "unknown"),
+                respondent_data=respondent_data,
                 llm_output=row[CANDIDATE_SOC_COL],  # type: ignore
             )
 
