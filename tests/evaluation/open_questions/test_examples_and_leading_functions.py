@@ -25,320 +25,334 @@ from survey_assist_eval.evaluation.open_questions.examples_and_leading_functions
 # ============================================================================
 
 
-def unique_texts(*groups: list[str]) -> list[str]:
+def unique_texts(*groups: tuple[tuple[str, str], ...]) -> list[str]:
     """Return unique texts while preserving their original order."""
-    return list(dict.fromkeys(text for group in groups for text in group))
+    return list(dict.fromkeys(text for group in groups for text, _ in group))
 
 
-NON_STRING_INPUTS = [
-    pytest.param(None, id="none_input"),
-    pytest.param(123, id="integer_input"),
-    pytest.param(12.5, id="float_input"),
-    pytest.param([], id="list_input"),
-    pytest.param({}, id="dict_input"),
-    pytest.param(True, id="bool_input"),
-]
+def as_pytest_params(cases: tuple[tuple[object, str], ...]) -> tuple:
+    """Convert (value, id) tuples into pytest.param entries."""
+    return tuple(pytest.param(value, id=case_id) for value, case_id in cases)
 
-EMPTY_TEXT_INPUTS = [
-    pytest.param("", id="empty_string"),
-    pytest.param("   ", id="whitespace_only"),
-]
 
-EXPLICIT_EXAMPLE_MARKER_CASES = [
-    pytest.param(
+NON_STRING_INPUTS = (
+    (None, "none_input"),
+    (123, "integer_input"),
+    (12.5, "float_input"),
+    ([], "list_input"),
+    ({}, "dict_input"),
+    (True, "bool_input"),
+)
+NON_STRING_INPUT_PARAMS = as_pytest_params(NON_STRING_INPUTS)
+
+EMPTY_TEXT_INPUTS = (
+    ("", "empty_string"),
+    ("   ", "whitespace_only"),
+)
+EMPTY_TEXT_INPUT_PARAMS = as_pytest_params(EMPTY_TEXT_INPUTS)
+
+EXPLICIT_EXAMPLE_MARKER_CASES = (
+    (
         "What is your employer's main activity, for example, "
         "providing finance, retail or social services?",
-        id="explicit_for_example_comma_list",
+        "explicit_for_example_comma_list",
     ),
-    pytest.param(
+    (
         "What products does your company make, for example, furniture or toys?",
-        id="explicit_for_example_or_list",
+        "explicit_for_example_or_list",
     ),
-    pytest.param(
+    (
         "What services does your organisation provide, for example, teaching or training?",
-        id="explicit_for_example_activity_examples",
+        "explicit_for_example_activity_examples",
     ),
-    pytest.param(
+    (
         "Do you consider your job to be in retail? E.g. selling goods in a shop.",
-        id="explicit_eg_follow_on_sentence",
+        "explicit_eg_follow_on_sentence",
     ),
-    pytest.param(
+    (
         "Do you work in manufacturing? E.g. making furniture or clothing.",
-        id="explicit_eg_follow_on_or_list",
+        "explicit_eg_follow_on_or_list",
     ),
-    pytest.param(
+    (
         "Are you self-employed? I.e. you run your own business.",
-        id="explicit_ie_follow_on_definition",
+        "explicit_ie_follow_on_definition",
     ),
-    pytest.param(
+    (
         "Do you work full time? I.e. 35 or more hours per week.",
-        id="explicit_ie_follow_on_hours_definition",
+        "explicit_ie_follow_on_hours_definition",
     ),
-    pytest.param(
+    (
         "What is your employer's main activity, such as hair cutting or teeth cleaning?",
-        id="explicit_such_as_or_list",
+        "explicit_such_as_or_list",
     ),
-    pytest.param(
+    (
         "What services do you provide, such as accounting or bookkeeping?",
-        id="explicit_such_as_service_examples",
+        "explicit_such_as_service_examples",
     ),
-    pytest.param(
+    (
         "What products does your employer manufacture (e.g. bicycles)?",
-        id="explicit_parenthetical_eg",
+        "explicit_parenthetical_eg",
     ),
-    pytest.param(
+    (
         "What service does your organisation provide (for example, hairdressing)?",
-        id="explicit_parenthetical_for_example",
+        "explicit_parenthetical_for_example",
     ),
-    pytest.param(
+    (
         "What type of work do you do (such as bookkeeping)?",
-        id="explicit_parenthetical_such_as",
+        "explicit_parenthetical_such_as",
     ),
-    pytest.param(
+    (
         "What industry do you work in (e.g. retail)?",
-        id="explicit_parenthetical_eg_single_example",
+        "explicit_parenthetical_eg_single_example",
     ),
-    pytest.param(
+    (
         "What products do you make (such as furniture)?",
-        id="explicit_parenthetical_such_as_single_example",
+        "explicit_parenthetical_such_as_single_example",
     ),
-]
+)
+EXPLICIT_EXAMPLE_MARKER_PARAMS = as_pytest_params(EXPLICIT_EXAMPLE_MARKER_CASES)
 
-
-INCLUDING_EXAMPLE_PHRASE_CASES = [
-    pytest.param(
+INCLUDING_EXAMPLE_PHRASE_CASES = (
+    (
         "Are you a student or a worker, including a lecturer as a worker?",
-        id="including_example_phrase_with_or",
+        "including_example_phrase_with_or",
     ),
-    pytest.param(
+    (
         "Do you work in healthcare, including nursing roles?",
-        id="including_example_phrase_single_role",
+        "including_example_phrase_single_role",
     ),
-    pytest.param(
+    (
         "Does your role involve administration, including scheduling meetings?",
-        id="including_example_phrase_activity",
+        "including_example_phrase_activity",
     ),
-    pytest.param(
+    (
         "Do you work in manufacturing, for instance, producing furniture?",
-        id="for_instance_example_phrase_activity",
+        "for_instance_example_phrase_activity",
     ),
-    pytest.param(
+    (
         "What services do you provide, for instance, accounting or payroll support?",
-        id="for_instance_example_phrase_or_list",
+        "for_instance_example_phrase_or_list",
     ),
-    pytest.param(
+    (
         "What products does your employer make, for instance, bicycles or clothing?",
-        id="for_instance_example_phrase_product_list",
+        "for_instance_example_phrase_product_list",
     ),
-    pytest.param(
+    (
         "What services do you provide (for instance, accounting)?",
-        id="parenthetical_for_instance_example_phrase",
+        "parenthetical_for_instance_example_phrase",
     ),
-]
+)
+INCLUDING_EXAMPLE_PHRASE_PARAMS = as_pytest_params(INCLUDING_EXAMPLE_PHRASE_CASES)
 
-
-DEFINITION_EXAMPLE_WORDING_CASES = [
-    pytest.param(
+DEFINITION_EXAMPLE_WORDING_CASES = (
+    (
         "Do you work in retail, meaning you sell goods directly to customers?",
-        id="definition_meaning_retail",
+        "definition_meaning_retail",
     ),
-    pytest.param(
+    (
         "Are you self-employed, meaning you run your own business?",
-        id="definition_meaning_self_employed",
+        "definition_meaning_self_employed",
     ),
-    pytest.param(
+    (
         "Do you work in education, meaning you teach or train people?",
-        id="definition_meaning_education",
+        "definition_meaning_education",
     ),
-    pytest.param(
+    (
         "Are you self-employed, which means you run your own business?",
-        id="definition_which_means_self_employed",
+        "definition_which_means_self_employed",
     ),
-    pytest.param(
+    (
         "Do you work in retail, which means selling goods to customers?",
-        id="definition_which_means_retail",
+        "definition_which_means_retail",
     ),
-    pytest.param(
+    (
         "Do you work in healthcare, namely nursing or physiotherapy?",
-        id="definition_namely_healthcare_or_list",
+        "definition_namely_healthcare_or_list",
     ),
-    pytest.param(
+    (
         "Do you provide professional services, namely accounting or legal advice?",
-        id="definition_namely_professional_services",
+        "definition_namely_professional_services",
     ),
-    pytest.param(
+    (
         "Do you work in education, that is teaching or training?",
-        id="definition_that_is_education",
+        "definition_that_is_education",
     ),
-    pytest.param(
+    (
         "Do you work in healthcare, that is nursing or physiotherapy?",
-        id="definition_that_is_healthcare",
+        "definition_that_is_healthcare",
     ),
-]
+)
+DEFINITION_EXAMPLE_WORDING_PARAMS = as_pytest_params(DEFINITION_EXAMPLE_WORDING_CASES)
 
-
-CLOSED_CATEGORY_OPTION_CASES = [
-    pytest.param(
+CLOSED_CATEGORY_OPTION_CASES = (
+    (
         "What is your employer's main activity: teaching or research?",
-        id="closed_category_colon_with_or",
+        "closed_category_colon_with_or",
     ),
-    pytest.param("Are you a student or a worker?", id="closed_category_simple_or"),
-    pytest.param(
+    ("Are you a student or a worker?", "closed_category_simple_or"),
+    (
         "Is your organisation mainly public or private?",
-        id="closed_category_public_or_private",
+        "closed_category_public_or_private",
     ),
-    pytest.param(
-        "Are you employed in retail or manufacturing?", id="closed_category_sector_or"
+    (
+        "Are you employed in retail or manufacturing?",
+        "closed_category_sector_or",
     ),
-    pytest.param(
+    (
         "Do you mainly provide products or services?",
-        id="closed_category_products_or_services",
+        "closed_category_products_or_services",
     ),
-    pytest.param("Are you a manager or a supervisor?", id="closed_category_role_or"),
-    pytest.param(
+    ("Are you a manager or a supervisor?", "closed_category_role_or"),
+    (
         "Do you work in the public or private sector?",
-        id="closed_category_sector_phrase",
+        "closed_category_sector_phrase",
     ),
-    pytest.param(
+    (
         "Are you involved in teaching or administration?",
-        id="closed_category_activity_or",
+        "closed_category_activity_or",
     ),
-    pytest.param(
+    (
         "What type of organisation do you work for: school, hospital or university?",
-        id="closed_category_colon_comma_or_list",
+        "closed_category_colon_comma_or_list",
     ),
-    pytest.param(
+    (
         "What kind of teacher are you: primary, secondary or college?",
-        id="closed_category_colon_teacher_options",
+        "closed_category_colon_teacher_options",
     ),
-    pytest.param(
+    (
         "Are you employed either full-time or part-time?",
-        id="closed_category_either_or",
+        "closed_category_either_or",
     ),
-    pytest.param("Are you a manager/supervisor?", id="closed_category_slash_options"),
-    pytest.param(
+    ("Are you a manager/supervisor?", "closed_category_slash_options"),
+    (
         "Which of the following best describes your role?",
-        id="closed_category_which_of_the_following",
+        "closed_category_which_of_the_following",
     ),
-    pytest.param(
-        "Which of these sectors do you work in?", id="closed_category_which_of_these"
+    (
+        "Which of these sectors do you work in?",
+        "closed_category_which_of_these",
     ),
-    pytest.param(
-        "Select one of the following options.", id="closed_category_select_one"
+    (
+        "Select one of the following options.",
+        "closed_category_select_one",
     ),
-    pytest.param(
+    (
         "Select the one that best describes your role.",
-        id="closed_category_select_the_one",
+        "closed_category_select_the_one",
     ),
-    pytest.param(
-        "Choose one of the following categories.", id="closed_category_choose_one"
+    (
+        "Choose one of the following categories.",
+        "closed_category_choose_one",
     ),
-    pytest.param(
+    (
         "Choose the one that best describes your organisation.",
-        id="closed_category_choose_the_one",
+        "closed_category_choose_the_one",
     ),
-    pytest.param("Pick one of the following options.", id="closed_category_pick_one"),
-    pytest.param(
-        "Pick the one that best matches your role.", id="closed_category_pick_the_one"
+    ("Pick one of the following options.", "closed_category_pick_one"),
+    (
+        "Pick the one that best matches your role.",
+        "closed_category_pick_the_one",
     ),
-]
+)
+CLOSED_CATEGORY_OPTION_PARAMS = as_pytest_params(CLOSED_CATEGORY_OPTION_CASES)
 
-
-CLOSED_CATEGORY_WITH_EXAMPLE_CASES = [
-    pytest.param(
+CLOSED_CATEGORY_WITH_EXAMPLE_CASES = (
+    (
         "What is your employer's main activity, for example, "
         "providing finance, retail or social services?",
-        id="closed_category_with_example_for_example_or_list",
+        "closed_category_with_example_for_example_or_list",
     ),
-    pytest.param(
+    (
         "What is your employer's main activity, such as hair cutting or teeth cleaning?",
-        id="closed_category_with_example_such_as_or_list",
+        "closed_category_with_example_such_as_or_list",
     ),
-    pytest.param(
+    (
         "Are you a student or a worker, including a lecturer as a worker?",
-        id="closed_category_with_example_including_and_or",
+        "closed_category_with_example_including_and_or",
     ),
-    pytest.param(
+    (
         "Do you see yourself as teenager or adult? I.e. 13-19 years old or 20+ years old.",
-        id="closed_category_with_example_ie_follow_on_or_list",
+        "closed_category_with_example_ie_follow_on_or_list",
     ),
-]
+)
 
-
-NON_EXAMPLE_CASES = [
-    pytest.param("I work in retail.", id="non_example_simple_statement"),
-    pytest.param(
+NON_EXAMPLE_CASES = (
+    ("I work in retail.", "non_example_simple_statement"),
+    (
         "The organisation provides healthcare services.",
-        id="non_example_healthcare_statement",
+        "non_example_healthcare_statement",
     ),
-    pytest.param(
+    (
         "Customer service activities form part of the role.",
-        id="non_example_customer_service_statement",
+        "non_example_customer_service_statement",
     ),
-    pytest.param(
-        "The company manufactures furniture.", id="non_example_manufacturing_statement"
+    (
+        "The company manufactures furniture.",
+        "non_example_manufacturing_statement",
     ),
-    pytest.param(
+    (
         "Teaching apprentices is a key responsibility.",
-        id="non_example_teaching_statement",
+        "non_example_teaching_statement",
     ),
-    pytest.param(
+    (
         "The organisation mainly supports local businesses.",
-        id="non_example_local_business_statement",
+        "non_example_local_business_statement",
     ),
-    pytest.param("What would you like to do next?", id="non_example_open_question"),
-    pytest.param(
+    ("What would you like to do next?", "non_example_open_question"),
+    (
         "The organisation's activities are mainly retail focused.",
-        id="non_example_retail_focused_statement",
+        "non_example_retail_focused_statement",
     ),
-    pytest.param(
+    (
         "Customer service is included within the role description.",
-        id="non_example_included_not_including",
+        "non_example_included_not_including",
     ),
-]
+)
+NON_EXAMPLE_PARAMS = as_pytest_params(NON_EXAMPLE_CASES)
 
-
-NON_CLOSED_CATEGORY_CASES = [
-    pytest.param(
+NON_CLOSED_CATEGORY_CASES = (
+    (
         "What services does your organisation provide?",
-        id="non_closed_open_services_question",
+        "non_closed_open_services_question",
     ),
-    pytest.param(
+    (
         "What products does your employer manufacture?",
-        id="non_closed_open_products_question",
+        "non_closed_open_products_question",
     ),
-    pytest.param(
-        "Please describe your main duties.", id="non_closed_describe_main_duties"
+    (
+        "Please describe your main duties.",
+        "non_closed_describe_main_duties",
     ),
-    pytest.param("What is your job title?", id="non_closed_job_title_question"),
-    pytest.param(
-        "What type of work do you do?", id="non_closed_open_type_of_work_question"
+    ("What is your job title?", "non_closed_job_title_question"),
+    (
+        "What type of work do you do?",
+        "non_closed_open_type_of_work_question",
     ),
-    pytest.param(
+    (
         "What products does your employer manufacture, for example bicycles?",
-        id="non_closed_example_without_category_options",
+        "non_closed_example_without_category_options",
     ),
-    pytest.param(
+    (
         "What services do you provide, such as accounting?",
-        id="non_closed_such_as_single_example",
+        "non_closed_such_as_single_example",
     ),
-    pytest.param(
+    (
         "Do you work in healthcare, like a nurse?",
-        id="non_closed_like_example_not_supported",
+        "non_closed_like_example_not_supported",
     ),
-    pytest.param(
+    (
         "Are you self-employed? I.e. you run your own business.",
-        id="non_closed_definition_example_without_options",
+        "non_closed_definition_example_without_options",
     ),
-]
+)
+NON_CLOSED_CATEGORY_PARAMS = as_pytest_params(NON_CLOSED_CATEGORY_CASES)
 
-
-ALL_EXAMPLE_CASES = [
+ALL_EXAMPLE_CASES = (
     *EXPLICIT_EXAMPLE_MARKER_CASES,
     *INCLUDING_EXAMPLE_PHRASE_CASES,
     *DEFINITION_EXAMPLE_WORDING_CASES,
-]
-
+)
+ALL_EXAMPLE_PARAMS = as_pytest_params(ALL_EXAMPLE_CASES)
 
 # ============================================================================
 # Test Data - Shared between tests
@@ -395,7 +409,7 @@ def expected_example_and_leading_df():
 # ============================================================================
 
 
-@pytest.mark.parametrize("text", EXPLICIT_EXAMPLE_MARKER_CASES)
+@pytest.mark.parametrize("text", EXPLICIT_EXAMPLE_MARKER_PARAMS)
 def test_has_explicit_example_marker_detects_explicit_examples(text: str):
     """Detect explicit example wording such as e.g. and for example."""
     assert has_explicit_example_marker(
@@ -403,7 +417,7 @@ def test_has_explicit_example_marker_detects_explicit_examples(text: str):
     ), f"Expected explicit example marker to be detected for: {text}"
 
 
-@pytest.mark.parametrize("text", EMPTY_TEXT_INPUTS)
+@pytest.mark.parametrize("text", EMPTY_TEXT_INPUT_PARAMS)
 def test_has_explicit_example_marker_empty_text(text):
     """Returns False for empty text inputs."""
     assert (
@@ -411,7 +425,7 @@ def test_has_explicit_example_marker_empty_text(text):
     ), f"Expected False for empty text input: {text!r}"
 
 
-@pytest.mark.parametrize("text", NON_STRING_INPUTS)
+@pytest.mark.parametrize("text", NON_STRING_INPUT_PARAMS)
 def test_has_explicit_example_marker_non_string_inputs(text):
     """Returns False for non-string inputs."""
     assert (
@@ -424,7 +438,7 @@ def test_has_explicit_example_marker_non_string_inputs(text):
 # ============================================================================
 
 
-@pytest.mark.parametrize("text", INCLUDING_EXAMPLE_PHRASE_CASES)
+@pytest.mark.parametrize("text", INCLUDING_EXAMPLE_PHRASE_PARAMS)
 def test_has_including_example_phrase_detects_including_style_examples(text: str):
     """Detect including-style example wording."""
     assert has_including_example_phrase(
@@ -432,7 +446,7 @@ def test_has_including_example_phrase_detects_including_style_examples(text: str
     ), f"Expected including-style example wording to be detected for: {text}"
 
 
-@pytest.mark.parametrize("text", EMPTY_TEXT_INPUTS)
+@pytest.mark.parametrize("text", EMPTY_TEXT_INPUT_PARAMS)
 def test_has_including_example_phrase_empty_text(text):
     """Returns False for empty text inputs."""
     assert (
@@ -440,7 +454,7 @@ def test_has_including_example_phrase_empty_text(text):
     ), f"Expected False for empty text input: {text!r}"
 
 
-@pytest.mark.parametrize("text", NON_STRING_INPUTS)
+@pytest.mark.parametrize("text", NON_STRING_INPUT_PARAMS)
 def test_has_including_example_phrase_non_string_inputs(text):
     """Returns False for non-string inputs."""
     assert (
@@ -453,7 +467,7 @@ def test_has_including_example_phrase_non_string_inputs(text):
 # ============================================================================
 
 
-@pytest.mark.parametrize("text", DEFINITION_EXAMPLE_WORDING_CASES)
+@pytest.mark.parametrize("text", DEFINITION_EXAMPLE_WORDING_PARAMS)
 def test_has_definition_example_wording_detects_definition_style_examples(
     text: str,
 ):
@@ -463,7 +477,7 @@ def test_has_definition_example_wording_detects_definition_style_examples(
     ), f"Expected definition-style example wording to be detected for: {text}"
 
 
-@pytest.mark.parametrize("text", EMPTY_TEXT_INPUTS)
+@pytest.mark.parametrize("text", EMPTY_TEXT_INPUT_PARAMS)
 def test_has_definition_example_wording_empty_text(text):
     """Returns False for empty text inputs."""
     assert (
@@ -471,7 +485,7 @@ def test_has_definition_example_wording_empty_text(text):
     ), f"Expected False for empty text input: {text!r}"
 
 
-@pytest.mark.parametrize("text", NON_STRING_INPUTS)
+@pytest.mark.parametrize("text", NON_STRING_INPUT_PARAMS)
 def test_has_definition_example_wording_non_string_inputs(text):
     """Returns False for non-string inputs."""
     assert (
@@ -484,25 +498,25 @@ def test_has_definition_example_wording_non_string_inputs(text):
 # ============================================================================
 
 
-@pytest.mark.parametrize("text", ALL_EXAMPLE_CASES)
+@pytest.mark.parametrize("text", ALL_EXAMPLE_PARAMS)
 def test_has_examples_detects_supported_example_patterns(text: str):
     """Detect example wording across all supported example patterns."""
     assert has_examples(text), f"Expected example wording to be detected for: {text}"
 
 
-@pytest.mark.parametrize("text", NON_EXAMPLE_CASES)
+@pytest.mark.parametrize("text", NON_EXAMPLE_PARAMS)
 def test_has_examples_ignores_non_example_wording(text: str):
     """Avoid flagging ordinary statements and similar wording as examples."""
     assert not has_examples(text), f"Did not expect example wording in: {text}"
 
 
-@pytest.mark.parametrize("text", EMPTY_TEXT_INPUTS)
+@pytest.mark.parametrize("text", EMPTY_TEXT_INPUT_PARAMS)
 def test_has_examples_empty_text(text):
     """Returns False for empty text inputs."""
     assert has_examples(text) is False, f"Expected False for empty text input: {text!r}"
 
 
-@pytest.mark.parametrize("text", NON_STRING_INPUTS)
+@pytest.mark.parametrize("text", NON_STRING_INPUT_PARAMS)
 def test_has_examples_non_string_inputs(text):
     """Returns False for non-string inputs."""
     assert has_examples(text) is False, f"Expected False for non-string input: {text!r}"
@@ -513,7 +527,7 @@ def test_has_examples_non_string_inputs(text):
 # ============================================================================
 
 
-@pytest.mark.parametrize("text", CLOSED_CATEGORY_OPTION_CASES)
+@pytest.mark.parametrize("text", CLOSED_CATEGORY_OPTION_PARAMS)
 def test_has_closed_category_options_detects_predefined_categories(text: str):
     """Detect closed-category response options in question wording."""
     assert has_closed_category_options(
@@ -521,7 +535,7 @@ def test_has_closed_category_options_detects_predefined_categories(text: str):
     ), f"Expected closed-category wording to be detected for: {text}"
 
 
-@pytest.mark.parametrize("text", NON_CLOSED_CATEGORY_CASES)
+@pytest.mark.parametrize("text", NON_CLOSED_CATEGORY_PARAMS)
 def test_has_closed_category_options_ignores_open_questions(text: str):
     """Avoid flagging open questions that do not provide response options."""
     assert not has_closed_category_options(
@@ -529,7 +543,7 @@ def test_has_closed_category_options_ignores_open_questions(text: str):
     ), f"Did not expect closed-category wording to be detected for: {text}"
 
 
-@pytest.mark.parametrize("text", EMPTY_TEXT_INPUTS)
+@pytest.mark.parametrize("text", EMPTY_TEXT_INPUT_PARAMS)
 def test_has_closed_category_options_empty_text(text):
     """Returns False for empty text inputs."""
     assert (
@@ -537,7 +551,7 @@ def test_has_closed_category_options_empty_text(text):
     ), f"Expected False for empty text input: {text!r}"
 
 
-@pytest.mark.parametrize("text", NON_STRING_INPUTS)
+@pytest.mark.parametrize("text", NON_STRING_INPUT_PARAMS)
 def test_has_closed_category_options_non_string_inputs(text):
     """Returns False for non-string inputs."""
     assert (
@@ -550,7 +564,7 @@ def test_has_closed_category_options_non_string_inputs(text):
 # ============================================================================
 
 
-@pytest.mark.parametrize("text", CLOSED_CATEGORY_OPTION_CASES)
+@pytest.mark.parametrize("text", CLOSED_CATEGORY_OPTION_PARAMS)
 def test_has_closed_category_without_examples_detects_pure_categories(text: str):
     """Detect closed-category questions that do not contain examples."""
     assert has_closed_category_without_examples(
@@ -571,7 +585,7 @@ def test_has_closed_category_without_examples_rejects_examples_or_open_text(
     )
 
 
-@pytest.mark.parametrize("text", EMPTY_TEXT_INPUTS)
+@pytest.mark.parametrize("text", EMPTY_TEXT_INPUT_PARAMS)
 def test_has_closed_category_without_examples_empty_text(text):
     """Returns False for empty text inputs."""
     assert (
@@ -579,7 +593,7 @@ def test_has_closed_category_without_examples_empty_text(text):
     ), f"Expected False for empty text input: {text!r}"
 
 
-@pytest.mark.parametrize("text", NON_STRING_INPUTS)
+@pytest.mark.parametrize("text", NON_STRING_INPUT_PARAMS)
 def test_has_closed_category_without_examples_non_string_inputs(text):
     """Returns False for non-string inputs."""
     assert (
@@ -658,7 +672,7 @@ def test_get_example_and_leading_metrics_returns_expected_metrics(
     )
 
 
-@pytest.mark.parametrize("text", NON_EXAMPLE_CASES)
+@pytest.mark.parametrize("text", NON_EXAMPLE_PARAMS)
 def test_get_example_and_leading_metrics_non_example_text(text):
     """Returns falsey example and leading metrics for non-example text."""
     assert (
@@ -670,7 +684,7 @@ def test_get_example_and_leading_metrics_non_example_text(text):
     )
 
 
-@pytest.mark.parametrize("text", EMPTY_TEXT_INPUTS)
+@pytest.mark.parametrize("text", EMPTY_TEXT_INPUT_PARAMS)
 def test_get_example_and_leading_metrics_empty_text(text):
     """Returns falsey example and leading metrics for empty text inputs."""
     assert (
@@ -682,7 +696,7 @@ def test_get_example_and_leading_metrics_empty_text(text):
     )
 
 
-@pytest.mark.parametrize("text", NON_STRING_INPUTS)
+@pytest.mark.parametrize("text", NON_STRING_INPUT_PARAMS)
 def test_get_example_and_leading_metrics_non_string(text):
     """Returns falsey example and leading metrics for non-string inputs."""
     assert (
