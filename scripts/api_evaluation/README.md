@@ -50,3 +50,27 @@ bash scripts/api_evaluation/02-local-run.sh sic|soc
 | `API_EVAL_CLASSIFY_SEMAPHORE_LIMIT` | The number of parallel requests made to the API's classify endpoint concurrently, by default 2. |
 | `API_EVAL_KEEP_API_ERRORS` | Keep any records relating to API errors (e.g. 5XXs) in the evaluation metrics (an effective penalisation). By default `True`, and set to any other value to exclude them. |
 | `API_EVAL_RANDOM_SAMPLE_SIZE` | Select a random sample of a predefined size, useful when debugging. When unset, the full dataset is used. |
+
+## Notes
+
+- The Docker manifest for the API evaluation pipeline resides at
+`./containers/api_evaluation/Dockerfile`.
+- The Docker manifest is a multi-stage image build, separating out the build
+and runtime dependencies.
+- Within the build stage, `poetry` is installed for consistency as
+this repo's tool for managing python dependencies. A pre-verified SHA256 is
+used to verify the open-source `poetry` installation executable script to
+protect against source changes/tampering and prevent supply chain attacks.
+This SHA is set as the Docker build argument `POETRY_INSTALLER_SHA256` in the
+build stage. It is pre-calculated by running the following commands locally:
+```bash
+curl -fL -o install-poetry.py https://install.python-poetry.org
+shasum -a 256 install-poetry.py
+rm -f install-poetry.py
+```
+and then setting the displayed SHA as that build argument.
+
+> [!WARNING]
+> When `poetry` updates the `install-poetry.py` installation script, the
+abov reference pre-calculation of the SHA256 step will need to be repeated
+otherwise the build will fail at the installation script verification stage.
