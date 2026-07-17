@@ -44,6 +44,14 @@ class OpenQuestionEvaluation(BaseModel):
             "simple_language": self.simple_language.__dict__,
         }
 
+    def report_metrics_by_section(self):
+        """Returns dictionary of open questions evaluation reports."""
+        return {
+            "text_statistics": self.text_statistics.report_metrics(),
+            "question_structure": self.question_structure.report_metrics(),
+            "simple_language": self.simple_language.report_metrics(),
+        }
+
 
 def evaluate_open_questions(
     df: pd.DataFrame,
