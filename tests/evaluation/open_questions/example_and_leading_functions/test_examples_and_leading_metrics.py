@@ -33,12 +33,10 @@ NON_STRING_INPUTS = [
     pytest.param({}, id="dict_input"),
     pytest.param(True, id="bool_input"),
 ]
-
 EMPTY_TEXT_INPUTS = [
     pytest.param("", id="empty_string"),
     pytest.param("   ", id="whitespace_only"),
 ]
-
 EXPLICIT_EXAMPLE_MARKER_CASES = [
     pytest.param(
         "What is your employer's main activity, for example, "
@@ -113,8 +111,31 @@ EXPLICIT_EXAMPLE_MARKER_CASES = [
         "What services do you provide (for instance, accounting)?",
         id="parenthetical_for_instance_example_phrase",
     ),
+    pytest.param(
+        "Do you work in retail, eg selling goods in a shop?",
+        id="explicit_space_eg_lowercase",
+    ),
+    pytest.param(
+        "Are you self-employed, eg running your own business?",
+        id="explicit_space_eg_lowercase_employment",
+    ),
+    pytest.param(
+        "Do you work in retail, eg. selling goods in a shop?",
+        id="explicit_space_eg_period_lowercase",
+    ),
+    pytest.param(
+        "Are you self-employed, ie running your own business?",
+        id="explicit_space_ie_lowercase",
+    ),
+    pytest.param(
+        "Do you work full time, ie 35 or more hours per week?",
+        id="explicit_space_ie_lowercase_hours",
+    ),
+    pytest.param(
+        "Are you self-employed, ie. you run your own business?",
+        id="explicit_space_ie_period_lowercase",
+    ),
 ]
-
 
 INCLUDING_EXAMPLE_PHRASE_CASES = [
     pytest.param(
@@ -130,7 +151,6 @@ INCLUDING_EXAMPLE_PHRASE_CASES = [
         id="including_example_phrase_activity",
     ),
 ]
-
 
 DEFINITION_EXAMPLE_WORDING_CASES = [
     pytest.param(
@@ -170,7 +190,6 @@ DEFINITION_EXAMPLE_WORDING_CASES = [
         id="definition_that_is_healthcare",
     ),
 ]
-
 
 CLOSED_CATEGORY_OPTION_CASES = [
     pytest.param(
@@ -238,7 +257,6 @@ CLOSED_CATEGORY_OPTION_CASES = [
     ),
 ]
 
-
 CLOSED_CATEGORY_WITH_EXAMPLE_CASES = [
     pytest.param(
         "What is your employer's main activity, for example, "
@@ -258,7 +276,6 @@ CLOSED_CATEGORY_WITH_EXAMPLE_CASES = [
         id="closed_category_with_example_ie_follow_on_or_list",
     ),
 ]
-
 
 NON_EXAMPLE_CASES = [
     pytest.param("I work in retail.", id="non_example_simple_statement"),
@@ -290,8 +307,51 @@ NON_EXAMPLE_CASES = [
         "Customer service is included within the role description.",
         id="non_example_included_not_including",
     ),
+    pytest.param(
+        "Do you work in a field that requires certification?",
+        id="non_example_word_field_contains_ie",
+    ),
+    pytest.param(
+        "Are you responsible for zombie accounts in your system?",
+        id="non_example_word_zombie_contains_ie",
+    ),
+    pytest.param(
+        "Do you believe professional development is important?",
+        id="non_example_word_believe_contains_ie",
+    ),
+    pytest.param(
+        "Is chief executive experience required for this role?",
+        id="non_example_word_chief_contains_ie",
+    ),
+    pytest.param(
+        "Do you have brief experience in project management?",
+        id="non_example_word_brief_contains_ie",
+    ),
+    pytest.param(
+        "Have you worked as a cashier before?",
+        id="non_example_word_cashier_contains_ie",
+    ),
+    pytest.param(
+        "Do you study legend in your coursework?",
+        id="non_example_word_legend_contains_eg",
+    ),
+    pytest.param(
+        "Does your organisation grow vegetables on site?",
+        id="non_example_word_vegetables_contains_eg",
+    ),
+    pytest.param(
+        "Are you begging for flexible working arrangements?",
+        id="non_example_word_begging_contains_eg",
+    ),
+    pytest.param(
+        "Do you wear leggings as part of your uniform?",
+        id="non_example_word_leggings_contains_eg",
+    ),
+    pytest.param(
+        "Is managing negligence an important part of your role?",
+        id="non_example_word_negligence_contains_eg",
+    ),
 ]
-
 
 NON_CLOSED_CATEGORY_CASES = [
     pytest.param(
@@ -326,7 +386,6 @@ NON_CLOSED_CATEGORY_CASES = [
         id="non_closed_definition_example_without_options",
     ),
 ]
-
 
 ALL_EXAMPLE_CASES = [
     *EXPLICIT_EXAMPLE_MARKER_CASES,
@@ -534,7 +593,6 @@ def test_has_closed_category_without_examples_non_string_inputs(text):
 # ============================================================================
 # Test get_example_and_leading_metrics function
 # ============================================================================
-
 EXPECTED_FALSE_EXAMPLE_AND_LEADING_METRICS = {
     "has_examples": False,
     "has_closed_category_option": False,
@@ -646,7 +704,6 @@ def test_get_example_and_leading_metrics_returns_expected_keys():
         "has_closed_category_option",
         "has_closed_category_without_examples",
     }
-
     assert (
         set(
             get_example_and_leading_metrics(
