@@ -92,6 +92,13 @@ out = df[
         "alt_sic_candidates",
     ]
 ].rename(columns={"sic2007_employee": "sic07_free_text_main_activity"})
+
+out["sic_section (from sic_code)"] = out.sic_code.map(
+    lambda x: get_clean_n_digit_codes(x, n=0, code_type="SIC")[0]
+).map(lambda x: next(iter(x))[0] if len(x) == 1 else None)
+out["sic_section (from sic_code)"].value_counts()
+
+# %%
 out.to_csv(
     f"{work_dir}/TLFS_OD25_Uncodable_Non_Disclosive_with_SA_codes.csv", index=False
 )
@@ -100,16 +107,10 @@ out.to_csv(
 kb = pd.read_csv(
     "gs://ons-survey-assist-dev-evaluation-data/sic_knowledgebase/sic_kb_for_direct_lookup.csv"
 )
+
 # %%
 clean_text = kb["description"].str.lower().str.strip()
 msk = out["sic07_free_text_main_activity"].str.lower().str.strip().isin(clean_text)
 out[msk]
-
-
-# %%
-out["sic_section"] = out.sic_code.map(
-    lambda x: get_clean_n_digit_codes(x, n=0, code_type="SIC")[0]
-).map(lambda x: next(iter(x))[0] if len(x) == 1 else None)
-out.sic_section.value_counts()
 
 # %%
