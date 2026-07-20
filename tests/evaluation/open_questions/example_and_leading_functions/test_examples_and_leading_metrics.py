@@ -10,9 +10,9 @@ from survey_assist_eval.evaluation.open_questions.examples_and_leading_functions
     has_closed_category_options,
     has_closed_category_without_examples,
     has_definition_example_wording,
+    has_example_introduction_phrase,
     has_examples,
     has_explicit_example_marker,
-    has_including_example_phrase,
 )
 
 # ============================================================================
@@ -423,31 +423,31 @@ def test_has_explicit_example_marker_non_string_inputs(text):
 
 
 # ============================================================================
-# Test has_including_example_phrase function
+# Test has_example_introduction_phrase function
 # ============================================================================
 
 
 @pytest.mark.parametrize("text", INCLUDING_EXAMPLE_PHRASE_CASES)
-def test_has_including_example_phrase_detects_including_style_examples(text: str):
+def test_has_example_introduction_phrase_detects_including_style_examples(text: str):
     """Detect including-style example wording."""
-    assert has_including_example_phrase(
+    assert has_example_introduction_phrase(
         text
     ), f"Expected including-style example wording to be detected for: {text}"
 
 
 @pytest.mark.parametrize("text", EMPTY_TEXT_INPUTS)
-def test_has_including_example_phrase_empty_text(text):
+def test_has_example_introduction_phrase_empty_text(text):
     """Returns False for empty text inputs."""
     assert (
-        has_including_example_phrase(text) is False
+        has_example_introduction_phrase(text) is False
     ), f"Expected False for empty text input: {text!r}"
 
 
 @pytest.mark.parametrize("text", NON_STRING_INPUTS)
-def test_has_including_example_phrase_non_string_inputs(text):
+def test_has_example_introduction_phrase_non_string_inputs(text):
     """Returns False for non-string inputs."""
     assert (
-        has_including_example_phrase(text) is False
+        has_example_introduction_phrase(text) is False
     ), f"Expected False for non-string input: {text!r}"
 
 

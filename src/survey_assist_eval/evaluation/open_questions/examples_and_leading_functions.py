@@ -91,19 +91,23 @@ def has_explicit_example_marker(text: str) -> bool:
     return any(marker in normalised_text for marker in markers)
 
 
-def has_including_example_phrase(text: str) -> bool:
-    """Check whether text contains including-style example phrases.
+def has_example_introduction_phrase(text: str) -> bool:
+    """Check whether text contains phrases that introduce examples,
+    categories, or included items.
 
     Args:
         text: Question text to evaluate.
 
     Returns:
-        True if phrases such as "including" are present,
-        otherwise False.
+        True if example-introduction phrases such as "including" or
+        "among other things" are present, otherwise False.
     """
     phrases = [
         "including",
         "includes",
+        "inclusive of",
+        "among other things",
+        "in particular",
     ]
 
     normalised_text = _normalise_text(text)
@@ -149,7 +153,7 @@ def has_examples(text: str) -> bool:
     return any(
         [
             has_explicit_example_marker(text),
-            has_including_example_phrase(text),
+            has_example_introduction_phrase(text),
             has_definition_example_wording(text),
         ]
     )
