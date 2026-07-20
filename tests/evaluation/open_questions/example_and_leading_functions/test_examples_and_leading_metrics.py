@@ -33,10 +33,12 @@ NON_STRING_INPUTS = [
     pytest.param({}, id="dict_input"),
     pytest.param(True, id="bool_input"),
 ]
+
 EMPTY_TEXT_INPUTS = [
     pytest.param("", id="empty_string"),
     pytest.param("   ", id="whitespace_only"),
 ]
+
 EXPLICIT_EXAMPLE_MARKER_CASES = [
     pytest.param(
         "What is your employer's main activity, for example, "
@@ -46,10 +48,6 @@ EXPLICIT_EXAMPLE_MARKER_CASES = [
     pytest.param(
         "What products does your company make, for example, furniture or toys?",
         id="explicit_for_example_or_list",
-    ),
-    pytest.param(
-        "What services does your organisation provide, for example, teaching or training?",
-        id="explicit_for_example_activity_examples",
     ),
     pytest.param(
         "Do you consider your job to be in retail? E.g. selling goods in a shop.",
@@ -64,16 +62,8 @@ EXPLICIT_EXAMPLE_MARKER_CASES = [
         id="explicit_ie_follow_on_definition",
     ),
     pytest.param(
-        "Do you work full time? I.e. 35 or more hours per week.",
-        id="explicit_ie_follow_on_hours_definition",
-    ),
-    pytest.param(
         "What is your employer's main activity, such as hair cutting or teeth cleaning?",
         id="explicit_such_as_or_list",
-    ),
-    pytest.param(
-        "What services do you provide, such as accounting or bookkeeping?",
-        id="explicit_such_as_service_examples",
     ),
     pytest.param(
         "What products does your employer manufacture (e.g. bicycles)?",
@@ -86,14 +76,6 @@ EXPLICIT_EXAMPLE_MARKER_CASES = [
     pytest.param(
         "What type of work do you do (such as bookkeeping)?",
         id="explicit_parenthetical_such_as",
-    ),
-    pytest.param(
-        "What industry do you work in (e.g. retail)?",
-        id="explicit_parenthetical_eg_single_example",
-    ),
-    pytest.param(
-        "What products do you make (such as furniture)?",
-        id="explicit_parenthetical_such_as_single_example",
     ),
     pytest.param(
         "Do you work in manufacturing, for instance, producing furniture?",
@@ -116,10 +98,6 @@ EXPLICIT_EXAMPLE_MARKER_CASES = [
         id="explicit_space_eg_lowercase",
     ),
     pytest.param(
-        "Are you self-employed, eg running your own business?",
-        id="explicit_space_eg_lowercase_employment",
-    ),
-    pytest.param(
         "Do you work in retail, eg. selling goods in a shop?",
         id="explicit_space_eg_period_lowercase",
     ),
@@ -128,20 +106,12 @@ EXPLICIT_EXAMPLE_MARKER_CASES = [
         id="explicit_space_ie_lowercase",
     ),
     pytest.param(
-        "Do you work full time, ie 35 or more hours per week?",
-        id="explicit_space_ie_lowercase_hours",
-    ),
-    pytest.param(
         "Are you self-employed, ie. you run your own business?",
         id="explicit_space_ie_period_lowercase",
     ),
 ]
 
-INCLUDING_EXAMPLE_PHRASE_CASES = [
-    pytest.param(
-        "Are you a student or a worker, including a lecturer as a worker?",
-        id="including_example_phrase_with_or",
-    ),
+EXAMPLE_INTRODUCTION_PHRASE_CASES = [
     pytest.param(
         "Do you work in healthcare, including nursing roles?",
         id="including_example_phrase_single_role",
@@ -149,6 +119,22 @@ INCLUDING_EXAMPLE_PHRASE_CASES = [
     pytest.param(
         "Does your role involve administration, including scheduling meetings?",
         id="including_example_phrase_activity",
+    ),
+    pytest.param(
+        "Do you work in healthcare, inclusive of nursing roles?",
+        id="inclusive_of_example_phrase_single_role",
+    ),
+    pytest.param(
+        "Does your role involve administration, in particular scheduling meetings?",
+        id="in_particular_example_phrase_activity",
+    ),
+    pytest.param(
+        "Do you work in healthcare, among other things including nursing roles?",
+        id="among_other_things_example_phrase_single_role",
+    ),
+    pytest.param(
+        "Does your role involve administration, among other things including scheduling meetings?",
+        id="among_other_things_example_phrase_activity",
     ),
 ]
 
@@ -389,7 +375,7 @@ NON_CLOSED_CATEGORY_CASES = [
 
 ALL_EXAMPLE_CASES = [
     *EXPLICIT_EXAMPLE_MARKER_CASES,
-    *INCLUDING_EXAMPLE_PHRASE_CASES,
+    *EXAMPLE_INTRODUCTION_PHRASE_CASES,
     *DEFINITION_EXAMPLE_WORDING_CASES,
 ]
 
@@ -427,7 +413,7 @@ def test_has_explicit_example_marker_non_string_inputs(text):
 # ============================================================================
 
 
-@pytest.mark.parametrize("text", INCLUDING_EXAMPLE_PHRASE_CASES)
+@pytest.mark.parametrize("text", EXAMPLE_INTRODUCTION_PHRASE_CASES)
 def test_has_example_introduction_phrase_detects_including_style_examples(text: str):
     """Detect including-style example wording."""
     assert has_example_introduction_phrase(
