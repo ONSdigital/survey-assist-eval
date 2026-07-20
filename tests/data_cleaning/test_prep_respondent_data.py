@@ -62,7 +62,7 @@ def test_answer_not_provided():
     assert expected.equals(result)
 
 
-def test_some_ansers_provided():
+def test_some_answers_provided():
     """Test cases, where some responses are provided.
     Expecting dictionaries with only fields that were provided.
     """
