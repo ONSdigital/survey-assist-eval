@@ -12,6 +12,7 @@ class ExampleLeadingQuestionMetrics(BaseModel):
     """Container for all example and leading question evaluation metrics."""
 
     n_count: int
+    pct_with_explicit_example_marker: float
     pct_with_examples: float
     pct_with_closed_category_option: float
     pct_with_closed_category_without_examples: float
@@ -21,6 +22,8 @@ class ExampleLeadingQuestionMetrics(BaseModel):
         lines = [
             "\nExample and leading question metrics:",
             f" Number of follow-up questions: {self.n_count:.0f}",
+            " Percentage with explicit example markers: "
+            f"{self.pct_with_explicit_example_marker:.2f}%",
             f" Percentage with examples: {self.pct_with_examples:.2f}%",
             " Percentage with closed category options: "
             f"{self.pct_with_closed_category_option:.2f}%",
@@ -214,6 +217,7 @@ def get_example_and_leading_metrics(text: str) -> dict[str, int | float | list[i
         A dict containing simple language metrics.
     """
     return {
+        "has_explicit_example_marker": has_explicit_example_marker(text),
         "has_examples": has_examples(text),
         "has_closed_category_option": has_closed_category_options(text),
         "has_closed_category_without_examples": has_closed_category_without_examples(
@@ -262,6 +266,7 @@ def summarise_example_and_leading_columns(
         ExampleLeadingQuestionMetrics: Structured summary of metrics.
 
     """
+    has_explicit_example_marker_col = df[f"{prefix}has_explicit_example_marker"]
     has_examples_col = df[f"{prefix}has_examples"]
     has_closed_category_option_col = df[f"{prefix}has_closed_category_option"]
     has_closed_category_without_examples_col = df[
@@ -270,6 +275,8 @@ def summarise_example_and_leading_columns(
 
     summary = {
         "n_count": len(df),
+        "pct_with_explicit_example_marker": has_explicit_example_marker_col.mean()
+        * 100,
         "pct_with_examples": has_examples_col.mean() * 100,
         "pct_with_closed_category_option": has_closed_category_option_col.mean() * 100,
         "pct_with_closed_category_without_examples": has_closed_category_without_examples_col.mean()
