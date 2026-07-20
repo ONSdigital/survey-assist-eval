@@ -74,9 +74,14 @@ def has_explicit_example_marker(text: str) -> bool:
         "for example",
         "e.g.",
         "e.g",
+        " eg ",
+        " eg. ",
         "i.e.",
         "i.e",
+        " ie ",
+        " ie. ",
         "such as",
+        "for instance",
     ]
 
     normalised_text = _normalise_text(text)
@@ -99,7 +104,6 @@ def has_including_example_phrase(text: str) -> bool:
     phrases = [
         "including",
         "includes",
-        "for instance",
     ]
 
     normalised_text = _normalise_text(text)
