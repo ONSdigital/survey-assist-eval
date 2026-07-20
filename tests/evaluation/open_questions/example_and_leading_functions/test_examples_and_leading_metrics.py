@@ -580,6 +580,7 @@ def test_has_closed_category_without_examples_non_string_inputs(text):
 # Test get_example_and_leading_metrics function
 # ============================================================================
 EXPECTED_FALSE_EXAMPLE_AND_LEADING_METRICS = {
+    "has_explicit_example_marker": False,
     "has_examples": False,
     "has_closed_category_option": False,
     "has_closed_category_without_examples": False,
@@ -592,6 +593,7 @@ EXPECTED_FALSE_EXAMPLE_AND_LEADING_METRICS = {
         pytest.param(
             "What products does your employer make, for example, furniture or toys?",
             {
+                "has_explicit_example_marker": True,
                 "has_examples": True,
                 "has_closed_category_option": True,
                 "has_closed_category_without_examples": False,
@@ -601,6 +603,7 @@ EXPECTED_FALSE_EXAMPLE_AND_LEADING_METRICS = {
         pytest.param(
             "Are you a student or a worker?",
             {
+                "has_explicit_example_marker": False,
                 "has_examples": False,
                 "has_closed_category_option": True,
                 "has_closed_category_without_examples": True,
@@ -610,6 +613,7 @@ EXPECTED_FALSE_EXAMPLE_AND_LEADING_METRICS = {
         pytest.param(
             "Are you a student or a worker, including a lecturer as a worker?",
             {
+                "has_explicit_example_marker": False,
                 "has_examples": True,
                 "has_closed_category_option": True,
                 "has_closed_category_without_examples": False,
@@ -619,6 +623,7 @@ EXPECTED_FALSE_EXAMPLE_AND_LEADING_METRICS = {
         pytest.param(
             "Are you self-employed? I.e. you run your own business.",
             {
+                "has_explicit_example_marker": True,
                 "has_examples": True,
                 "has_closed_category_option": False,
                 "has_closed_category_without_examples": False,
@@ -628,6 +633,7 @@ EXPECTED_FALSE_EXAMPLE_AND_LEADING_METRICS = {
         pytest.param(
             "What services do your organisation provide?",
             {
+                "has_explicit_example_marker": False,
                 "has_examples": False,
                 "has_closed_category_option": False,
                 "has_closed_category_without_examples": False,
@@ -686,6 +692,7 @@ def test_get_example_and_leading_metrics_non_string(text):
 def test_get_example_and_leading_metrics_returns_expected_keys():
     """Returns all expected example and leading metric keys."""
     expected_keys = {
+        "has_explicit_example_marker",
         "has_examples",
         "has_closed_category_option",
         "has_closed_category_without_examples",

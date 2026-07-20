@@ -46,6 +46,12 @@ def expected_example_and_leading_df():
                 None,
             ],
             "respondent_id": [1, 2, 3, 4],
+            "follow_up_question_has_explicit_example_marker": [
+                True,
+                False,
+                False,
+                False,
+            ],
             "follow_up_question_has_examples": [True, False, False, False],
             "follow_up_question_has_closed_category_option": [
                 True,
@@ -97,6 +103,11 @@ def test_summarise_example_and_leading_columns_returns_expected_summary(
 
     assert result["n_count"] == 4, "Expected n_count to equal the number of rows"
 
+    assert result["pct_with_explicit_example_marker"] == pytest.approx(25, rel=1e-2), (
+        "Expected pct_with_explicit_example_marker to equal the percentage "
+        "of rows containing explicit example markers"
+    )
+
     assert result["pct_with_examples"] == pytest.approx(25, rel=1e-2), (
         "Expected pct_with_examples to equal the percentage of rows "
         "containing example wording"
@@ -119,6 +130,7 @@ def test_summarise_example_and_leading_columns_uses_prefix():
     """Uses the supplied prefix to locate metric columns."""
     df = pd.DataFrame(
         {
+            "test_has_explicit_example_marker": [True],
             "test_has_examples": [True],
             "test_has_closed_category_option": [True],
             "test_has_closed_category_without_examples": [False],
@@ -133,6 +145,11 @@ def test_summarise_example_and_leading_columns_uses_prefix():
     assert result["n_count"] == 1, (
         "Expected summarise_example_and_leading_columns to use the supplied "
         "prefix when locating metric columns"
+    )
+
+    assert result["pct_with_explicit_example_marker"] == 100.0, (
+        "Expected pct_with_explicit_example_marker to be calculated from "
+        "prefixed columns"
     )
 
     assert (
@@ -160,7 +177,7 @@ def test_summarise_example_and_leading_columns_missing_column_raises_key_error()
 
     with pytest.raises(
         KeyError,
-        match="question_has_closed_category_option",
+        match="question_has_explicit_example_marker",
     ):
         summarise_example_and_leading_columns(
             df,
@@ -192,12 +209,16 @@ def test_example_leading_question_metrics_stores_values():
     """Stores the supplied example and leading question metric values."""
     metrics = ExampleLeadingQuestionMetrics(
         n_count=4,
+        pct_with_explicit_example_marker=25.0,
         pct_with_examples=50.0,
         pct_with_closed_category_option=75.0,
         pct_with_closed_category_without_examples=25.0,
     )
 
     assert metrics.n_count == 4, "Expected n_count to be stored"
+    assert (
+        metrics.pct_with_explicit_example_marker == 25.0
+    ), "Expected pct_with_explicit_example_marker to be stored"
     assert metrics.pct_with_examples == 50.0, "Expected pct_with_examples to be stored"
     assert (
         metrics.pct_with_closed_category_option == 75.0
@@ -211,6 +232,7 @@ def test_example_leading_question_metrics_report_metrics_returns_expected_text()
     """Returns formatted example and leading question metrics as text."""
     metrics = ExampleLeadingQuestionMetrics(
         n_count=4,
+        pct_with_explicit_example_marker=25.0,
         pct_with_examples=50.0,
         pct_with_closed_category_option=75.0,
         pct_with_closed_category_without_examples=25.0,
@@ -222,6 +244,7 @@ def test_example_leading_question_metrics_report_metrics_returns_expected_text()
         [
             "\nExample and leading question metrics:",
             " Number of follow-up questions: 4",
+            " Percentage with explicit example markers: 25.00%",
             " Percentage with examples: 50.00%",
             " Percentage with closed category options: 75.00%",
             " Percentage with closed category options without examples: 25.00%",
@@ -266,6 +289,11 @@ def test_compute_example_and_leading_metrics_returns_expected_values(
         result.n_count == 4
     ), "Expected n_count to equal the number of rows in the input DataFrame"
 
+    assert result.pct_with_explicit_example_marker == pytest.approx(25, rel=1e-2), (
+        "Expected pct_with_explicit_example_marker to equal the percentage "
+        "of rows containing explicit example markers"
+    )
+
     assert result.pct_with_examples == pytest.approx(25, rel=1e-2), (
         "Expected pct_with_examples to equal the percentage of rows "
         "containing example wording"
@@ -301,6 +329,7 @@ def test_compute_example_and_leading_metrics_returns_zero_percentages():
     )
 
     assert result.n_count == 2
+    assert result.pct_with_explicit_example_marker == 0.0
     assert result.pct_with_examples == 0.0
     assert result.pct_with_closed_category_option == 0.0
     assert result.pct_with_closed_category_without_examples == 0.0
