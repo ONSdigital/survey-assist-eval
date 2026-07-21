@@ -1,79 +1,17 @@
-# git
-.git
-.gitignore
-.github/
+# default to excluding everything
+*
 
-# python
-__pycache__/
-*.py[cod]
-*$py.class
+# allow dependency files
+!pyproject.toml
+!poetry.lock
+!README.md
 
-# python distribution / packaging
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
+# allow source code
+!src/
+!src/survey_assist_eval/**
+!scripts/
+!scripts/api_evaluation/
+!scripts/api_evaluation/run.py
 
-# Unit test / coverage reports
-tests/
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
-.pytest_cache/
-cover/
-
-# Environments
-.env
-.venv
-.venv/
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-
-# folders
-docs/
-data/*
-notebooks/
-outputs/
-tests/
-.ruff_cache/
-.mypy_cache/
-.pytest_cache/
-
-# VSCode config
-.vscode/
-
-# Additional files
-.env.template
-.pre-commit-config.yaml
-.python-version
-CODEOWNERS
-config.toml
-LICENSE
-Makefile
-mkdocs.yml
-pytest.ini
+# exclude cache files in source code directories
+**/__pycache__/
