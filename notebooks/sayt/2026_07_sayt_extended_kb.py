@@ -1,15 +1,20 @@
-"""Combine extended SIC knowledge base with reviewed sayt lookup/rephrased data.
+"""Build `sic_kb_for_sayt.csv` for the SAYT suggester.
 
-Expects following environment variables to be set:
-- EVALUATION_BUCKET_NAME: name of GCS bucket where the data is stored
-The variables are loaded from the ".env" file.
+The notebook reads three bucket sources:
+- `evaluation-pipeline/SAYT/Lookup_IT3_Final.csv` for reviewed SAYT lookup terms.
+- `sic_knowledgebase/sic_kb_for_classifai.csv` for the wider SIC search-text base.
+- `sic_knowledgebase/sic_rephrased.csv` for reworded SIC descriptions.
 
-The goal is created a dataset of two columns search_text and display_text that
-can be used to build a SAYT suggester.
-- The search_text column contains the text that will be used for searching and is
-based on the extended SIC (activities) knowledge base.
-- The display_text column contains the text that will be displayed in the suggestions.
-There should be pretty labels for each 5-digit SIC code (can be more than one per group).
+It normalises SIC codes to 5 digits, creates candidate `display_text` labels from
+the reviewed lookup and rephrased descriptions, removes duplicate or very similar
+labels within the same code, then combines search terms from all three sources.
+Each remaining `search_text` is matched to the most similar `display_text` for the
+same SIC code using `sentence-transformers/all-MiniLM-L6-v2` embeddings.
+
+The output is written to `data/sayt/sic_kb_for_sayt.csv` with columns `code`,
+`search_text`, and `display_text`.
+
+Expects `EVALUATION_BUCKET_NAME` to be set, loaded from `.env`.
 """
 
 # ruff: noqa: PLR2004

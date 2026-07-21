@@ -29,7 +29,7 @@ from survey_assist_eval.data_cleaning.code_standard import get_clean_n_digit_cod
 # pylint: disable=R0801
 
 # %%
-EXTENDED_RUN = True  # set to True to include more suggesters and debug messages
+EXTENDED_RUN = False  # set to True to include more suggesters and debug messages
 
 if EXTENDED_RUN:
     logging.getLogger("survey_assist_e...").setLevel(logging.DEBUG)
@@ -108,17 +108,16 @@ sayt_corpus = list(zip(sayt_df["SIC_lookup"], sayt_df["display_text"], strict=Fa
 
 # %%
 sic_kb_for_classifai = pd.read_csv(
-    f"gs://{bucket_name}/sic_knowledgebase/sic_kb_for_classifai.csv", dtype=str
+    f"gs://{bucket_name}/sic_knowledgebase/sic_kb_for_sayt.csv", dtype=str
 )
-rephrased_df = pd.read_csv(
-    f"gs://{bucket_name}/sic_knowledgebase/sic_rephrased.csv", dtype=str
-)
-sayt2_df = sic_kb_for_classifai.merge(
-    rephrased_df, left_on="label", right_on="sic_code", how="left"
-)
-sayt2_df["display_text"] = sayt2_df["rephrased_description"] + ": " + sayt2_df["label"]
 
-sayt2_corpus = list(zip(sayt2_df["text"], sayt2_df["display_text"], strict=False))
+sayt2_corpus = list(
+    zip(
+        sic_kb_for_classifai["search_text"],
+        sic_kb_for_classifai["display_text"],
+        strict=False,
+    )
+)
 
 # %%
 suggesters = {
@@ -150,6 +149,10 @@ if EXTENDED_RUN:
             ),
             "Hybrid sem_w=1.5": build_lookup_suggester(
                 sayt_corpus, semantic_weight=1.5
+            ),
+            "Blaise proxy method (prefix + n_grams) "
+            "with extended knowledge base": build_lookup_suggester(
+                sayt2_corpus, semantic_weight=None
             ),
         }
     )
