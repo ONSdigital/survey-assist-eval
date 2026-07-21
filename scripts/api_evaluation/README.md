@@ -1,7 +1,7 @@
 # API Evaluation
 
 This directory contains source code for an automated Survey Assist API
-evaluation pipeline. It's objective is to exercise the API using a known
+evaluation pipeline. Its objective is to exercise the API using a known
 dataset to support development, verify performance, and test for model drift.
 
 This pipeline performs the following tasks:
@@ -17,11 +17,17 @@ This pipeline performs the following tasks:
 1. Ensure a Docker daemon is running (or equivalent).
 2. Set up environment variables in a `.env` file in accordance the
 [environment variables](#environment-variables) section.
+
+> [!NOTE]
+> Do not use quotation marks around values when setting environment variables.
+Sometimes, these are not escaped correctly and are assumed to be part of the
+actual value.
+
 3. Ensure you have:
-    - verified you GCP application default creditals for the
+    - verified you GCP application default credentials for the
       project setup.
     - the necessary permissions for:
-        - reading the input test dataset from the configured bukcet
+        - reading the input test dataset from the configured bucket
         - storing evaluation results in the configured firestore database
         - authorised usage with the configured API gateway (JWT signing)
 4. Build the Docker image:
@@ -57,18 +63,20 @@ bash scripts/api_evaluation/02-local-run.sh sic|soc
 `./containers/api_evaluation/Dockerfile`.
 - The Docker manifest is a multi-stage image build, separating out the build
 and runtime dependencies.
-- Within the build stage, `poetry` is installed for consistency as
-this repo's tool for managing python dependencies. A pre-verified SHA256 is
-used to verify the open-source `poetry` installation executable script to
-protect against source changes/tampering and prevent supply chain attacks.
-This SHA is set as the Docker build argument `POETRY_INSTALLER_SHA256` in the
-build stage. It is pre-calculated by running the following commands locally:
+- Within the build stage of the docker manifest, `poetry` is installed for
+consistency as this repo's tool for managing python dependencies.
+A pre-verified SHA256 is used to verify the open-source `poetry` installation
+executable script to protect against source changes/tampering and prevent
+supply chain attacks. This SHA is set as the Docker build argument
+`POETRY_INSTALLER_SHA256` in the build stage. It is pre-calculated by running
+the following commands locally:
 ```bash
 curl -fL -o install-poetry.py https://install.python-poetry.org
 shasum -a 256 install-poetry.py
 rm -f install-poetry.py
 ```
-and then setting the displayed SHA as that build argument.
+and then setting the `POETRY_INSTALLER_SHA256` build arg as that locally
+verified SHA value.
 
 > [!WARNING]
 > When `poetry` updates the `install-poetry.py` installation script, the

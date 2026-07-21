@@ -33,7 +33,7 @@ RUN apt-get update && \
 
 WORKDIR /app
 
-# copy dev dependencies and install them (separate docker layers to improve caching)
+# copy required dependencies and install them (separate docker layers to improve caching)
 # install only required dependencies only and clear cache to reduce image size
 COPY pyproject.toml poetry.lock ./
 RUN poetry install --no-root --only main --sync --no-ansi && \
