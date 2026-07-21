@@ -82,12 +82,23 @@ display_text_all = pd.concat(
     ],
     ignore_index=True,
 )
+print(f"Total number of display_texts: {len(display_text_all)}")
 display_text_all.groupby("code").size().sort_values(ascending=False).head(10)
 
-# %%
+# %% drop duplicates
+alpha_numeric = (
+    display_text_all["display_text"]
+    .fillna("")
+    .str.lower()
+    .str.replace(r"[^a-z0-9]+", "", regex=True)
+)
+display_text_all = display_text_all.loc[~alpha_numeric.duplicated()].reset_index(
+    drop=True
+)
+
 vectoriser = build_vectoriser("sentence-transformers/all-MiniLM-L6-v2")
 display_text_embeddings = vectoriser.transform(
-    display_text_all["display_text"].map(lambda x: x[:-7]).tolist()
+    display_text_all["display_text"].fillna("").str.slice(stop=-7).tolist()
 )
 
 # %%
@@ -125,20 +136,24 @@ display_text_filtered = (
     .sort_values(by=["code", "display_text"])
     .reset_index(drop=True)
 )
+print(f"Total number of display_texts after filtering: {len(display_text_filtered)}")
 display_text_filtered.groupby("code").size().sort_values(ascending=False).head(10)
 
 # %%
 search_text_all = pd.concat(
-    [sayt_df[["code", "search_text"]], sic_kb_for_classifai[["code", "search_text"]]],
-    ignore_index=True,
-)
+    [
+        sayt_df[["code", "search_text"]],
+        rephrased_df[["code", "search_text"]],
+        sic_kb_for_classifai[["code", "search_text"]],
+    ],
+).reset_index(drop=True)
 search_text_all.groupby("code").size().sort_values(ascending=False).head(10)
 
 # %% (takes ~ 5 mins)
 search_text_embeddings = vectoriser.transform(search_text_all["search_text"].tolist())
 # Recompute embeddings so indices stay aligned with filtered display_text rows.
 display_text_embeddings = vectoriser.transform(
-    display_text_filtered["display_text"].map(lambda x: x[:-7]).tolist()
+    display_text_filtered["display_text"].fillna("").str.slice(stop=-7).tolist()
 )
 
 # %%
@@ -165,8 +180,8 @@ for code in search_text_all["code"].unique():
     display_denom = np.clip(search_norms * display_norms, 1e-12, None)
     display_similarities = (search_embeddings @ display_embeddings.T) / display_denom
 
-    # remove search_texts that are too similar to each other (cosine similarity > 0.99)
-    for num_ind, search_ind in enumerate(range(len(search_inds))):
+    # remove search_texts that are too similar to each other (cosine similarity > 0.95)
+    for num_ind, search_ind in enumerate(search_inds):
         if any(search_similarities[num_ind, 0:num_ind] > 0.95):
             continue
 
@@ -187,6 +202,12 @@ for code in search_text_all["code"].unique():
             ],
             ignore_index=True,
         )
+        max_sim = display_similarities[num_ind].max()
+        if max_sim < 0.10:
+            logger.warning(
+                f"Bad match for search_text '{search_text}' and display_text '{display_text}' "
+                f"for code {code} (max similarity {max_sim:.2f})."
+            )
 
 
 # %%
