@@ -111,6 +111,8 @@ def has_example_introduction_phrase(text: str) -> bool:
         "inclusive of",
         "among other things",
         "in particular",
+        "particularly",
+        "especially",
     ]
 
     normalised_text = _normalise_text(text)

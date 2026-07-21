@@ -136,6 +136,14 @@ EXAMPLE_INTRODUCTION_PHRASE_CASES = [
         "Does your role involve administration, among other things including scheduling meetings?",
         id="among_other_things_example_phrase_activity",
     ),
+    pytest.param(
+        "Do you work in healthcare, particularly nursing roles?",
+        id="particularly_example_phrase_single_role",
+    ),
+    pytest.param(
+        "Does your role involve administration, especially scheduling meetings?",
+        id="especially_example_phrase_activity",
+    ),
 ]
 
 DEFINITION_EXAMPLE_WORDING_CASES = [
