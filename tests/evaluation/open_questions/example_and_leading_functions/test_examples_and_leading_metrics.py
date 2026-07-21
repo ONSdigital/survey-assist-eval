@@ -7,12 +7,13 @@ import pytest
 
 from survey_assist_eval.evaluation.open_questions.examples_and_leading_functions import (
     get_example_and_leading_metrics,
-    has_closed_category_options,
-    has_closed_category_without_examples,
+    has_binary_choice_wording,
     has_definition_example_wording,
     has_example_introduction_phrase,
     has_examples,
     has_explicit_example_marker,
+    has_explicit_predefined_response_options,
+    has_predefined_response_options,
 )
 
 # ============================================================================
@@ -185,7 +186,35 @@ DEFINITION_EXAMPLE_WORDING_CASES = [
     ),
 ]
 
-CLOSED_CATEGORY_OPTION_CASES = [
+EXPLICIT_PREDEFINED_RESPONSE_OPTION_CASES = [
+    pytest.param(
+        "Which of the following best describes your role?",
+        id="closed_category_which_of_the_following",
+    ),
+    pytest.param(
+        "Which of these sectors do you work in?", id="closed_category_which_of_these"
+    ),
+    pytest.param(
+        "Select one of the following options.", id="closed_category_select_one"
+    ),
+    pytest.param(
+        "Select the one that best describes your role.",
+        id="closed_category_select_the_one",
+    ),
+    pytest.param(
+        "Choose one of the following categories.", id="closed_category_choose_one"
+    ),
+    pytest.param(
+        "Choose the one that best describes your organisation.",
+        id="closed_category_choose_the_one",
+    ),
+    pytest.param("Pick one of the following options.", id="closed_category_pick_one"),
+    pytest.param(
+        "Pick the one that best matches your role.", id="closed_category_pick_the_one"
+    ),
+]
+
+BINARY_CHOICE_WORDING_WITHOUT_EXAMPLE_CASES = [
     pytest.param(
         "What is your employer's main activity: teaching or research?",
         id="closed_category_colon_with_or",
@@ -224,34 +253,9 @@ CLOSED_CATEGORY_OPTION_CASES = [
         id="closed_category_either_or",
     ),
     pytest.param("Are you a manager/supervisor?", id="closed_category_slash_options"),
-    pytest.param(
-        "Which of the following best describes your role?",
-        id="closed_category_which_of_the_following",
-    ),
-    pytest.param(
-        "Which of these sectors do you work in?", id="closed_category_which_of_these"
-    ),
-    pytest.param(
-        "Select one of the following options.", id="closed_category_select_one"
-    ),
-    pytest.param(
-        "Select the one that best describes your role.",
-        id="closed_category_select_the_one",
-    ),
-    pytest.param(
-        "Choose one of the following categories.", id="closed_category_choose_one"
-    ),
-    pytest.param(
-        "Choose the one that best describes your organisation.",
-        id="closed_category_choose_the_one",
-    ),
-    pytest.param("Pick one of the following options.", id="closed_category_pick_one"),
-    pytest.param(
-        "Pick the one that best matches your role.", id="closed_category_pick_the_one"
-    ),
 ]
 
-CLOSED_CATEGORY_WITH_EXAMPLE_CASES = [
+BINARY_CHOICE_WORDING_WITH_EXAMPLE_CASES = [
     pytest.param(
         "What is your employer's main activity, for example, "
         "providing finance, retail or social services?",
@@ -269,6 +273,11 @@ CLOSED_CATEGORY_WITH_EXAMPLE_CASES = [
         "Do you see yourself as teenager or adult? I.e. 13-19 years old or 20+ years old.",
         id="closed_category_with_example_ie_follow_on_or_list",
     ),
+]
+
+PREDEFINED_RESPONSE_OPTION_CASES = [
+    *EXPLICIT_PREDEFINED_RESPONSE_OPTION_CASES,
+    *BINARY_CHOICE_WORDING_WITHOUT_EXAMPLE_CASES,
 ]
 
 NON_EXAMPLE_CASES = [
@@ -347,7 +356,7 @@ NON_EXAMPLE_CASES = [
     ),
 ]
 
-NON_CLOSED_CATEGORY_CASES = [
+NON_OPTION_CASES = [
     pytest.param(
         "What services does your organisation provide?",
         id="non_closed_open_services_question",
@@ -506,81 +515,126 @@ def test_has_examples_non_string_inputs(text):
 
 
 # ============================================================================
-# Test has_closed_category_options function
+# Test has_explicit_predefined_response_options function
 # ============================================================================
 
 
-@pytest.mark.parametrize("text", CLOSED_CATEGORY_OPTION_CASES)
-def test_has_closed_category_options_detects_predefined_categories(text: str):
+@pytest.mark.parametrize("text", EXPLICIT_PREDEFINED_RESPONSE_OPTION_CASES)
+def test_has_explicit_predefined_response_options_detects_predefined_categories(
+    text: str,
+):
     """Detect closed-category response options in question wording."""
-    assert has_closed_category_options(
+    assert has_explicit_predefined_response_options(
         text
     ), f"Expected closed-category wording to be detected for: {text}"
 
 
-@pytest.mark.parametrize("text", NON_CLOSED_CATEGORY_CASES)
-def test_has_closed_category_options_ignores_open_questions(text: str):
+@pytest.mark.parametrize("text", NON_OPTION_CASES)
+def test_has_explicit_predefined_response_options_ignores_open_questions(text: str):
     """Avoid flagging open questions that do not provide response options."""
-    assert not has_closed_category_options(
+    assert not has_explicit_predefined_response_options(
         text
     ), f"Did not expect closed-category wording to be detected for: {text}"
 
 
 @pytest.mark.parametrize("text", EMPTY_TEXT_INPUTS)
-def test_has_closed_category_options_empty_text(text):
+def test_has_explicit_predefined_response_options_empty_text(text):
     """Returns False for empty text inputs."""
     assert (
-        has_closed_category_options(text) is False
+        has_explicit_predefined_response_options(text) is False
     ), f"Expected False for empty text input: {text!r}"
 
 
 @pytest.mark.parametrize("text", NON_STRING_INPUTS)
-def test_has_closed_category_options_non_string_inputs(text):
+def test_has_explicit_predefined_response_options_non_string_inputs(text):
     """Returns False for non-string inputs."""
     assert (
-        has_closed_category_options(text) is False
+        has_explicit_predefined_response_options(text) is False
     ), f"Expected False for non-string input: {text!r}"
 
 
 # ============================================================================
-# Test has_closed_category_without_examples function
+# Test has_binary_choice_wording function
 # ============================================================================
 
 
-@pytest.mark.parametrize("text", CLOSED_CATEGORY_OPTION_CASES)
-def test_has_closed_category_without_examples_detects_pure_categories(text: str):
+@pytest.mark.parametrize(
+    "text",
+    unique_texts(
+        BINARY_CHOICE_WORDING_WITHOUT_EXAMPLE_CASES,
+        BINARY_CHOICE_WORDING_WITH_EXAMPLE_CASES,
+    ),
+)
+def test_has_binary_choice_wording_detects_binary_choices(text: str):
+    """Detect binary-choice wording such as ' or ', ':', and '/' delimiters."""
+    assert has_binary_choice_wording(
+        text
+    ), f"Expected binary choice wording to be detected for: {text}"
+
+
+@pytest.mark.parametrize("text", NON_OPTION_CASES)
+def test_has_binary_choice_wording_ignores_open_questions(text: str):
+    """Avoid flagging open questions that do not provide binary choices."""
+    assert not has_binary_choice_wording(
+        text
+    ), f"Did not expect binary choice wording to be detected for: {text}"
+
+
+@pytest.mark.parametrize("text", EMPTY_TEXT_INPUTS)
+def test_has_binary_choice_wording_empty_text(text):
+    """Returns False for empty text inputs."""
+    assert (
+        has_binary_choice_wording(text) is False
+    ), f"Expected False for empty text input: {text!r}"
+
+
+@pytest.mark.parametrize("text", NON_STRING_INPUTS)
+def test_has_binary_choice_wording_non_string_inputs(text):
+    """Returns False for non-string inputs."""
+    assert (
+        has_binary_choice_wording(text) is False
+    ), f"Expected False for non-string input: {text!r}"
+
+
+# ============================================================================
+# Test has_predefined_response_options function
+# ============================================================================
+
+
+@pytest.mark.parametrize("text", PREDEFINED_RESPONSE_OPTION_CASES)
+def test_has_predefined_response_options_detects_pure_categories(text: str):
     """Detect closed-category questions that do not contain examples."""
-    assert has_closed_category_without_examples(
+    assert has_predefined_response_options(
         text
     ), f"Expected closed-category wording without examples for: {text}"
 
 
 @pytest.mark.parametrize(
     "text",
-    unique_texts(CLOSED_CATEGORY_WITH_EXAMPLE_CASES, NON_CLOSED_CATEGORY_CASES),
+    unique_texts(BINARY_CHOICE_WORDING_WITH_EXAMPLE_CASES, NON_OPTION_CASES),
 )
-def test_has_closed_category_without_examples_rejects_examples_or_open_text(
+def test_has_predefined_response_options_rejects_examples_or_open_text(
     text: str,
 ):
     """Avoid flagging questions that either contain examples or remain open-ended."""
-    assert not has_closed_category_without_examples(text), (
+    assert not has_predefined_response_options(text), (
         "Did not expect pure closed-category wording without examples for: " f"{text}"
     )
 
 
 @pytest.mark.parametrize("text", EMPTY_TEXT_INPUTS)
-def test_has_closed_category_without_examples_empty_text(text):
+def test_has_predefined_response_options_empty_text(text):
     """Returns False for empty text inputs."""
     assert (
-        has_closed_category_without_examples(text) is False
+        has_predefined_response_options(text) is False
     ), f"Expected False for empty text input: {text!r}"
 
 
 @pytest.mark.parametrize("text", NON_STRING_INPUTS)
-def test_has_closed_category_without_examples_non_string_inputs(text):
+def test_has_predefined_response_options_non_string_inputs(text):
     """Returns False for non-string inputs."""
     assert (
-        has_closed_category_without_examples(text) is False
+        has_predefined_response_options(text) is False
     ), f"Expected False for non-string input: {text!r}"
 
 
@@ -590,8 +644,7 @@ def test_has_closed_category_without_examples_non_string_inputs(text):
 EXPECTED_FALSE_EXAMPLE_AND_LEADING_METRICS = {
     "has_explicit_example_marker": False,
     "has_examples": False,
-    "has_closed_category_option": False,
-    "has_closed_category_without_examples": False,
+    "has_predefined_response_options": False,
 }
 
 
@@ -603,8 +656,7 @@ EXPECTED_FALSE_EXAMPLE_AND_LEADING_METRICS = {
             {
                 "has_explicit_example_marker": True,
                 "has_examples": True,
-                "has_closed_category_option": True,
-                "has_closed_category_without_examples": False,
+                "has_predefined_response_options": False,
             },
             id="example_and_closed_category",
         ),
@@ -613,8 +665,7 @@ EXPECTED_FALSE_EXAMPLE_AND_LEADING_METRICS = {
             {
                 "has_explicit_example_marker": False,
                 "has_examples": False,
-                "has_closed_category_option": True,
-                "has_closed_category_without_examples": True,
+                "has_predefined_response_options": True,
             },
             id="closed_category_without_example",
         ),
@@ -623,8 +674,7 @@ EXPECTED_FALSE_EXAMPLE_AND_LEADING_METRICS = {
             {
                 "has_explicit_example_marker": False,
                 "has_examples": True,
-                "has_closed_category_option": True,
-                "has_closed_category_without_examples": False,
+                "has_predefined_response_options": False,
             },
             id="closed_category_with_including_example",
         ),
@@ -633,8 +683,7 @@ EXPECTED_FALSE_EXAMPLE_AND_LEADING_METRICS = {
             {
                 "has_explicit_example_marker": True,
                 "has_examples": True,
-                "has_closed_category_option": False,
-                "has_closed_category_without_examples": False,
+                "has_predefined_response_options": False,
             },
             id="example_without_closed_category",
         ),
@@ -643,8 +692,7 @@ EXPECTED_FALSE_EXAMPLE_AND_LEADING_METRICS = {
             {
                 "has_explicit_example_marker": False,
                 "has_examples": False,
-                "has_closed_category_option": False,
-                "has_closed_category_without_examples": False,
+                "has_predefined_response_options": False,
             },
             id="open_question_without_example",
         ),
@@ -702,8 +750,7 @@ def test_get_example_and_leading_metrics_returns_expected_keys():
     expected_keys = {
         "has_explicit_example_marker",
         "has_examples",
-        "has_closed_category_option",
-        "has_closed_category_without_examples",
+        "has_predefined_response_options",
     }
     assert (
         set(

@@ -14,8 +14,7 @@ class ExampleLeadingQuestionMetrics(BaseModel):
     n_count: int
     pct_with_explicit_example_marker: float
     pct_with_examples: float
-    pct_with_closed_category_option: float
-    pct_with_closed_category_without_examples: float
+    pct_with_predefined_response_options: float
 
     def report_metrics(self) -> str:
         """Pretty print the example and leading question evaluation metrics."""
@@ -25,10 +24,8 @@ class ExampleLeadingQuestionMetrics(BaseModel):
             " Percentage with explicit example markers: "
             f"{self.pct_with_explicit_example_marker:.2f}%",
             f" Percentage with examples: {self.pct_with_examples:.2f}%",
-            " Percentage with closed category options: "
-            f"{self.pct_with_closed_category_option:.2f}%",
-            " Percentage with closed category options without examples: "
-            f"{self.pct_with_closed_category_without_examples:.2f}%",
+            " Percentage with predefined response options: "
+            f"{self.pct_with_predefined_response_options:.2f}%",
         ]
         return "\n".join(lines)
 
@@ -164,14 +161,14 @@ def has_examples(text: str) -> bool:
     )
 
 
-def has_closed_category_options(text: str) -> bool:
-    """Check whether text provides predefined response categories.
+def has_explicit_predefined_response_options(text: str) -> bool:
+    """Check whether text provides predefined response options.
 
     Args:
         text: Question text to evaluate.
 
     Returns:
-        True if closed-category wording is detected,
+        True if predefined response option wording is detected,
         otherwise False.
     """
     normalised_text = _normalise_text(text)
@@ -180,10 +177,6 @@ def has_closed_category_options(text: str) -> bool:
 
     return any(
         [
-            " or " in normalised_text,
-            ":" in normalised_text
-            and (" or " in normalised_text or "," in normalised_text),
-            "/" in normalised_text,
             "which of the following" in normalised_text,
             "which of these" in normalised_text,
             "select one" in normalised_text,
@@ -196,17 +189,46 @@ def has_closed_category_options(text: str) -> bool:
     )
 
 
-def has_closed_category_without_examples(text: str) -> bool:
-    """Check whether text provides closed-category options without examples.
+def has_binary_choice_wording(text: str) -> bool:
+    """Check whether text contains binary-choice wording.
 
     Args:
         text: Question text to evaluate.
 
     Returns:
-        True if closed-category wording is detected and no examples are present,
+        True if binary-choice wording is detected,
         otherwise False.
     """
-    return has_closed_category_options(text) and not has_examples(text)
+    normalised_text = _normalise_text(text)
+    if normalised_text is None:
+        return False
+
+    return any(
+        [
+            " or " in normalised_text,
+            ":" in normalised_text
+            and (" or " in normalised_text or "," in normalised_text),
+            "/" in normalised_text,
+        ]
+    )
+
+
+def has_predefined_response_options(text: str) -> bool:
+    """Check whether text provides binary-choice wording without examples.
+
+    Args:
+        text: Question text to evaluate.
+
+    Returns:
+        True if binary-choice wording is detected without examples or predefined response options,
+        otherwise False.
+    """
+    return any(
+        [
+            has_binary_choice_wording(text) and not has_examples(text),
+            has_explicit_predefined_response_options(text),
+        ]
+    )
 
 
 def get_example_and_leading_metrics(text: str) -> dict[str, int | float | list[int]]:
@@ -216,15 +238,12 @@ def get_example_and_leading_metrics(text: str) -> dict[str, int | float | list[i
         text: Text to analyse.
 
     Returns:
-        A dict containing simple language metrics.
+        A dict containing example and leading question metrics.
     """
     return {
         "has_explicit_example_marker": has_explicit_example_marker(text),
         "has_examples": has_examples(text),
-        "has_closed_category_option": has_closed_category_options(text),
-        "has_closed_category_without_examples": has_closed_category_without_examples(
-            text
-        ),
+        "has_predefined_response_options": has_predefined_response_options(text),
     }
 
 
@@ -270,18 +289,14 @@ def summarise_example_and_leading_columns(
     """
     has_explicit_example_marker_col = df[f"{prefix}has_explicit_example_marker"]
     has_examples_col = df[f"{prefix}has_examples"]
-    has_closed_category_option_col = df[f"{prefix}has_closed_category_option"]
-    has_closed_category_without_examples_col = df[
-        f"{prefix}has_closed_category_without_examples"
-    ]
+    has_predefined_response_options_col = df[f"{prefix}has_predefined_response_options"]
 
     summary = {
         "n_count": len(df),
         "pct_with_explicit_example_marker": has_explicit_example_marker_col.mean()
         * 100,
         "pct_with_examples": has_examples_col.mean() * 100,
-        "pct_with_closed_category_option": has_closed_category_option_col.mean() * 100,
-        "pct_with_closed_category_without_examples": has_closed_category_without_examples_col.mean()
+        "pct_with_predefined_response_options": has_predefined_response_options_col.mean()
         * 100,
     }
 

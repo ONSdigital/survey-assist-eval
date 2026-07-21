@@ -53,13 +53,7 @@ def expected_example_and_leading_df():
                 False,
             ],
             "follow_up_question_has_examples": [True, False, False, False],
-            "follow_up_question_has_closed_category_option": [
-                True,
-                True,
-                False,
-                False,
-            ],
-            "follow_up_question_has_closed_category_without_examples": [
+            "follow_up_question_has_predefined_response_options": [
                 False,
                 True,
                 False,
@@ -113,16 +107,11 @@ def test_summarise_example_and_leading_columns_returns_expected_summary(
         "containing example wording"
     )
 
-    assert result["pct_with_closed_category_option"] == pytest.approx(50, rel=1e-2), (
-        "Expected pct_with_closed_category_option to equal the percentage "
-        "of rows containing closed-category wording"
-    )
-
-    assert result["pct_with_closed_category_without_examples"] == pytest.approx(
+    assert result["pct_with_predefined_response_options"] == pytest.approx(
         25, rel=1e-2
     ), (
-        "Expected pct_with_closed_category_without_examples to equal the "
-        "percentage of rows containing closed-category wording without examples"
+        "Expected pct_with_predefined_response_options to equal the percentage "
+        "of rows containing predefined response options"
     )
 
 
@@ -132,8 +121,7 @@ def test_summarise_example_and_leading_columns_uses_prefix():
         {
             "test_has_explicit_example_marker": [True],
             "test_has_examples": [True],
-            "test_has_closed_category_option": [True],
-            "test_has_closed_category_without_examples": [False],
+            "test_has_predefined_response_options": [True],
         }
     )
 
@@ -156,14 +144,9 @@ def test_summarise_example_and_leading_columns_uses_prefix():
         result["pct_with_examples"] == 100.0
     ), "Expected pct_with_examples to be calculated from prefixed columns"
 
-    assert result["pct_with_closed_category_option"] == 100.0, (
-        "Expected pct_with_closed_category_option to be calculated from "
+    assert result["pct_with_predefined_response_options"] == 100.0, (
+        "Expected pct_with_predefined_response_options to be calculated from "
         "prefixed columns"
-    )
-
-    assert result["pct_with_closed_category_without_examples"] == 0.0, (
-        "Expected pct_with_closed_category_without_examples to be calculated "
-        "from prefixed columns"
     )
 
 
@@ -211,8 +194,7 @@ def test_example_leading_question_metrics_stores_values():
         n_count=4,
         pct_with_explicit_example_marker=25.0,
         pct_with_examples=50.0,
-        pct_with_closed_category_option=75.0,
-        pct_with_closed_category_without_examples=25.0,
+        pct_with_predefined_response_options=75.0,
     )
 
     assert metrics.n_count == 4, "Expected n_count to be stored"
@@ -221,11 +203,8 @@ def test_example_leading_question_metrics_stores_values():
     ), "Expected pct_with_explicit_example_marker to be stored"
     assert metrics.pct_with_examples == 50.0, "Expected pct_with_examples to be stored"
     assert (
-        metrics.pct_with_closed_category_option == 75.0
-    ), "Expected pct_with_closed_category_option to be stored"
-    assert (
-        metrics.pct_with_closed_category_without_examples == 25.0
-    ), "Expected pct_with_closed_category_without_examples to be stored"
+        metrics.pct_with_predefined_response_options == 75.0
+    ), "Expected pct_with_predefined_response_options to be stored"
 
 
 def test_example_leading_question_metrics_report_metrics_returns_expected_text():
@@ -234,8 +213,7 @@ def test_example_leading_question_metrics_report_metrics_returns_expected_text()
         n_count=4,
         pct_with_explicit_example_marker=25.0,
         pct_with_examples=50.0,
-        pct_with_closed_category_option=75.0,
-        pct_with_closed_category_without_examples=25.0,
+        pct_with_predefined_response_options=75.0,
     )
 
     result = metrics.report_metrics()
@@ -246,8 +224,7 @@ def test_example_leading_question_metrics_report_metrics_returns_expected_text()
             " Number of follow-up questions: 4",
             " Percentage with explicit example markers: 25.00%",
             " Percentage with examples: 50.00%",
-            " Percentage with closed category options: 75.00%",
-            " Percentage with closed category options without examples: 25.00%",
+            " Percentage with predefined response options: 75.00%",
         ]
     )
 
@@ -299,16 +276,9 @@ def test_compute_example_and_leading_metrics_returns_expected_values(
         "containing example wording"
     )
 
-    assert result.pct_with_closed_category_option == pytest.approx(50, rel=1e-2), (
-        "Expected pct_with_closed_category_option to equal the percentage "
-        "of rows containing closed-category wording"
-    )
-
-    assert result.pct_with_closed_category_without_examples == pytest.approx(
-        25, rel=1e-2
-    ), (
-        "Expected pct_with_closed_category_without_examples to equal the "
-        "percentage of rows containing closed-category wording without examples"
+    assert result.pct_with_predefined_response_options == pytest.approx(25, rel=1e-2), (
+        "Expected pct_with_predefined_response_options to equal the percentage "
+        "of rows containing predefined response options"
     )
 
 
@@ -331,8 +301,7 @@ def test_compute_example_and_leading_metrics_returns_zero_percentages():
     assert result.n_count == 2
     assert result.pct_with_explicit_example_marker == 0.0
     assert result.pct_with_examples == 0.0
-    assert result.pct_with_closed_category_option == 0.0
-    assert result.pct_with_closed_category_without_examples == 0.0
+    assert result.pct_with_predefined_response_options == 0.0
 
 
 def test_compute_example_and_leading_metrics_uses_default_prefix(
