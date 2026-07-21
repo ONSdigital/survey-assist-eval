@@ -9,11 +9,17 @@ conducted by Social Surveys in November 2026.
 import os
 
 import pandas as pd
+from dotenv import load_dotenv
 
 from survey_assist_eval.evaluation.open_questions.open_questions_evaluation import (
     evaluate_open_questions,
 )
 
+# %%
+MANUAL_OPEN_Q_EVAL_FILE = (
+    "analysis-interim-results/CC_SocSurveys_feedback/"
+    "Quality_and_CC_RAG_Statuses_SurveyAssist_OpenQs.csv"
+)
 # %%
 MAX_WORD_COUNT_THRESHOLD = 15
 MAX_NUM_SENTENCE_THRESHOLD = 1
@@ -38,7 +44,8 @@ EVAL_COLUMNS = [
     "Complex Task",
     "Leading Questions",
     "Double Barrelled Qs",
-    "Overall RAG Status",
+    "CC RAG Status",
+    # "Overall RAG Status",
 ]
 
 SECTION_TO_MANUAL_COLUMNS = {
@@ -55,10 +62,12 @@ SECTION_TO_MANUAL_COLUMNS = {
 }
 
 # %%
-df = pd.read_excel(
-    SOURCE_PATH,
-    sheet_name="Sheet1",
-)
+load_dotenv()
+bucket_name = os.getenv("PREPROD_BUCKET_NAME")
+if not bucket_name:
+    raise ValueError("PREPROD_BUCKET_NAME environment variable not set")
+base_folder = f"gs://{bucket_name}/"
+df = pd.read_csv(f"{base_folder}{MANUAL_OPEN_Q_EVAL_FILE}")
 
 # %%
 text_statistics_config = {
