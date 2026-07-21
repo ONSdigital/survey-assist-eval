@@ -157,12 +157,16 @@ if __name__ == "__main__":
     if args.write_output:
         out_file = args.evaluation_data.replace(".parquet", f"_metrics_{DIGITS}d.json")
         if out_file.startswith("gs://"):
-            # optional dependency on gsfs
-            from gcsfs import GCSFileSystem
+            from google.cloud import storage
 
-            fs = GCSFileSystem()
-            with fs.open(out_file, "w") as f:
-                json.dump(evaluation_metrics.as_dict(), f, indent=2)
+            path = out_file[len("gs://") :]
+            bucket_name, _, blob_name = path.partition("/")
+            client = storage.Client()
+            blob = client.bucket(bucket_name).blob(blob_name)
+            blob.upload_from_string(
+                json.dumps(evaluation_metrics.as_dict(), indent=2),
+                content_type="application/json",
+            )
         else:
             with open(out_file, "w", encoding="utf-8") as f:
                 json.dump(evaluation_metrics.as_dict(), f, indent=2)
