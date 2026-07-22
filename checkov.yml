@@ -1,0 +1,6 @@
+compact: true
+framework: dockerfile
+output: cli
+quiet: true
+soft-fail: false
+summary-position: bottom

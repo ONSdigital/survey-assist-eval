@@ -1,0 +1,17 @@
+# default to excluding everything
+*
+
+# allow dependency files
+!pyproject.toml
+!poetry.lock
+!README.md
+
+# allow source code
+!src/
+!src/survey_assist_eval/**
+!scripts/
+!scripts/api_evaluation/
+!scripts/api_evaluation/run.py
+
+# exclude cache files in source code directories
+**/__pycache__/
