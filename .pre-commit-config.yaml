@@ -39,6 +39,15 @@ repos:
     # disabled for now as it fights with makefile checks
     # - id: ruff-format
 
+# ---- Checkov ---- Static code analysis of Docker manifests.
+- repo: https://github.com/bridgecrewio/checkov.git
+  rev: 3.3.8
+  hooks:
+    - id: checkov
+      name: checkov (api-evaluation)
+      files: ^containers/api_evaluation/Dockerfile$
+      args: [ '-f', './containers/api_evaluation/Dockerfile', '--framework', 'dockerfile', '--config-file', 'checkov.yml' ]
+
 # ---- Pylint etc from Makefile ----
 - repo: local
   hooks:
