@@ -21,11 +21,12 @@ survey-assist-utils = { git = "https://github.com/ONSdigital/survey-assist-utils
 toml = "^0.10.2"
 shortuuid = "^1.0.13"
 textstat = "^0.7.13"
+firebase-admin = "6.9.0"
+pyarrow = "^21"
 
 [tool.poetry.group.dev.dependencies]
 bandit = "^1.8.3"
 black = "^25.1.0"
-firebase-admin = "6.9.0"
 google-genai = "^1.66.0"
 ipykernel = "^6.29.5"
 isort = "^6.0.1"
@@ -48,6 +49,7 @@ scipy = "^1.16.3"
 sic-classification-utils = { git = "https://github.com/ONSdigital/sic-classification-utils.git", rev = "dd30779" }
 soc-classification-utils = { git = "https://github.com/ONSdigital/soc-classification-utils.git", rev = "3fc1e16" }
 survey-assist-embed-core = { git = "https://github.com/ONSdigital/survey-assist-embed-core.git", tag = "v0.2.0" }
+db-dtypes = "^1.7.1"
 
 
 [tool.isort]
