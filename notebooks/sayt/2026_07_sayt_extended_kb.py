@@ -11,7 +11,7 @@ labels within the same code, then combines search terms from all three sources.
 Each remaining `search_text` is matched to the most similar `display_text` for the
 same SIC code using `sentence-transformers/all-MiniLM-L6-v2` embeddings.
 
-The output is written to `data/sayt/sic_kb_for_sayt.csv` with columns `code`,
+The output is written to `sic_kb_for_sayt.csv` with columns `code`,
 `search_text`, and `display_text`.
 
 Expects `EVALUATION_BUCKET_NAME` to be set, loaded from `.env`.
@@ -55,7 +55,7 @@ sayt_df = pd.read_csv(
 sayt_df["code"] = sayt_df["SIC07"].apply(
     lambda x: x if len(x) == SIC_CODE_LENGTH else f"0{x}"
 )
-sayt_df["display_text"] = sayt_df["search_text"] + ": " + sayt_df["code"]
+sayt_df["display_text"] = sayt_df["search_text"]
 sayt_df = (
     sayt_df[["code", "search_text", "display_text"]]
     .sort_values(by=["code", "search_text"])
@@ -72,7 +72,7 @@ rephrased_df = (
     .sort_values(by=["code", "search_text"])
     .reset_index(drop=True)
 )
-rephrased_df["display_text"] = rephrased_df["search_text"] + ": " + rephrased_df["code"]
+rephrased_df["display_text"] = rephrased_df["search_text"]
 
 
 # %%
@@ -107,22 +107,20 @@ display_text_all = display_text_all.loc[~alpha_numeric.duplicated()].reset_index
 
 vectoriser = build_vectoriser("sentence-transformers/all-MiniLM-L6-v2")
 display_text_embeddings = vectoriser.transform(
-    display_text_all["display_text"]
-    .fillna("")
-    .str.slice(stop=-SIC_CODE_LENGTH - 2)
-    .tolist()
+    display_text_all["display_text"].to_list()
 )
 
 # %%
 # drop display_texts that are too similar to other display_texts for the same code
+# keep the sayt approved ones (thats why the start of the ind range is sum(~higher_codes)
 to_drop = [False] * len(display_text_all)
+
 for ind in range(sum(~higher_codes), len(display_text_all)):
     code = display_text_all.loc[ind, "code"]
     display_text = display_text_all.loc[ind, "display_text"]
     embedding = display_text_embeddings[ind]
-    # find all other display texts with the same code
-    same_code_inds = display_text_all.index[display_text_all["code"] == code].tolist()
-    same_code_inds.remove(ind)
+    # find any previous display texts with the same code
+    same_code_inds = [i for i in range(ind) if display_text_all.loc[i, "code"] == code]
     if not same_code_inds:
         continue
     same_code_embeddings = display_text_embeddings[same_code_inds]
@@ -169,10 +167,7 @@ search_text_all.groupby("code").size().sort_values(ascending=False).head(10)
 search_text_embeddings = vectoriser.transform(search_text_all["search_text"].tolist())
 # Recompute display text embeddings so indices stay aligned with filtered display_text rows.
 display_text_embeddings = vectoriser.transform(
-    display_text_filtered["display_text"]
-    .fillna("")
-    .str.slice(stop=-SIC_CODE_LENGTH - 2)
-    .tolist()
+    display_text_filtered["display_text"].tolist()
 )
 search_inds_by_code = search_text_all.groupby("code", sort=False).indices
 display_inds_by_code = display_text_filtered.groupby("code", sort=False).indices

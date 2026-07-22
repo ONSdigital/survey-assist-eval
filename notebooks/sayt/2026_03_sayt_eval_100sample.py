@@ -111,19 +111,25 @@ sayt_df = pd.read_csv(LOOKUP_FILE_NAME, dtype=str)
 sayt_df["code"] = sayt_df["SIC07"].apply(
     lambda x: x if len(x) == SIC_CODE_LENGTH else f"0{x}"
 )
-sayt_df["display_text"] = sayt_df["SIC_lookup"] + ": " + sayt_df["code"]
+sayt_df["display_text_with_code"] = sayt_df["SIC_lookup"] + ": " + sayt_df["code"]
 
-sayt_corpus = list(zip(sayt_df["SIC_lookup"], sayt_df["display_text"], strict=False))
+sayt_corpus = list(
+    zip(sayt_df["SIC_lookup"], sayt_df["display_text_with_code"], strict=False)
+)
 
 # %%
 sic_kb_for_classifai = pd.read_csv(
     f"gs://{bucket_name}/sic_knowledgebase/sic_kb_for_sayt.csv", dtype=str
 )
+sic_kb_for_classifai["display_text_with_code"] = (
+    sic_kb_for_classifai["display_text"] + ": " + sic_kb_for_classifai["code"]
+)
+
 
 sayt2_corpus = list(
     zip(
         sic_kb_for_classifai["search_text"],
-        sic_kb_for_classifai["display_text"],
+        sic_kb_for_classifai["display_text_with_code"],
         strict=False,
     )
 )
