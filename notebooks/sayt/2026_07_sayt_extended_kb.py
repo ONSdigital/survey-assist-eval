@@ -45,8 +45,32 @@ logger.info("Location specs", bucket_name=bucket_name, output_dir=OUTPUT_DIR)
 SIC_CODE_LENGTH = 5
 DISPLAY_DUPLICATE_THRESHOLD = 0.85
 SEARCH_DUPLICATE_THRESHOLD = 0.95
-LOG_BORDERLINE_DUPLICATE_THRESHOLD = DISPLAY_DUPLICATE_THRESHOLD + 0.03
+LOG_BORDERLINE_MARGIN = 0.01
 LOG_LOW_MATCH_THRESHOLD = 0.10
+
+
+def cosine_similarity_matrix(
+    left_embeddings: np.ndarray,
+    right_embeddings: np.ndarray | None = None,
+    eps: float = 1e-12,
+) -> np.ndarray:
+    """Return pairwise cosine similarities between row-wise embedding matrices."""
+    left = np.asarray(left_embeddings)
+    if left.ndim == 1:
+        left = left.reshape(1, -1)
+
+    if right_embeddings is None:
+        right = left
+    else:
+        right = np.asarray(right_embeddings)
+        if right.ndim == 1:
+            right = right.reshape(1, -1)
+
+    left_norms = np.linalg.norm(left, axis=1, keepdims=True)
+    right_norms = np.linalg.norm(right, axis=1, keepdims=True)
+    denom = np.clip(left_norms @ right_norms.T, eps, None)
+    return (left @ right.T) / denom
+
 
 # %%
 sayt_df = pd.read_csv(
@@ -91,8 +115,14 @@ display_text_all = pd.concat(
     ],
     ignore_index=True,
 )
-logger.info(f"Total number of display_texts: {len(display_text_all)}")
-display_text_all.groupby("code").size().sort_values(ascending=False).head(10)
+logger.info(
+    f"Total number of display_texts: {len(display_text_all)}",
+    most_common_codes=display_text_all.groupby("code")
+    .size()
+    .sort_values(ascending=False)
+    .head(10)
+    .to_dict(),
+)
 
 # %% drop duplicates
 alpha_numeric = (
@@ -113,44 +143,61 @@ display_text_embeddings = vectoriser.transform(
 # %%
 # drop display_texts that are too similar to other display_texts for the same code
 # keep the sayt approved ones (thats why the start of the ind range is sum(~higher_codes)
-to_drop = [False] * len(display_text_all)
+display_text_all["max_similarity_score"] = 0.0
+display_text_all["most_similar_entry"] = None
 
 for ind in range(sum(~higher_codes), len(display_text_all)):
     code = display_text_all.loc[ind, "code"]
     display_text = display_text_all.loc[ind, "display_text"]
-    embedding = display_text_embeddings[ind]
+    one_embedding = display_text_embeddings[ind]
     # find any previous display texts with the same code
     same_code_inds = [i for i in range(ind) if display_text_all.loc[i, "code"] == code]
     if not same_code_inds:
         continue
     same_code_embeddings = display_text_embeddings[same_code_inds]
-    # compute cosine similarity
-    similarities = (same_code_embeddings @ embedding) / (
-        (same_code_embeddings**2).sum(axis=1) ** 0.5 * (embedding**2).sum() ** 0.5
-    )
-    if any(similarities > DISPLAY_DUPLICATE_THRESHOLD):
-        to_drop[ind] = True
-        # print borderline cases to sense check the threshold
-        if all(similarities < LOG_BORDERLINE_DUPLICATE_THRESHOLD):
-            logger.info(
-                f"Dropping display_text '{display_text}' for code {code} "
-                f"as it is too similar to other display texts: "
-                f"{display_text_all.loc[same_code_inds, 'display_text'].tolist()}."
-            )
+    similarities = cosine_similarity_matrix(same_code_embeddings, one_embedding)[:, 0]
+    display_text_all.loc[ind, "max_similarity_score"] = max(similarities)
+    display_text_all.loc[ind, "most_similar_entry"] = display_text_all.loc[
+        same_code_inds[similarities.argmax()], "display_text"
+    ]
 
+# print borderline cases to sense check the threshold
+borderline_msk = display_text_all["max_similarity_score"].gt(
+    DISPLAY_DUPLICATE_THRESHOLD - LOG_BORDERLINE_MARGIN
+) & display_text_all["max_similarity_score"].le(
+    DISPLAY_DUPLICATE_THRESHOLD + LOG_BORDERLINE_MARGIN
+)
+borderline_display_texts = display_text_all.loc[borderline_msk].sort_values(
+    "max_similarity_score"
+)
 logger.info(
-    f"Dropping {sum(to_drop)} display_texts that are too similar"
+    f"Borderline cases ( {DISPLAY_DUPLICATE_THRESHOLD - LOG_BORDERLINE_MARGIN} < similarity <= "
+    f"{DISPLAY_DUPLICATE_THRESHOLD + LOG_BORDERLINE_MARGIN}) for the same code. "
+    "Please sense check if the threshold is appropriate.",
+    borderline_display_texts=borderline_display_texts.to_dict(orient="records"),
+)
+
+to_drop_msk = display_text_all["max_similarity_score"].gt(DISPLAY_DUPLICATE_THRESHOLD)
+logger.info(
+    f"Dropping {sum(to_drop_msk)} display_texts that are too similar"
     "to other display_texts for the same code."
 )
 display_text_filtered = (
-    display_text_all.loc[~pd.Series(to_drop), ["code", "display_text"]]
+    display_text_all.loc[
+        ~to_drop_msk,
+        ["code", "display_text"],
+    ]
     .sort_values(by=["code", "display_text"])
     .reset_index(drop=True)
 )
 logger.info(
-    f"Total number of display_texts after filtering: {len(display_text_filtered)}"
+    f"Total number of display_texts after filtering: {len(display_text_filtered)}",
+    most_common_codes=display_text_filtered.groupby("code")
+    .size()
+    .sort_values(ascending=False)
+    .head(10)
+    .to_dict(),
 )
-display_text_filtered.groupby("code").size().sort_values(ascending=False).head(10)
 
 # %%
 search_text_all = pd.concat(
@@ -174,14 +221,12 @@ display_inds_by_code = display_text_filtered.groupby("code", sort=False).indices
 
 # %%
 # Match each search_text to the most similar display_text for the same code.
-out_rows = []
+pairs_rows = []
 
 for code, search_inds_arr in search_inds_by_code.items():
-    search_inds = search_inds_arr.tolist()
+    search_inds = list(search_inds_arr)
     search_embeddings = search_text_embeddings[search_inds]
-    search_norms = np.linalg.norm(search_embeddings, axis=1, keepdims=True)
-    search_denom = np.clip(search_norms @ search_norms.T, 1e-12, None)
-    search_similarities = (search_embeddings @ search_embeddings.T) / search_denom
+    search_search_similarities = cosine_similarity_matrix(search_embeddings)
 
     display_inds_arr = display_inds_by_code.get(code)
     if display_inds_arr is None:
@@ -191,43 +236,58 @@ for code, search_inds_arr in search_inds_by_code.items():
                 f"{search_text_all.loc[search_inds, 'search_text'].tolist()}."
             )
         continue
-    display_inds = display_inds_arr.tolist()
+    display_inds = list(display_inds_arr)
     display_embeddings = display_text_embeddings[display_inds]
-    display_norms = np.linalg.norm(display_embeddings, axis=1, keepdims=True).T
-    display_denom = np.clip(search_norms * display_norms, 1e-12, None)
-    display_similarities = (search_embeddings @ display_embeddings.T) / display_denom
+    search_display_similarities = cosine_similarity_matrix(
+        search_embeddings, display_embeddings
+    )
 
-    # remove search_texts that are too similar to each other (cosine similarity > 0.95)
+    # remove search_texts that are too similar to each other
     for num_ind, search_ind in enumerate(search_inds):
-        if any(search_similarities[num_ind, 0:num_ind] > SEARCH_DUPLICATE_THRESHOLD):
+        if any(
+            search_search_similarities[num_ind, 0:num_ind] > SEARCH_DUPLICATE_THRESHOLD
+        ):
             continue
 
         # find the display_text with the highest similarity to the search_text
         search_text = search_text_all.loc[search_ind, "search_text"]
-        display_ind = display_inds[display_similarities[num_ind].argmax()]
+        display_ind = display_inds[search_display_similarities[num_ind].argmax()]
         display_text = display_text_filtered.loc[display_ind, "display_text"]
-        out_rows.append(
+        similarity_score = search_display_similarities[num_ind].max()
+        pairs_rows.append(
             {
                 "code": code,
                 "search_text": search_text,
                 "display_text": display_text,
+                "similarity_score": similarity_score,
             }
         )
-        max_sim = display_similarities[num_ind].max()
 
-        # Log examples for low similarity matches (< 0.1)
-        # these may be worth adding to the display_texts.
-        if max_sim < LOG_LOW_MATCH_THRESHOLD:
-            logger.warning(
-                f"Bad match for search_text '{search_text}' and display_text '{display_text}' "
-                f"for code {code} (max similarity {max_sim:.2f})."
-            )
-out_df = pd.DataFrame(out_rows, columns=["code", "search_text", "display_text"])
+pairs_df = pd.DataFrame(
+    pairs_rows, columns=["code", "search_text", "display_text", "similarity_score"]
+)
 
 # %%
-out_df = out_df.sort_values(by=["code", "search_text"]).reset_index(drop=True)
+# Inspect entries with low similarity scores, these may be worth adding to the display_texts.
+low_similarity_pairs = (
+    pairs_df[pairs_df["similarity_score"] < LOG_LOW_MATCH_THRESHOLD]
+    .sort_values(["code", "similarity_score"])
+    .reset_index(drop=True)
+)
+logger.warning(
+    f"Found {len(low_similarity_pairs)} search_text/display_text pairs with low similarity "
+    f"(similarity < {LOG_LOW_MATCH_THRESHOLD}). "
+    "Please consider extending the display_texts input to cover these cases.",
+    low_similarity_pairs=low_similarity_pairs.to_dict(orient="records"),
+)
+
+# %%
+out_df = (
+    pairs_df[["code", "search_text", "display_text"]]
+    .sort_values(by=["code", "search_text"])
+    .reset_index(drop=True)
+)
 logger.info(f"Output dataframe shape: {out_df.shape}")
-# %%
 out_df.to_csv(f"{OUTPUT_DIR}/sic_kb_for_sayt.csv", index=False)
 
 # %%
