@@ -12,6 +12,7 @@ import pandas as pd
 from dotenv import load_dotenv
 
 from survey_assist_eval.evaluation.open_questions.open_questions_evaluation import (
+    add_open_question_evaluation_columns,
     evaluate_open_questions,
 )
 
@@ -112,4 +113,9 @@ for section, manual_columns in SECTION_TO_MANUAL_COLUMNS.items():
     for metric, metric_group in section_summary.groupby("metric", sort=False):
         print(f"\n{metric}")
         print(metric_group[["value", "count", "pct"]].to_string(index=False))
+# %%
+df_with_eval_columns = add_open_question_evaluation_columns(
+    df,
+    text_column=MANUAL_TEXT_COLUMN,
+)
 # %%

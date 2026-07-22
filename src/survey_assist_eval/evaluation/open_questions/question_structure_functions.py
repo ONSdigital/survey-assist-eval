@@ -275,7 +275,7 @@ def contains_multiple_asks(text: str) -> bool:
         return True
 
     # Conjunctions linking clauses
-    conjunctions = r"\b(or|also)\b"
+    conjunctions = r"\b(also)\b"
     return re.search(conjunctions, text) is not None
 
 

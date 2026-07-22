@@ -7,14 +7,17 @@ from pydantic import BaseModel
 
 from survey_assist_eval.evaluation.open_questions.question_structure_functions import (
     QuestionStructureMetrics,
+    add_question_structure_columns,
     compute_question_structure_metrics,
 )
 from survey_assist_eval.evaluation.open_questions.simple_language_functions import (
     SimpleLanguageMetrics,
+    add_simple_language_columns,
     compute_simple_language_metrics,
 )
 from survey_assist_eval.evaluation.open_questions.text_statistics_functions import (
     OpenQuestionTextStatistics,
+    add_text_stats_columns,
     compute_text_statistics,
 )
 
@@ -99,6 +102,26 @@ def evaluate_open_questions(
         text_statistics=text_stats,
         question_structure=question_struct_metrics,
         simple_language=simple_language_metrics,
+    )
+
+
+def add_open_question_evaluation_columns(
+    df: pd.DataFrame,
+    text_column: str,
+) -> pd.DataFrame:
+    """Add all open question evaluation metric columns derived from a text column.
+
+    Args:
+        df: DataFrame containing open question text.
+        text_column: Column containing the open questions.
+
+    Returns:
+        DataFrame with added open question evaluation metric columns.
+    """
+    return (
+        add_question_structure_columns(df, text_column=text_column)
+        .pipe(add_simple_language_columns, text_column=text_column)
+        .pipe(add_text_stats_columns, text_column=text_column)
     )
 
 

@@ -238,10 +238,6 @@ def test_contains_multiple_asks_true_multiple_instruction_prompts(text):
             id="wh_twice",
         ),
         pytest.param(
-            "Can you explain this or give an example",
-            id="modal_with_or",
-        ),
-        pytest.param(
             "Tell me how this works and also describe the output",
             id="instruction_with_and_also",
         ),
@@ -408,10 +404,6 @@ def test_is_single_question_false_non_questions(text):
         pytest.param(
             "What is your name and where do you live",
             id="compound_wh_and",
-        ),
-        pytest.param(
-            "Can you explain this or give an example",
-            id="compound_or",
         ),
         pytest.param(
             "Describe your role. Explain your responsibilities.",
