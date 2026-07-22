@@ -14,6 +14,9 @@ from industrial_classification_utils.synthetic_responses.synthetic_response_util
 )
 from tqdm import tqdm
 
+from survey_assist_eval.data_cleaning.prep_respondent_data import (
+    respondent_data_to_dict,
+)
 from survey_assist_eval.pipeline.shared_components import (
     parse_args,
     persist_results,
@@ -45,11 +48,7 @@ def get_followup_answer(row: dict, one_sr: SyntheticResponder) -> str:
     Returns:
         str: The generated answer to the followup question.
     """
-    payload = {
-        "industry_descr": row[MERGED_INDUSTRY_DESC_COL],
-        "job_title": row[JOB_TITLE_COL],
-        "job_description": row[JOB_DESCRIPTION_COL],
-    }
+    payload = respondent_data_to_dict(row)
     if not row["unambiguously_codable"]:
         answer_followup_prompt = one_sr.construct_prompt(
             payload, row[FOLLOWUP_QUESTION_COL]
