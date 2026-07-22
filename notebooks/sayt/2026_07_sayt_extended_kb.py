@@ -207,7 +207,14 @@ search_text_all = pd.concat(
         sic_kb_for_classifai[["code", "search_text"]],
     ],
 ).reset_index(drop=True)
-search_text_all.groupby("code").size().sort_values(ascending=False).head(10)
+logger.info(
+    f"Total number of search_texts: {len(search_text_all)}",
+    most_common_codes=search_text_all.groupby("code")
+    .size()
+    .sort_values(ascending=False)
+    .head(10)
+    .to_dict(),
+)
 
 # %%
 # Prepare embeddings for search_text (takes ~ 5 mins)
@@ -221,7 +228,10 @@ display_inds_by_code = display_text_filtered.groupby("code", sort=False).indices
 
 # %%
 # Match each search_text to the most similar display_text for the same code.
-pairs_rows = []
+search_text_all["search_search_similarity"] = 0.0
+search_text_all["most_similar_entry"] = None
+search_text_all["display_text"] = None
+search_text_all["search_display_similarity"] = 0.0
 
 for code, search_inds_arr in search_inds_by_code.items():
     search_inds = list(search_inds_arr)
@@ -242,36 +252,48 @@ for code, search_inds_arr in search_inds_by_code.items():
         search_embeddings, display_embeddings
     )
 
-    # remove search_texts that are too similar to each other
     for num_ind, search_ind in enumerate(search_inds):
-        if any(
-            search_search_similarities[num_ind, 0:num_ind] > SEARCH_DUPLICATE_THRESHOLD
-        ):
-            continue
-
-        # find the display_text with the highest similarity to the search_text
-        search_text = search_text_all.loc[search_ind, "search_text"]
-        display_ind = display_inds[search_display_similarities[num_ind].argmax()]
-        display_text = display_text_filtered.loc[display_ind, "display_text"]
-        similarity_score = search_display_similarities[num_ind].max()
-        pairs_rows.append(
-            {
-                "code": code,
-                "search_text": search_text,
-                "display_text": display_text,
-                "similarity_score": similarity_score,
-            }
+        # find the most similar search_text for the same code
+        if num_ind > 0:
+            search_text_all.loc[search_ind, "search_search_similarity"] = max(
+                search_search_similarities[num_ind, 0:num_ind]
+            )
+            search_text_all.loc[search_ind, "most_similar_entry"] = search_text_all.loc[
+                search_inds[search_search_similarities[num_ind, 0:num_ind].argmax()],
+                "search_text",
+            ]
+        # find the most similar display_text for the same code
+        search_text_all.loc[search_ind, "search_display_similarity"] = (
+            search_display_similarities[num_ind].max()
         )
+        search_text_all.loc[search_ind, "display_text"] = display_text_filtered.loc[
+            display_inds[search_display_similarities[num_ind].argmax()], "display_text"
+        ]
 
-pairs_df = pd.DataFrame(
-    pairs_rows, columns=["code", "search_text", "display_text", "similarity_score"]
+search_drop_msk = search_text_all["search_search_similarity"].gt(
+    SEARCH_DUPLICATE_THRESHOLD
+)
+logger.info(
+    f"Number of search_text entries to drop: {search_drop_msk.sum()}",
+    most_common_codes=search_text_all.loc[search_drop_msk, "code"]
+    .value_counts()
+    .head(10)
+    .to_dict(),
+)
+pairs_df = (
+    search_text_all.loc[
+        ~search_drop_msk,
+        ["code", "search_text", "display_text", "search_display_similarity"],
+    ]
+    .sort_values(by=["code", "search_text"])
+    .reset_index(drop=True)
 )
 
 # %%
 # Inspect entries with low similarity scores, these may be worth adding to the display_texts.
 low_similarity_pairs = (
-    pairs_df[pairs_df["similarity_score"] < LOG_LOW_MATCH_THRESHOLD]
-    .sort_values(["code", "similarity_score"])
+    pairs_df[pairs_df["search_display_similarity"] < LOG_LOW_MATCH_THRESHOLD]
+    .sort_values(["code", "search_display_similarity"])
     .reset_index(drop=True)
 )
 logger.warning(
