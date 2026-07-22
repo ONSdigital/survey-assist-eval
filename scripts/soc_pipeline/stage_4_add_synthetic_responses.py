@@ -25,9 +25,6 @@ from survey_assist_eval.pipeline.shared_components import (
 
 #####################################################
 # Constants:
-JOB_TITLE_COL = "soc2020_job_title"
-JOB_DESCRIPTION_COL = "soc2020_job_description"
-MERGED_INDUSTRY_DESC_COL = "merged_industry_desc"
 FOLLOWUP_QUESTION_COL = "followup_question"
 FOLLOWUP_ANSWER_COL = "followup_answer"
 #####################################################
