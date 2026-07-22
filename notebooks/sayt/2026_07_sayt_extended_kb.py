@@ -17,8 +17,7 @@ The output is written to `data/sayt/sic_kb_for_sayt.csv` with columns `code`,
 Expects `EVALUATION_BUCKET_NAME` to be set, loaded from `.env`.
 """
 
-# ruff: noqa: PLR2004
-# pylint: disable=protected-access,redefined-outer-name,C0103
+# pylint: disable=invalid-name
 
 # %%
 import os
@@ -26,8 +25,6 @@ import os
 import numpy as np
 import pandas as pd
 from dotenv import load_dotenv
-
-# pylint: disable=R0801
 from survey_assist_embed_core.adapters.classifai.vectoriser import build_vectoriser
 from survey_assist_utils.logging import get_logger
 
@@ -37,20 +34,27 @@ bucket_name = os.getenv("EVALUATION_BUCKET_NAME")
 if not bucket_name:
     raise ValueError("EVALUATION_BUCKET_NAME environment variable not set")
 
-output_dir = "data/sayt"
-if not os.path.exists(output_dir):
-    os.makedirs(output_dir)
+OUTPUT_DIR = "data/sayt"
+if not os.path.exists(OUTPUT_DIR):
+    os.makedirs(OUTPUT_DIR)
 
 logger = get_logger(__name__)
-logger.info("Location specs", bucket_name=bucket_name, output_dir=output_dir)
-
+logger.info("Location specs", bucket_name=bucket_name, output_dir=OUTPUT_DIR)
 
 # %%
-lookup_file_name = f"gs://{bucket_name}/evaluation-pipeline/SAYT/Lookup_IT3_Final.csv"
-sayt_df = pd.read_csv(lookup_file_name, dtype=str).rename(
-    columns={"SIC_lookup": "search_text"}
+SIC_CODE_LENGTH = 5
+DISPLAY_DUPLICATE_THRESHOLD = 0.85
+SEARCH_DUPLICATE_THRESHOLD = 0.95
+LOG_BORDERLINE_DUPLICATE_THRESHOLD = DISPLAY_DUPLICATE_THRESHOLD + 0.03
+LOG_LOW_MATCH_THRESHOLD = 0.10
+
+# %%
+sayt_df = pd.read_csv(
+    f"gs://{bucket_name}/evaluation-pipeline/SAYT/Lookup_IT3_Final.csv", dtype=str
+).rename(columns={"SIC_lookup": "search_text"})
+sayt_df["code"] = sayt_df["SIC07"].apply(
+    lambda x: x if len(x) == SIC_CODE_LENGTH else f"0{x}"
 )
-sayt_df["code"] = sayt_df["SIC07"].apply(lambda x: x if len(x) == 5 else f"0{x}")
 sayt_df["display_text"] = sayt_df["search_text"] + ": " + sayt_df["code"]
 sayt_df = (
     sayt_df[["code", "search_text", "display_text"]]
@@ -74,9 +78,9 @@ rephrased_df["display_text"] = rephrased_df["search_text"] + ": " + rephrased_df
 # %%
 # remove higher level codes from SAYT data
 higher_codes = ~sayt_df["code"].isin(rephrased_df["code"])
-print(
-    f"Following sayt records have higher level codes and will be removed:\n{
-        sayt_df.loc[higher_codes, ['code', 'search_text']]}"
+logger.warning(
+    f"Following sayt records have higher level codes and will be removed:\n"
+    f"{sayt_df.loc[higher_codes, ['code', 'search_text']]}"
 )
 
 # %%
@@ -87,7 +91,7 @@ display_text_all = pd.concat(
     ],
     ignore_index=True,
 )
-print(f"Total number of display_texts: {len(display_text_all)}")
+logger.info(f"Total number of display_texts: {len(display_text_all)}")
 display_text_all.groupby("code").size().sort_values(ascending=False).head(10)
 
 # %% drop duplicates
@@ -103,10 +107,14 @@ display_text_all = display_text_all.loc[~alpha_numeric.duplicated()].reset_index
 
 vectoriser = build_vectoriser("sentence-transformers/all-MiniLM-L6-v2")
 display_text_embeddings = vectoriser.transform(
-    display_text_all["display_text"].fillna("").str.slice(stop=-7).tolist()
+    display_text_all["display_text"]
+    .fillna("")
+    .str.slice(stop=-SIC_CODE_LENGTH - 2)
+    .tolist()
 )
 
 # %%
+# drop display_texts that are too similar to other display_texts for the same code
 to_drop = [False] * len(display_text_all)
 for ind in range(sum(~higher_codes), len(display_text_all)):
     code = display_text_all.loc[ind, "code"]
@@ -122,17 +130,17 @@ for ind in range(sum(~higher_codes), len(display_text_all)):
     similarities = (same_code_embeddings @ embedding) / (
         (same_code_embeddings**2).sum(axis=1) ** 0.5 * (embedding**2).sum() ** 0.5
     )
-    if any(similarities > 0.85):
+    if any(similarities > DISPLAY_DUPLICATE_THRESHOLD):
         to_drop[ind] = True
         # print borderline cases to sense check the threshold
-        if all(similarities < 0.88):
-            print(
+        if all(similarities < LOG_BORDERLINE_DUPLICATE_THRESHOLD):
+            logger.info(
                 f"Dropping display_text '{display_text}' for code {code} "
                 f"as it is too similar to other display texts: "
                 f"{display_text_all.loc[same_code_inds, 'display_text'].tolist()}."
             )
 
-print(
+logger.info(
     f"Dropping {sum(to_drop)} display_texts that are too similar"
     "to other display_texts for the same code."
 )
@@ -141,45 +149,54 @@ display_text_filtered = (
     .sort_values(by=["code", "display_text"])
     .reset_index(drop=True)
 )
-print(f"Total number of display_texts after filtering: {len(display_text_filtered)}")
+logger.info(
+    f"Total number of display_texts after filtering: {len(display_text_filtered)}"
+)
 display_text_filtered.groupby("code").size().sort_values(ascending=False).head(10)
 
 # %%
 search_text_all = pd.concat(
     [
-        sayt_df[["code", "search_text"]],
+        sayt_df.loc[~higher_codes, ["code", "search_text"]],
         rephrased_df[["code", "search_text"]],
         sic_kb_for_classifai[["code", "search_text"]],
     ],
 ).reset_index(drop=True)
 search_text_all.groupby("code").size().sort_values(ascending=False).head(10)
 
-# %% (takes ~ 5 mins)
+# %%
+# Prepare embeddings for search_text (takes ~ 5 mins)
 search_text_embeddings = vectoriser.transform(search_text_all["search_text"].tolist())
-# Recompute embeddings so indices stay aligned with filtered display_text rows.
+# Recompute display text embeddings so indices stay aligned with filtered display_text rows.
 display_text_embeddings = vectoriser.transform(
-    display_text_filtered["display_text"].fillna("").str.slice(stop=-7).tolist()
+    display_text_filtered["display_text"]
+    .fillna("")
+    .str.slice(stop=-SIC_CODE_LENGTH - 2)
+    .tolist()
 )
+search_inds_by_code = search_text_all.groupby("code", sort=False).indices
+display_inds_by_code = display_text_filtered.groupby("code", sort=False).indices
 
 # %%
-out_df = pd.DataFrame(columns=["code", "search_text", "display_text"])
+# Match each search_text to the most similar display_text for the same code.
+out_rows = []
 
-for code in search_text_all["code"].unique():
-    search_inds = search_text_all.index[search_text_all["code"] == code].tolist()
+for code, search_inds_arr in search_inds_by_code.items():
+    search_inds = search_inds_arr.tolist()
     search_embeddings = search_text_embeddings[search_inds]
     search_norms = np.linalg.norm(search_embeddings, axis=1, keepdims=True)
     search_denom = np.clip(search_norms @ search_norms.T, 1e-12, None)
     search_similarities = (search_embeddings @ search_embeddings.T) / search_denom
 
-    display_rows = display_text_filtered[display_text_filtered["code"] == code]
-    if display_rows.empty:
+    display_inds_arr = display_inds_by_code.get(code)
+    if display_inds_arr is None:
         if len(search_inds) > 1:
             logger.warning(
                 f"No display_text found for code {code}. Skipping for "
                 f"{search_text_all.loc[search_inds, 'search_text'].tolist()}."
             )
         continue
-    display_inds = display_rows.index.tolist()
+    display_inds = display_inds_arr.tolist()
     display_embeddings = display_text_embeddings[display_inds]
     display_norms = np.linalg.norm(display_embeddings, axis=1, keepdims=True).T
     display_denom = np.clip(search_norms * display_norms, 1e-12, None)
@@ -187,38 +204,35 @@ for code in search_text_all["code"].unique():
 
     # remove search_texts that are too similar to each other (cosine similarity > 0.95)
     for num_ind, search_ind in enumerate(search_inds):
-        if any(search_similarities[num_ind, 0:num_ind] > 0.95):
+        if any(search_similarities[num_ind, 0:num_ind] > SEARCH_DUPLICATE_THRESHOLD):
             continue
 
         # find the display_text with the highest similarity to the search_text
         search_text = search_text_all.loc[search_ind, "search_text"]
         display_ind = display_inds[display_similarities[num_ind].argmax()]
         display_text = display_text_filtered.loc[display_ind, "display_text"]
-        out_df = pd.concat(
-            [
-                out_df,
-                pd.DataFrame(
-                    {
-                        "code": [code],
-                        "search_text": [search_text],
-                        "display_text": [display_text],
-                    }
-                ),
-            ],
-            ignore_index=True,
+        out_rows.append(
+            {
+                "code": code,
+                "search_text": search_text,
+                "display_text": display_text,
+            }
         )
         max_sim = display_similarities[num_ind].max()
-        if max_sim < 0.10:
+
+        # Log examples for low similarity matches (< 0.1)
+        # these may be worth adding to the display_texts.
+        if max_sim < LOG_LOW_MATCH_THRESHOLD:
             logger.warning(
                 f"Bad match for search_text '{search_text}' and display_text '{display_text}' "
                 f"for code {code} (max similarity {max_sim:.2f})."
             )
-
+out_df = pd.DataFrame(out_rows, columns=["code", "search_text", "display_text"])
 
 # %%
 out_df = out_df.sort_values(by=["code", "search_text"]).reset_index(drop=True)
-print(out_df.shape)
+logger.info(f"Output dataframe shape: {out_df.shape}")
 # %%
-out_df.to_csv(f"{output_dir}/sic_kb_for_sayt.csv", index=False)
+out_df.to_csv(f"{OUTPUT_DIR}/sic_kb_for_sayt.csv", index=False)
 
 # %%
