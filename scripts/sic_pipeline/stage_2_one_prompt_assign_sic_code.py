@@ -18,6 +18,9 @@ import pandas as pd
 from industrial_classification_utils.llm.llm import ClassificationLLM
 from tqdm import tqdm
 
+from survey_assist_eval.data_cleaning.prep_respondent_data import (
+    respondent_data_to_dict,
+)
 from survey_assist_eval.pipeline.shared_components import (
     parse_args,
     persist_results,
@@ -60,10 +63,11 @@ async def get_rag_response_batch_async(
 
     async def _run_row(row: pd.Series):
         async with semaphore:
+
+            respondent_data = respondent_data_to_dict(row)
+
             return await c_llm.sa_rag_sic_code(
-                job_title=row[JOB_TITLE_COL],
-                job_description=row[JOB_DESCRIPTION_COL],
-                industry_descr=row[INDUSTRY_DESCR_COL],
+                respondent_data=respondent_data,
                 code_digits=CODE_DIGITS,
                 candidates_limit=CANDIDATES_LIMIT,
                 short_list=row[SEMANTIC_SEARCH_COL],
