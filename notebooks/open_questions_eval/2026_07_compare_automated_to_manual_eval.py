@@ -46,7 +46,6 @@ EVAL_COLUMNS = [
     "Leading Questions",
     "Double Barrelled Qs",
     "CC RAG Status",
-    # "Overall RAG Status",
 ]
 
 SECTION_TO_MANUAL_COLUMNS = {

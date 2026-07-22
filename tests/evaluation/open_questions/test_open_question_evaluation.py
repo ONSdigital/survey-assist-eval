@@ -4,6 +4,7 @@ import pandas as pd
 
 from survey_assist_eval.evaluation.open_questions.open_questions_evaluation import (
     OpenQuestionEvaluation,
+    add_open_question_evaluation_columns,
     evaluate_open_questions,
     filter_nonempty_object_column,
 )
@@ -178,6 +179,88 @@ def test_evaluate_open_questions_counts_contractions_and_hyphens_end_to_end():
     assert result.text_statistics.mean_word_count == 7.0
     assert result.text_statistics.median_word_count == 7.0
     assert result.text_statistics.pct_over_word_count_threshold == 100.0
+
+
+# ============================================================================
+# Test add_open_question_evaluation_columns function
+# ============================================================================
+
+
+def test_add_open_question_evaluation_columns_adds_expected_metric_columns():
+    """Add all expected open question metric columns using text-column prefix."""
+    df = pd.DataFrame(
+        {
+            "question": [
+                "What do you do?",
+                "Describe your role.",
+            ],
+            "id": [1, 2],
+        }
+    )
+
+    result = add_open_question_evaluation_columns(df, text_column="question")
+
+    expected_columns = {
+        "question_has_question_mark",
+        "question_interrogative_start",
+        "question_instruction_prompt_start",
+        "question_interrogative_wh_count",
+        "question_instruction_prompt_count",
+        "question_is_question",
+        "question_contains_multiple_asks",
+        "question_is_single_question",
+        "question_n_acronyms",
+        "question_avg_syllables_per_word",
+        "question_syllable_counts",
+        "question_word_count",
+        "question_sentence_count",
+        "question_character_count",
+        "question_letter_count",
+        "question_words_per_sentence",
+        "question_mean_words_per_sentence",
+    }
+
+    assert expected_columns.issubset(set(result.columns))
+    assert "question" in result.columns
+    assert "id" in result.columns
+
+
+def test_add_open_question_evaluation_columns_uses_provided_text_column_name_as_prefix():
+    """Use the provided text column name when building metric column prefixes."""
+    df = pd.DataFrame(
+        {
+            "prompt_text": [
+                "What is your role?",
+            ]
+        }
+    )
+
+    result = add_open_question_evaluation_columns(df, text_column="prompt_text")
+
+    assert "prompt_text_is_question" in result.columns
+    assert "prompt_text_n_acronyms" in result.columns
+    assert "prompt_text_word_count" in result.columns
+
+
+def test_add_open_question_evaluation_columns_preserves_rows_including_empty_and_null():
+    """Preserve all input rows and compute metrics even when text is null/blank."""
+    df = pd.DataFrame(
+        {
+            "question": [
+                "What do you do?",
+                "",
+                None,
+            ],
+            "id": [10, 20, 30],
+        }
+    )
+
+    result = add_open_question_evaluation_columns(df, text_column="question")
+
+    assert len(result) == 3
+    assert list(result["id"]) == [10, 20, 30]
+    assert not bool(result.loc[1, "question_is_question"])
+    assert not bool(result.loc[2, "question_is_question"])
 
 
 # ============================================================================
