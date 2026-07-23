@@ -23,10 +23,17 @@ import os
 import shutil
 from argparse import ArgumentParser, Namespace
 
-import gcsfs
 import pandas as pd
+from google.cloud import storage as gcs
 
 from survey_assist_eval.pipeline.metadata import update_metadata_with_args_and_defaults
+
+
+def _parse_gcs_path(gcs_path: str) -> tuple[str, str]:
+    """Splits a gs://bucket/blob path into (bucket_name, blob_name)."""
+    path = gcs_path[len("gs://") :]
+    bucket, _, blob = path.partition("/")
+    return bucket, blob
 
 
 def parse_args(default_output_shortname: str = "STGK") -> Namespace:
@@ -203,9 +210,10 @@ def _read_json(file_path: str) -> dict:
         dict: The contents of the JSON file as a dictionary.
     """
     if file_path.startswith("gs://"):
-        fs = gcsfs.GCSFileSystem()
-        with fs.open(file_path, "r", encoding="utf8") as f:
-            obj = json.load(f)
+        bucket_name, blob_name = _parse_gcs_path(file_path)
+        client = gcs.Client()
+        blob = client.bucket(bucket_name).blob(blob_name)
+        obj = json.loads(blob.download_as_text(encoding="utf-8"))
     else:
         with open(file_path, encoding="utf8") as f:
             obj = json.load(f)
@@ -224,13 +232,16 @@ def _write_json(obj: dict, file_path: str) -> None:
         None
     """
     if file_path.startswith("gs://"):
-        fs = gcsfs.GCSFileSystem()
-        with fs.open(file_path, "w", encoding="utf8") as f:
-            f.write(json.dumps(obj))
+        bucket_name, blob_name = _parse_gcs_path(file_path)
+        client = gcs.Client()
+        blob = client.bucket(bucket_name).blob(blob_name)
+        blob.upload_from_string(
+            json.dumps(obj, indent=2), content_type="application/json"
+        )
     else:
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
         with open(file_path, "w", encoding="utf8") as f:
-            json.dump(obj, f)
+            json.dump(obj, f, indent=2)
 
 
 def _delete_folder_contents(folder_path: str) -> None:
@@ -243,8 +254,10 @@ def _delete_folder_contents(folder_path: str) -> None:
         None
     """
     if folder_path.startswith("gs://"):
-        fs = gcsfs.GCSFileSystem()
-        fs.rm(folder_path, recursive=True)
+        bucket_name, prefix = _parse_gcs_path(folder_path)
+        client = gcs.Client()
+        blobs = list(client.list_blobs(bucket_name, prefix=prefix))
+        client.bucket(bucket_name).delete_blobs(blobs)
     else:
         shutil.rmtree(folder_path)
 
