@@ -14,7 +14,6 @@ Use:
     -h, --help to show help message.
 """
 
-import json
 import logging
 from argparse import ArgumentParser as AP
 
@@ -27,6 +26,7 @@ from survey_assist_eval.data_cleaning.prep_data import (
 from survey_assist_eval.evaluation.metrics import (
     calc_simple_metrics,
 )
+from survey_assist_eval.pipeline.shared_components import _write_json
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(
@@ -156,18 +156,5 @@ if __name__ == "__main__":
 
     if args.write_output:
         out_file = args.evaluation_data.replace(".parquet", f"_metrics_{DIGITS}d.json")
-        if out_file.startswith("gs://"):
-            from google.cloud import storage
-
-            path = out_file[len("gs://") :]
-            bucket_name, _, blob_name = path.partition("/")
-            client = storage.Client()
-            blob = client.bucket(bucket_name).blob(blob_name)
-            blob.upload_from_string(
-                json.dumps(evaluation_metrics.as_dict(), indent=2),
-                content_type="application/json",
-            )
-        else:
-            with open(out_file, "w", encoding="utf-8") as f:
-                json.dump(evaluation_metrics.as_dict(), f, indent=2)
+        _write_json(evaluation_metrics.as_dict(), out_file)
         logger.info("Wrote evaluation metrics to %s", out_file)

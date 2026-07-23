@@ -179,7 +179,7 @@ logger.info(
 
 to_drop_msk = display_text_all["max_similarity_score"].gt(DISPLAY_DUPLICATE_THRESHOLD)
 logger.info(
-    f"Dropping {sum(to_drop_msk)} display_texts that are too similar"
+    f"Dropping {sum(to_drop_msk)} display_texts that are too similar "
     "to other display_texts for the same code."
 )
 display_text_filtered = (

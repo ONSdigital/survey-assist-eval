@@ -86,7 +86,7 @@ def test_delete_folder_contents_local_removes_folder(tmp_path: Path):
 
 
 @pytest.mark.utils
-def test_delete_folder_contents_gcs_path_calls_rm():
+def test_delete_folder_contents_gcs_path_deletes_listed_blobs_for_prefix():
     mock_client = MagicMock()
     mock_bucket = MagicMock()
     mock_blobs = [MagicMock(), MagicMock()]
