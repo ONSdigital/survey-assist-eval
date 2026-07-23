@@ -7,7 +7,6 @@ These tests focus on the helper functions in `survey_assist_eval.pipeline.shared
 
 from __future__ import annotations
 
-import io
 import json
 import re
 from argparse import Namespace
@@ -33,44 +32,47 @@ def test_write_and_read_json_local_roundtrip(tmp_path: Path):
 
 
 @pytest.mark.utils
-def test_read_json_gcs_path_uses_gcsfs():
+def test_read_json_gcs_path_uses_gcs_client():
     payload = {"hello": "world", "n": 2}
-    buf = io.StringIO(json.dumps(payload))
-
-    fs = MagicMock()
-    fs.open.return_value = buf
+    mock_client = MagicMock()
+    mock_bucket = MagicMock()
+    mock_blob = MagicMock()
+    mock_client.bucket.return_value = mock_bucket
+    mock_bucket.blob.return_value = mock_blob
+    mock_blob.download_as_text.return_value = json.dumps(payload)
 
     with patch.object(
-        shared_components.gcsfs, "GCSFileSystem", return_value=fs
-    ) as gcsfs_cls:
+        shared_components.gcs, "Client", return_value=mock_client
+    ) as client_cls:
         loaded = shared_components._read_json("gs://some-bucket/some.json")
 
-    gcsfs_cls.assert_called_once()
-    fs.open.assert_called_once()
+    client_cls.assert_called_once()
+    mock_client.bucket.assert_called_once_with("some-bucket")
+    mock_bucket.blob.assert_called_once_with("some.json")
+    mock_blob.download_as_text.assert_called_once_with(encoding="utf-8")
     assert loaded == payload
 
 
 @pytest.mark.utils
-def test_write_json_gcs_path_uses_gcsfs():
+def test_write_json_gcs_path_uses_gcs_client():
     payload = {"x": 1, "y": ["a", "b"]}
-
-    class _NonClosingStringIO(io.StringIO):
-        def close(self):
-            """Keep buffer readable after context manager exit."""
-
-    buf = _NonClosingStringIO()
-    fs = MagicMock()
-    fs.open.return_value = buf
+    mock_client = MagicMock()
+    mock_bucket = MagicMock()
+    mock_blob = MagicMock()
+    mock_client.bucket.return_value = mock_bucket
+    mock_bucket.blob.return_value = mock_blob
 
     with patch.object(
-        shared_components.gcsfs, "GCSFileSystem", return_value=fs
-    ) as gcsfs_cls:
+        shared_components.gcs, "Client", return_value=mock_client
+    ) as client_cls:
         shared_components._write_json(payload, "gs://some-bucket/out.json")
 
-    gcsfs_cls.assert_called_once()
-    fs.open.assert_called_once()
-    buf.seek(0)
-    assert json.loads(buf.read()) == payload
+    client_cls.assert_called_once()
+    mock_client.bucket.assert_called_once_with("some-bucket")
+    mock_bucket.blob.assert_called_once_with("out.json")
+    mock_blob.upload_from_string.assert_called_once_with(
+        json.dumps(payload, indent=2), content_type="application/json"
+    )
 
 
 @pytest.mark.utils
@@ -84,15 +86,22 @@ def test_delete_folder_contents_local_removes_folder(tmp_path: Path):
 
 
 @pytest.mark.utils
-def test_delete_folder_contents_gcs_path_calls_rm():
-    fs = MagicMock()
+def test_delete_folder_contents_gcs_path_deletes_listed_blobs_for_prefix():
+    mock_client = MagicMock()
+    mock_bucket = MagicMock()
+    mock_blobs = [MagicMock(), MagicMock()]
+    mock_client.bucket.return_value = mock_bucket
+    mock_client.list_blobs.return_value = mock_blobs
+
     with patch.object(
-        shared_components.gcsfs, "GCSFileSystem", return_value=fs
-    ) as gcsfs_cls:
+        shared_components.gcs, "Client", return_value=mock_client
+    ) as client_cls:
         shared_components._delete_folder_contents("gs://bucket/path")
 
-    gcsfs_cls.assert_called_once()
-    fs.rm.assert_called_once_with("gs://bucket/path", recursive=True)
+    client_cls.assert_called_once()
+    mock_client.list_blobs.assert_called_once_with("bucket", prefix="path")
+    mock_client.bucket.assert_called_once_with("bucket")
+    mock_bucket.delete_blobs.assert_called_once_with(mock_blobs)
 
 
 @pytest.mark.utils

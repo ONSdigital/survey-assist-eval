@@ -16,7 +16,6 @@ from re import sub as regex_sub
 import numpy as np
 import pandas as pd
 from survey_assist_embed_core import EmbeddingHandler, build_embedding_index
-from survey_assist_embed_core.sayt.indexes import _silence_classifai_tqdm
 from tqdm import tqdm
 
 from survey_assist_eval.data_cleaning.code_standard import INVALID_VALUES
@@ -145,10 +144,9 @@ def _get_semantic_search_results(
         else row[MERGED_INDUSTRY_DESC_COL]
     )
 
-    with _silence_classifai_tqdm():
-        results = one_embedding_handler.search_index_multi(
-            [industry_descr, row[JOB_TITLE_COL], row[JOB_DESCRIPTION_COL]],
-        )
+    results = one_embedding_handler.search_index_multi(
+        [industry_descr, row[JOB_TITLE_COL], row[JOB_DESCRIPTION_COL]],
+    )
 
     reduced_results = [r.model_dump() for r in results.results]
     return reduced_results
