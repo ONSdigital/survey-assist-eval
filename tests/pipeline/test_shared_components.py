@@ -71,7 +71,7 @@ def test_write_json_gcs_path_uses_gcs_client():
     mock_client.bucket.assert_called_once_with("some-bucket")
     mock_bucket.blob.assert_called_once_with("out.json")
     mock_blob.upload_from_string.assert_called_once_with(
-        json.dumps(payload), content_type="application/json"
+        json.dumps(payload, indent=2), content_type="application/json"
     )
 
 
