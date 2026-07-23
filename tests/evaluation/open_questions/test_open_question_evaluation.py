@@ -2,6 +2,9 @@
 
 import pandas as pd
 
+from survey_assist_eval.evaluation.open_questions.examples_and_leading_functions import (
+    ExampleLeadingQuestionMetrics,
+)
 from survey_assist_eval.evaluation.open_questions.open_questions_evaluation import (
     OpenQuestionEvaluation,
     evaluate_open_questions,
@@ -70,6 +73,32 @@ def test_open_question_evaluation_report_metrics_returns_string():
     assert "Open Question Evaluation metrics summary:" in report
 
 
+def test_open_question_evaluation_report_metrics_by_section_returns_expected_mapping():
+    """Return per-section metric reports keyed by evaluation component."""
+    df = pd.DataFrame(
+        {
+            "question": [
+                "What do you do?",
+                "Describe your role.",
+            ]
+        }
+    )
+
+    evaluation = evaluate_open_questions(
+        df,
+        text_column="question",
+    )
+
+    report = evaluation.report_metrics_by_section()
+
+    assert report == {
+        "text_statistics": evaluation.text_statistics.report_metrics(),
+        "question_structure": evaluation.question_structure.report_metrics(),
+        "simple_language": evaluation.simple_language.report_metrics(),
+        "example_and_leading": evaluation.example_and_leading.report_metrics(),
+    }
+
+
 # ============================================================================
 # Test evaluate_open_questions function
 # ============================================================================
@@ -95,6 +124,7 @@ def test_evaluate_open_questions_returns_expected_model():
     assert isinstance(result.text_statistics, OpenQuestionTextStatistics)
     assert isinstance(result.question_structure, QuestionStructureMetrics)
     assert isinstance(result.simple_language, SimpleLanguageMetrics)
+    assert isinstance(result.example_and_leading, ExampleLeadingQuestionMetrics)
 
 
 def test_evaluate_open_questions_filters_empty_rows():
@@ -118,6 +148,7 @@ def test_evaluate_open_questions_filters_empty_rows():
     assert result.text_statistics.n_count == 2
     assert result.question_structure.n_count == 2
     assert result.simple_language.n_count == 2
+    assert result.example_and_leading.n_count == 2
 
 
 def test_evaluate_open_questions_uses_default_text_statistics_config():
