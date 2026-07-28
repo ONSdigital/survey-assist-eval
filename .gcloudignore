@@ -27,5 +27,8 @@ scripts/*
 scripts/api_evaluation/*
 !scripts/api_evaluation/run.py
 
+# allowed CICD content
+!cicd/**
+
 # reject pycache
 **/__pycache__
