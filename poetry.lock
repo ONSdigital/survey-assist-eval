@@ -8620,8 +8620,8 @@ survey-assist-utils = {git = "https://github.com/ONSdigital/survey-assist-utils.
 [package.source]
 type = "git"
 url = "https://github.com/ONSdigital/sic-classification-utils.git"
-reference = "4b4e759"
-resolved_reference = "4b4e759ff560b49b898cfb6c968ad627a6fcea92"
+reference = "5a480c9"
+resolved_reference = "5a480c953d383f798e310d6c20363e010da49411"
 
 [[package]]
 name = "simplejson"
@@ -10342,4 +10342,4 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<4.0"
-content-hash = "e1426defe6ba1e7e50a7777df8e4737ada3366827eb0c687c2682bc80c84b65a"
+content-hash = "2c0eea02b14f67b3856835b1b2c0dba6881556c1adc5ad07eb4cc9d59643f927"

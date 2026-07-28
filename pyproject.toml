@@ -46,7 +46,7 @@ python-dotenv = "^1.1.0"
 ruff = "^0.9.10"
 scikit-learn = "^1.8.0"
 scipy = "^1.16.3"
-sic-classification-utils = { git = "https://github.com/ONSdigital/sic-classification-utils.git", rev = "4b4e759" }
+sic-classification-utils = { git = "https://github.com/ONSdigital/sic-classification-utils.git", rev = "5a480c9" }
 soc-classification-utils = { git = "https://github.com/ONSdigital/soc-classification-utils.git", rev = "f29f8cc" }
 survey-assist-embed-core = { git = "https://github.com/ONSdigital/survey-assist-embed-core.git", tag = "v0.2.3" }
 
