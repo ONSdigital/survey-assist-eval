@@ -34,6 +34,9 @@ steps:
         docker push $$IMAGE:latest
         docker push $$IMAGE:$SHORT_SHA
 
+        echo === Deploy SA API evaluation cloud run job ===
+        gcloud run jobs update $$CR_JOB_NAME --image=$$IMAGE:$SHORT_SHA --region $LOCATION --project $$TARGET_PROJECT_ID
+
 timeout: 600s
 options:
   logging: CLOUD_LOGGING_ONLY
