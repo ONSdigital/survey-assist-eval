@@ -12,7 +12,6 @@ containers/api_evaluation/*
 !containers/api_evaluation/Dockerfile
 
 # allowed survey-assist-eval source
-
 !src/
 !src/survey_assist_eval/**
 !poetry.lock
