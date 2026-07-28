@@ -30,7 +30,7 @@ steps:
         TARGET_PROJECT_ID=$(echo $config | python3 -c "import sys, json; print(json.load(sys.stdin)['project-id'])")
 
         echo === Build Docker image, tag and push to GAR ===
-        docker build -t $$IMAGE:$SHORT_SHA -t $$IMAGE:latest .
+        docker build -t $$IMAGE:$SHORT_SHA -t $$IMAGE:latest -f containers/api_evaluation/Dockerfile .
         docker push $$IMAGE:latest
         docker push $$IMAGE:$SHORT_SHA
 
