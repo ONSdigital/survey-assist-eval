@@ -5,6 +5,10 @@
 
 # allowed docker files
 !.dockerignore
+!containers/
+containers/*
+!containers/api_evaluation/
+containers/api_evaluation/*
 !containers/api_evaluation/Dockerfile
 
 # allowed survey-assist-eval source
