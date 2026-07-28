@@ -13,7 +13,6 @@ dynamic = ["dependencies"]
 packages = [{ include = "survey_assist_eval", from = "src" }]
 
 [tool.poetry.dependencies]
-gcsfs = "^2025.3.2"
 numpy = "^2.3.3"
 pandas = "^2.3.3"
 pydantic = "^2.12.5"
@@ -27,6 +26,7 @@ pyarrow = "^21"
 [tool.poetry.group.dev.dependencies]
 bandit = "^1.8.3"
 black = "^25.1.0"
+db-dtypes = "^1.7.1"
 google-genai = "^1.66.0"
 ipykernel = "^6.29.5"
 isort = "^6.0.1"
@@ -46,10 +46,9 @@ python-dotenv = "^1.1.0"
 ruff = "^0.9.10"
 scikit-learn = "^1.8.0"
 scipy = "^1.16.3"
-sic-classification-utils = { git = "https://github.com/ONSdigital/sic-classification-utils.git", rev = "d0193d6" }
+sic-classification-utils = { git = "https://github.com/ONSdigital/sic-classification-utils.git", rev = "4b4e759" }
 soc-classification-utils = { git = "https://github.com/ONSdigital/soc-classification-utils.git", rev = "f29f8cc" }
-survey-assist-embed-core = { git = "https://github.com/ONSdigital/survey-assist-embed-core.git", tag = "v0.2.0" }
-db-dtypes = "^1.7.1"
+survey-assist-embed-core = { git = "https://github.com/ONSdigital/survey-assist-embed-core.git", tag = "v0.2.3" }
 
 
 [tool.isort]
