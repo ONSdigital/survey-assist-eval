@@ -24,7 +24,7 @@ class SAYTPerformanceMetrics(BaseModel):
             f" Total queries: {self.total_queries}",
             f" Average time per query: {self.ave_time_per_query_ms:.2f} ms",
             f" Unmatched query count: {self.unmatched_query_count}",
-            f" MRR: {self.mrr:.4f}",
+            f" Mean reciprocal rank: {self.mrr:.4f}",
             f" Mean rank: {self.mean_rank:.2f}",
         ]
         for k, val in sorted(self.precision_at_k.items()):
