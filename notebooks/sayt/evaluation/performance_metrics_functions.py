@@ -115,15 +115,15 @@ def compute_recall_at_k(retrieved_codes: list[str], correct_code: str, k: int) -
     return 1.0 if correct_code in top_k_retrieved else 0.0
 
 
-def compute_mrr(retrieved_codes: list[str], correct_code: str) -> float:
-    """Compute Mean Reciprocal Rank (MRR) for a single query.
+def compute_reciprocal_rank(retrieved_codes: list[str], correct_code: str) -> float:
+    """Compute Reciprocal Rank for a single query.
 
     Args:
         retrieved_codes: List of codes retrieved by the system (ordered by relevance).
         correct_code: The correct code for the query.
 
     Returns:
-        float: MRR value.
+        float: Reciprocal Rank value.
     """
     for rank, item in enumerate(retrieved_codes, start=1):
         if item == correct_code:
@@ -131,15 +131,15 @@ def compute_mrr(retrieved_codes: list[str], correct_code: str) -> float:
     return 0.0
 
 
-def compute_mean_rank(retrieved_codes: list[str], correct_code: str) -> float:
-    """Compute Mean Rank for a single query.
+def get_rank_of_correct_code(retrieved_codes: list[str], correct_code: str) -> float:
+    """Get the rank of the correct code in the retrieved list for a single query.
 
     Args:
         retrieved_codes: List of codes retrieved by the system (ordered by relevance).
         correct_code: The correct code for the query.
 
     Returns:
-        float: Mean Rank value.
+        float: Rank of the correct code, or 0.0 if not found.
     """
     for rank, item in enumerate(retrieved_codes, start=1):
         if item == correct_code:
@@ -179,11 +179,15 @@ def add_sayt_metrics_columns(
             axis=1,
         )
     df["mrr"] = df.apply(
-        lambda row: compute_mrr(row[retrieved_codes_col], row[correct_code_col]),
+        lambda row: compute_reciprocal_rank(
+            row[retrieved_codes_col], row[correct_code_col]
+        ),
         axis=1,
     )
     df["mean_rank"] = df.apply(
-        lambda row: compute_mean_rank(row[retrieved_codes_col], row[correct_code_col]),
+        lambda row: get_rank_of_correct_code(
+            row[retrieved_codes_col], row[correct_code_col]
+        ),
         axis=1,
     )
     return df
