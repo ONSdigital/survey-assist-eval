@@ -23,7 +23,12 @@ from survey_assist_embed_core.sayt import (
 )
 from survey_assist_utils.logging import get_logger
 
-from survey_assist_eval.data_cleaning.code_standard import get_clean_n_digit_codes
+from notebooks.sayt.sayt_utils import (
+    build_lookup_suggester,
+    get_suggestions_for_row,
+    rank_of_correct_code_in_suggestions,
+    validate_one_code,
+)
 
 # %%
 EXTENDED_RUN = False  # set to True to include more suggesters and debug messages
@@ -44,17 +49,6 @@ if not os.path.exists(OUTPUT_DIR):
 
 logger = get_logger(__name__)
 logger.info("Location specs", bucket_name=bucket_name, output_dir=OUTPUT_DIR)
-
-
-# %%
-def build_lookup_suggester(
-    corpus: list[tuple[str, str]], *, semantic_weight: float | None
-) -> SAYTSuggester:
-    """Build a lookup suggester using the explicit retriever-spec API."""
-    retrievers = [PrefixRetrieverSpec(), NgramRetrieverSpec()]
-    if semantic_weight is not None:
-        retrievers.append(SemanticRetrieverSpec(weight=semantic_weight))
-    return SAYTSuggester(corpus, retrievers=retrievers)
 
 
 # %%
@@ -86,23 +80,14 @@ for col in [
 
 # %%
 # check the codes are well formed
-def validate_one_code(code: str, n_digits=SIC_CODE_LENGTH) -> bool:
-    """Return a set of cleaned codes, or raise ValueError if the code is malformed."""
-    if pd.isna(code):
-        logger.warning("Code is NaN")
-        return False
-    clean_codes = get_clean_n_digit_codes(code, n=n_digits, code_type="SIC")
-    if len(clean_codes[1]) != 0:
-        logger.warning(f"Malformed code: {code}")
-        return False
-    if len(clean_codes[0]) != 1 or next(iter(clean_codes[0])) != code:
-        logger.warning(f"Code {code} cleaned to different code: {clean_codes[0]}")
-        return False
-    return True
-
-
 print(
-    f'Clerical codes validated: {test_df["correct_sic_code"].apply(validate_one_code).all()}'
+    f'Clerical codes validated: {
+        test_df["correct_sic_code"]
+        .apply(validate_one_code,
+               logger=logger,
+               code_length=SIC_CODE_LENGTH)
+               .all()
+               }'
 )
 
 # %%
@@ -175,27 +160,6 @@ if EXTENDED_RUN:
 
 
 # %%
-def get_suggestions_for_row(row, suggester, num_chars, max_suggestions):
-    """Return suggester output for a single input row."""
-    return suggester.suggest(
-        row["full_entry"][:num_chars],
-        num_suggestions=max_suggestions,
-    )
-
-
-def rank_of_correct_code_in_suggestions(
-    row, num_chars, suggester_label, correct_code_col="correct_sic_code"
-):
-    """Return the rank of the correct code in the suggestions, or None if not found."""
-    correct_code = row[correct_code_col]
-    suggestions = row[f"suggestions_{num_chars}chars_{suggester_label}"]
-    for rank, suggest in enumerate(suggestions):
-        if suggest[-SIC_CODE_LENGTH:] == correct_code:
-            return rank + 1
-    return None
-
-
-# %%
 
 for prefix_chars in [4, 5, 7, 10]:  # 150]:
     for suggester_name, suggester_obj in suggesters.items():
@@ -224,6 +188,7 @@ for prefix_chars in [4, 5, 7, 10]:  # 150]:
             correct_code_col="correct_sic_code",
             suggester_label=suggester_name,
             num_chars=prefix_chars,
+            code_length=SIC_CODE_LENGTH,
             axis=1,
         )
 
