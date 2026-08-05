@@ -31,7 +31,6 @@ def build_lookup_suggester(
         semantic_weight: Weight for semantic retrieval. If None, semantic retrieval
             is not included.
         retrievers: list of retrievers to be used.
-            Defaults to [PrefixRetrieverSpec(), NgramRetrieverSpec()]
 
     Returns:
         SAYTSuggester: Configured suggester instance.
