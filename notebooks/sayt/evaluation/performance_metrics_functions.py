@@ -195,7 +195,7 @@ def add_sayt_metrics_columns(
 
 def summarise_performance_metrics(
     df, k_values: list[int], ave_time_per_query: int
-) -> dict:
+) -> SAYTPerformanceMetrics:
     """Summarize performance metrics across the DataFrame.
 
     Args:

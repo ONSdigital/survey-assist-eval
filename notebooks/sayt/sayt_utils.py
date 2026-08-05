@@ -114,7 +114,7 @@ def rank_of_correct_code_in_suggestions(
 
 
 def get_codes_from_suggestions(
-    row: dict[str, Any],
+    row: pd.Series,
     suggestions_col: str,
     code_length: int = 5,
 ) -> list[str]:
