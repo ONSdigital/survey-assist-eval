@@ -122,12 +122,12 @@ suggesters = {
     "Blaise proxy method (prefix + n_grams)": build_lookup_suggester(
         sayt_corpus, semantic_weight=None
     ),
-    # "Hybrid method including semantic retriever": build_lookup_suggester(
-    #     sayt_corpus, semantic_weight=1.0
-    # ),
-    # "Hybrid method with extended knowledge base": build_lookup_suggester(
-    #     sayt2_corpus, semantic_weight=1.0
-    # ),
+    "Hybrid method including semantic retriever": build_lookup_suggester(
+        sayt_corpus, semantic_weight=1.0
+    ),
+    "Hybrid method with extended knowledge base": build_lookup_suggester(
+        sayt2_corpus, semantic_weight=1.0
+    ),
 }
 
 if EXTENDED_RUN:
@@ -188,5 +188,3 @@ for suggester_name, suggester_obj in suggesters.items():
             retriever_name=name,
             matrix_shape=shape,
         )
-
-# %%
