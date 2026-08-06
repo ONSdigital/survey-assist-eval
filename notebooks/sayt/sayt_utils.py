@@ -127,7 +127,7 @@ def get_suggestions_for_collection(
     characters: list | None = None,
     suggestions_limit: int | None = 9,
 ) -> tuple[pd.DataFrame, float]:
-    """Gatheres suggestions for specified number of chatracters using suggesters.
+    """Gathers suggestions for specified number of characters using suggesters.
 
     Args:
         df: dataframe containing melted suggestions.
@@ -141,7 +141,7 @@ def get_suggestions_for_collection(
     """
     if characters is None:
         characters = [4, 5, 7, 10]
-    for prefix_chars in characters:  # 150]:
+    for prefix_chars in characters:
         for suggester_name, suggester_obj in suggesters_dict.items():
             logger.info(
                 "Starting SAYT suggesting - one loop",
