@@ -160,9 +160,7 @@ def get_suggestions_for_collection(
                     axis=1,
                 )
             )
-            logger.info(
-                "  -> suggestions done",
-            )
+            logger.info("  -> suggestions done", elapsed_sec=avg_ms)
             df[f"rank_{prefix_chars}chars_{suggester_name}"] = df.apply(
                 rank_of_correct_code_in_suggestions,
                 correct_code_col="correct_sic_code",
