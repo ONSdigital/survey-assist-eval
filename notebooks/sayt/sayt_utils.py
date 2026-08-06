@@ -48,7 +48,6 @@ def validate_one_code(code: str, code_length=5) -> bool:
 
     Args:
         code: SIC code value to validate.
-        logger: Logger used for warning messages.
         code_length: Expected SIC code length.
 
     Returns:
@@ -127,7 +126,7 @@ def get_suggestions_for_collection(
     suggesters_dict: dict[str, Any],
     characters: list | None = None,
     suggestions_limit: int | None = 9,
-) -> pd.DataFrame:
+) -> tuple[pd.DataFrame, float]:
     """Gatheres suggestions for specified number of chatracters using suggesters.
 
     Args:
@@ -136,6 +135,9 @@ def get_suggestions_for_collection(
         suggesters_dict: a dictionary with initialised suggester models.
         suggestions_limit: the maximum rank of suggestions considered as valid.
 
+    Returns:
+        tuple[pd.DataFrame, float]: Suggestions for specified characters typed;
+            average milliseconds per row.
     """
     if characters is None:
         characters = [4, 5, 7, 10]
@@ -148,12 +150,15 @@ def get_suggestions_for_collection(
             )
 
             t_start = time.perf_counter()
-            df[f"suggestions_{prefix_chars}chars_{suggester_name}"] = df.apply(
-                get_suggestions_for_row,
-                suggester=suggester_obj,
-                max_suggestions=suggestions_limit,
-                num_chars=prefix_chars,
-                axis=1,
+            df[f"suggestions_{prefix_chars}chars_{suggester_name}"], avg_ms = (
+                timed_apply(
+                    df,
+                    get_suggestions_for_row,
+                    suggester=suggester_obj,
+                    max_suggestions=suggestions_limit,
+                    num_chars=prefix_chars,
+                    axis=1,
+                )
             )
             elapsed = time.perf_counter() - t_start
             logger.info(
@@ -168,7 +173,7 @@ def get_suggestions_for_collection(
                 num_chars=prefix_chars,
                 axis=1,
             )
-    return df
+    return df, avg_ms
 
 
 def melt_results_for_analysis(

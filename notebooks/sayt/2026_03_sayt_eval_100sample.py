@@ -82,7 +82,6 @@ print(
     f'Clerical codes validated: {
         test_df["correct_sic_code"]
         .apply(validate_one_code,
-               logger=logger,
                code_length=SIC_CODE_LENGTH)
                .all()
                }'
@@ -123,9 +122,9 @@ suggesters = {
     "Blaise proxy method (prefix + n_grams)": build_lookup_suggester(
         sayt_corpus, semantic_weight=None
     ),
-    "Hybrid method including semantic retriever": build_lookup_suggester(
-        sayt_corpus, semantic_weight=1.0
-    ),
+    # "Hybrid method including semantic retriever": build_lookup_suggester(
+    #     sayt_corpus, semantic_weight=1.0
+    # ),
     # "Hybrid method with extended knowledge base": build_lookup_suggester(
     #     sayt2_corpus, semantic_weight=1.0
     # ),
@@ -157,7 +156,7 @@ if EXTENDED_RUN:
     )
 
 # %%
-suggestions_df = get_suggestions_for_collection(test_df, suggesters_dict=suggesters)
+suggestions_df = get_suggestions_for_collection(test_df, suggesters_dict=suggesters)[0]
 
 # %%
 melt_df = melt_results_for_analysis(df=suggestions_df)
