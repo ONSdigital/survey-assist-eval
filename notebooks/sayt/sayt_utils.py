@@ -185,7 +185,7 @@ def melt_results_for_analysis(
         correct_code_column: a column name with correct codes.
 
     Returns:
-        pd.DataFrame: dataframe with results form the suggester split by the type of suggester
+        pd.DataFrame: dataframe with results form suggesters, split by the type of suggester
             and number of characters.
     """
     results_df = df.melt(
@@ -218,10 +218,10 @@ def create_figure(
     output_dir: str,
     suggestions_limit: int | None = 9,
 ):
-    """Compare rank histograms for the two suggesters at different num_chars.
+    """Compare rank histograms for suggesters at different num_chars.
 
     Args:
-        df: dataframe containing.
+        df: dataframe containing results created by suggesters split by number of characters.
         output_dir: path to file location to be saved.
         suggestions_limit: the maximum rank of suggestions considered as valid.
     """
