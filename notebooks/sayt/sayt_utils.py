@@ -177,17 +177,19 @@ def get_suggestions_for_collection(
 
 
 def melt_results_for_analysis(
-    df: pd.DataFrame, suggestions_limit: int | None = 9
+    df: pd.DataFrame,
+    suggestions_limit: int | None = 9,
+    correct_code_column: str | None = "correct_sic_code",
 ) -> pd.DataFrame:
     """Melt results by suggester and num_chars for easier analysis.
 
     Args:
         df: dataframe containing columns 'correct_sic_code' and 'full_entry' with rank columns.
         suggestions_limit: the maximum rank of suggestions considered as valid.
-
+        correct_code_column: a column name with correct codes.
     """
     results_df = df.melt(
-        id_vars=["correct_sic_code", "full_entry"],
+        id_vars=[correct_code_column, "full_entry"],
         value_vars=[col for col in df.columns if col.startswith("rank_")],
         var_name="suggester_numchars",
         value_name="rank",
