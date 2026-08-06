@@ -110,9 +110,14 @@ def rank_of_correct_code_in_suggestions(
         int | None: 1-based rank of the correct code, or None if not found.
     """
     correct_code = row[correct_code_col]
-    suggestions = row[f"suggestions_{num_chars}chars_{suggester_label}"]
-    for rank, suggest in enumerate(suggestions):
-        if suggest[-code_length:] == correct_code:
+    suggested_codes = get_codes_from_suggestions(
+        row,
+        suggestions_col=f"suggestions_{num_chars}chars_{suggester_label}",
+        code_length=code_length,
+    )
+
+    for rank, suggest in enumerate(suggested_codes):
+        if suggest == correct_code:
             return rank + 1
     return None
 
@@ -248,3 +253,38 @@ def create_figure(
     fig.show()
 
     fig.write_html(f"{output_dir}/sayt_eval_100sample_rank_histograms.html")
+
+
+def get_codes_from_suggestions(
+    row: pd.Series,
+    suggestions_col: str,
+    code_length: int = 5,
+) -> list[str]:
+    """Extract code suffixes from suggestion strings for a single input row.
+
+    Args:
+        row: Input row containing a suggestions column.
+        suggestions_col: Column name containing suggestion strings.
+        code_length: Number of trailing characters to extract as a code.
+
+    Returns:
+        list[str]: Extracted codes in suggestion order.
+    """
+    return [suggestion[-code_length:] for suggestion in row[suggestions_col]]
+
+
+def timed_apply(df: pd.DataFrame, func, **kwargs) -> tuple[pd.Series, float]:
+    """Run df.apply and return the results alongside the average time per row.
+
+    Args:
+        df: DataFrame to apply the function to.
+        func: Callable to apply row-wise.
+        **kwargs: Additional keyword arguments passed to df.apply.
+
+    Returns:
+        tuple[pd.Series, float]: Apply results and average milliseconds per row.
+    """
+    t_start = time.perf_counter()
+    results = df.apply(func, **kwargs)
+    avg_ms = (time.perf_counter() - t_start) / len(df) * 1000
+    return results, avg_ms
