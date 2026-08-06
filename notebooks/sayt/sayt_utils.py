@@ -139,6 +139,7 @@ def get_suggestions_for_collection(
         tuple[pd.DataFrame, float]: Suggestions for specified characters typed;
             average milliseconds per row.
     """
+    avg_ms_dict = {}
     if characters is None:
         characters = [4, 5, 7, 10]
     for prefix_chars in characters:
@@ -149,7 +150,6 @@ def get_suggestions_for_collection(
                 suggester_label=suggester_name,
             )
 
-            t_start = time.perf_counter()
             df[f"suggestions_{prefix_chars}chars_{suggester_name}"], avg_ms = (
                 timed_apply(
                     df,
@@ -160,11 +160,8 @@ def get_suggestions_for_collection(
                     axis=1,
                 )
             )
-            elapsed = time.perf_counter() - t_start
             logger.info(
                 "  -> suggestions done",
-                elapsed_sec=elapsed,
-                elapsed_per_row_ms=elapsed / len(df) * 1000,
             )
             df[f"rank_{prefix_chars}chars_{suggester_name}"] = df.apply(
                 rank_of_correct_code_in_suggestions,
@@ -173,7 +170,8 @@ def get_suggestions_for_collection(
                 num_chars=prefix_chars,
                 axis=1,
             )
-    return df, avg_ms
+            avg_ms_dict.update({f"{prefix_chars}chars_{suggester_name}": avg_ms})
+    return df, avg_ms_dict
 
 
 def melt_results_for_analysis(
