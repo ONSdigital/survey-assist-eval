@@ -25,7 +25,7 @@ from survey_assist_utils.logging import get_logger
 from notebooks.sayt.sayt_utils import (
     build_lookup_suggester,
     create_figure,
-    get_suggestions_for_collection,
+    get_suggestions_by_chars,
     melt_results_for_analysis,
     validate_one_code,
 )
@@ -156,7 +156,7 @@ if EXTENDED_RUN:
     )
 
 # %%
-suggestions_df = get_suggestions_for_collection(test_df, suggesters_dict=suggesters)[0]
+suggestions_df = get_suggestions_by_chars(test_df, suggesters_dict=suggesters)[0]
 
 # %%
 melt_df = melt_results_for_analysis(df=suggestions_df)

@@ -121,12 +121,12 @@ def rank_of_correct_code_in_suggestions(
     return None
 
 
-def get_suggestions_for_collection(
+def get_suggestions_by_chars(
     df: pd.DataFrame,
     suggesters_dict: dict[str, Any],
     characters: list | None = None,
     suggestions_limit: int | None = 9,
-) -> tuple[pd.DataFrame, float]:
+) -> tuple[pd.DataFrame, dict]:
     """Gathers suggestions for specified number of characters using suggesters.
 
     Args:
@@ -183,6 +183,10 @@ def melt_results_for_analysis(
         df: dataframe containing columns 'correct_sic_code' and 'full_entry' with rank columns.
         suggestions_limit: the maximum rank of suggestions considered as valid.
         correct_code_column: a column name with correct codes.
+
+    Returns:
+        pd.DataFrame: dataframe with results form the suggester split by the type of suggester
+            and number of characters.
     """
     results_df = df.melt(
         id_vars=[correct_code_column, "full_entry"],
