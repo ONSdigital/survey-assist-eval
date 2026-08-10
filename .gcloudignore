@@ -29,5 +29,8 @@ scripts/api_evaluation/*
 # allowed CICD content
 !cicd/**
 
+# allowed tests content
+!tests/**
+
 # reject pycache
 **/__pycache__
