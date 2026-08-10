@@ -85,7 +85,7 @@ def get_suggestions_for_row(
     """
     return suggester.suggest(
         row["full_entry"][:num_chars],
-        max_suggestions=max_suggestions,
+        num_suggestions=max_suggestions,
     )
 
 
