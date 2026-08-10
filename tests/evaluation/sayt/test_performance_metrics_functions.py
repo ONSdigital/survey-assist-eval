@@ -2,15 +2,21 @@
 
 # pylint: disable=redefined-outer-name
 
+import math
+
 import pandas as pd
 import pytest
+from pydantic import ValidationError
 
 from survey_assist_eval.evaluation.sayt.performance_metrics_functions import (
+    SAYTPerformanceMetrics,
     add_sayt_metrics_columns,
+    build_sayt_metrics_comparison_table,
     compute_precision_at_k,
     compute_recall_at_k,
     compute_reciprocal_rank,
     get_rank_of_correct_code,
+    summarise_performance_metrics,
 )
 
 
@@ -181,11 +187,11 @@ def test_get_rank_of_correct_code_returns_first_matching_rank():
 
 
 def test_get_rank_of_correct_code_returns_zero_when_code_not_found():
-    """Rank should be zero when the correct code is absent."""
+    """Rank should be None when the correct code is absent."""
     rank = get_rank_of_correct_code(["1111", "2222", "3333"], "4444")
 
-    assert rank == pytest.approx(0.0), (
-        "Expected rank to be 0.0 when the correct code is absent from the retrieved "
+    assert rank is None, (
+        "Expected rank to be None when the correct code is absent from the retrieved "
         "list."
     )
 
@@ -278,14 +284,16 @@ def test_add_sayt_metrics_columns_adds_rank_based_summary_columns(
         k_values=[1],
     )
 
-    assert result_df["mrr"].tolist() == pytest.approx([1.0, 0.0, 0.0]), (
-        "Expected MRR values to equal the reciprocal rank of the first matching code "
-        "or 0.0 when there is no match."
+    assert result_df["reciprocal_rank"].tolist() == pytest.approx([1.0, 0.0, 0.0]), (
+        "Expected reciprocal_rank values to equal the reciprocal rank "
+        "of the first matching code or 0.0 when there is no match."
     )
-    assert result_df["mean_rank"].tolist() == pytest.approx([1.0, 0.0, 0.0]), (
-        "Expected mean_rank values to store the first matching rank or 0.0 when the "
-        "correct code is absent."
-    )
+    assert result_df["correct_code_rank"].iloc[0] == pytest.approx(1.0)
+    assert result_df["correct_code_rank"].isna().tolist() == [
+        False,
+        True,
+        True,
+    ], "Expected correct_code_rank to be NaN when the correct code is absent."
 
 
 def test_add_sayt_metrics_columns_handles_empty_k_values(sayt_metrics_input_df):
@@ -297,12 +305,13 @@ def test_add_sayt_metrics_columns_handles_empty_k_values(sayt_metrics_input_df):
         k_values=[],
     )
 
-    assert (
-        "mrr" in result_df.columns
-    ), "Expected mrr to be added even when no precision/recall cutoffs are provided."
-    assert "mean_rank" in result_df.columns, (
-        "Expected mean_rank to be added even when no precision/recall cutoffs are "
-        "provided."
+    assert "reciprocal_rank" in result_df.columns, (
+        "Expected reciprocal_rank to be added even when no "
+        "precision/recall cutoffs are provided."
+    )
+    assert "correct_code_rank" in result_df.columns, (
+        "Expected correct_code_rank to be added even when no precision/recall "
+        "cutoffs are provided."
     )
     assert not any(
         column.startswith("precision_at_") for column in result_df.columns
@@ -322,3 +331,634 @@ def test_add_sayt_metrics_columns_raises_for_non_positive_k(sayt_metrics_input_d
             correct_code_col="correct_code",
             k_values=[k],
         )
+
+
+# ============================================================================
+# Test summarise_performance_metrics function
+# ============================================================================
+
+
+@pytest.fixture
+def sayt_metrics_df():
+    """Pre-computed per-row metric DataFrame for summarise_performance_metrics tests.
+
+    Row 0: correct code found at rank 1 (full match).
+    Row 1: correct code found at rank 2 (partial match).
+    Row 2: correct code not found (unmatched).
+    """
+    return pd.DataFrame(
+        {
+            "reciprocal_rank": [1.0, 0.5, 0.0],
+            "correct_code_rank": [1.0, 2.0, None],
+            "precision_at_1": [1.0, 0.0, 0.0],
+            "precision_at_3": [1 / 3, 1 / 3, 0.0],
+            "recall_at_1": [1.0, 0.0, 0.0],
+            "recall_at_3": [1.0, 1.0, 0.0],
+        }
+    )
+
+
+def test_summarise_performance_metrics_returns_sayt_performance_metrics_instance(
+    sayt_metrics_df,
+):
+    """The function should return a SAYTPerformanceMetrics instance."""
+    result = summarise_performance_metrics(
+        sayt_metrics_df, k_values=[1, 3], ave_time_per_query=12.5
+    )
+
+    assert isinstance(result, SAYTPerformanceMetrics), (
+        "Expected summarise_performance_metrics to return a SAYTPerformanceMetrics "
+        "instance."
+    )
+
+
+def test_summarise_performance_metrics_total_queries_equals_row_count(
+    sayt_metrics_df,
+):
+    """total_queries should equal the number of rows in the input DataFrame."""
+    result = summarise_performance_metrics(
+        sayt_metrics_df, k_values=[1], ave_time_per_query=10.0
+    )
+
+    assert (
+        result.total_queries == 3
+    ), "Expected total_queries to equal the number of rows in the input DataFrame."
+
+
+def test_summarise_performance_metrics_stores_ave_time_per_query(
+    sayt_metrics_df,
+):
+    """ave_time_per_query_ms should store the value passed in without modification."""
+    result = summarise_performance_metrics(
+        sayt_metrics_df, k_values=[1], ave_time_per_query=42.7
+    )
+
+    assert result.ave_time_per_query_ms == pytest.approx(
+        42.7
+    ), "Expected ave_time_per_query_ms to store the supplied value unchanged."
+
+
+def test_summarise_performance_metrics_counts_rows_with_zero_correct_code_rank(
+    sayt_metrics_df,
+):
+    """unmatched_query_count should equal the number of rows where correct_code_rank is None."""
+    result = summarise_performance_metrics(
+        sayt_metrics_df, k_values=[1], ave_time_per_query=0.0
+    )
+
+    assert (
+        result.unmatched_query_count == 1
+    ), "Expected unmatched_query_count to count rows where correct_code_rank is None."
+
+
+def test_summarise_performance_metrics_computes_mean_reciprocal_rank(
+    sayt_metrics_df,
+):
+    """Mrr should be the mean of the per-row mrr column."""
+    result = summarise_performance_metrics(
+        sayt_metrics_df, k_values=[1], ave_time_per_query=0.0
+    )
+
+    assert result.mrr == pytest.approx(
+        (1.0 + 0.5 + 0.0) / 3
+    ), "Expected mrr to equal the row-wise mean of the reciprocal_rank column."
+
+
+def test_summarise_performance_metrics_computes_mean_rank(sayt_metrics_df):
+    """mean_rank should be the mean of the per-row correct_code_rank column,
+    ignoring None values.
+    """
+    result = summarise_performance_metrics(
+        sayt_metrics_df, k_values=[1], ave_time_per_query=0.0
+    )
+
+    assert result.mean_rank == pytest.approx(
+        (1.0 + 2.0) / 2
+    ), "Expected mean_rank to equal the row-wise mean of the correct_code_rank column."
+
+
+def test_summarise_performance_metrics_builds_precision_at_k_dict(sayt_metrics_df):
+    """precision_at_k should map each k to the mean of the corresponding column."""
+    result = summarise_performance_metrics(
+        sayt_metrics_df, k_values=[1, 3], ave_time_per_query=0.0
+    )
+
+    assert result.precision_at_k == {
+        1: pytest.approx((1.0 + 0.0 + 0.0) / 3),
+        3: pytest.approx((1 / 3 + 1 / 3 + 0.0) / 3),
+    }, "Expected precision_at_k to map each k to the mean precision across all rows."
+
+
+def test_summarise_performance_metrics_builds_recall_at_k_dict(sayt_metrics_df):
+    """recall_at_k should map each k to the mean of the corresponding column."""
+    result = summarise_performance_metrics(
+        sayt_metrics_df, k_values=[1, 3], ave_time_per_query=0.0
+    )
+
+    assert result.recall_at_k == {
+        1: pytest.approx((1.0 + 0.0 + 0.0) / 3),
+        3: pytest.approx((1.0 + 1.0 + 0.0) / 3),
+    }, "Expected recall_at_k to map each k to the mean recall across all rows."
+
+
+def test_summarise_performance_metrics_all_matched():
+    """unmatched_query_count should be zero when every row has a non-zero rank."""
+    df = pd.DataFrame(
+        {
+            "reciprocal_rank": [1.0, 0.5],
+            "correct_code_rank": [1.0, 2.0],
+            "precision_at_1": [1.0, 0.0],
+            "recall_at_1": [1.0, 1.0],
+        }
+    )
+
+    result = summarise_performance_metrics(df, k_values=[1], ave_time_per_query=0.0)
+
+    assert (
+        result.unmatched_query_count == 0
+    ), "Expected unmatched_query_count to be 0 when all rows have a non-zero rank."
+
+
+def test_summarise_performance_metrics_all_unmatched():
+    """Mrr should be 0.0 and mean_rank NaN when no query returns the correct code."""
+    df = pd.DataFrame(
+        {
+            "reciprocal_rank": [0.0, 0.0],
+            "correct_code_rank": [None, None],
+            "precision_at_1": [0.0, 0.0],
+            "recall_at_1": [0.0, 0.0],
+        }
+    )
+
+    result = summarise_performance_metrics(df, k_values=[1], ave_time_per_query=0.0)
+
+    assert (
+        result.unmatched_query_count == 2
+    ), "Expected unmatched_query_count to equal total_queries when no code is found."
+    assert result.mrr == pytest.approx(
+        0.0
+    ), "Expected mrr to be 0.0 when no query returns the correct code."
+    assert math.isnan(
+        result.mean_rank
+    ), "Expected mean_rank to be NaN when no query has a rank (all correct_code_rank are None)."
+
+
+def test_summarise_performance_metrics_single_row():
+    """Metrics should be computed correctly for a single-row DataFrame."""
+    df = pd.DataFrame(
+        {
+            "reciprocal_rank": [0.5],
+            "correct_code_rank": [2.0],
+            "precision_at_2": [0.5],
+            "recall_at_2": [1.0],
+        }
+    )
+
+    result = summarise_performance_metrics(df, k_values=[2], ave_time_per_query=5.0)
+
+    assert (
+        result.total_queries == 1
+    ), "Expected total_queries to be 1 for a single-row DataFrame."
+    assert (
+        result.unmatched_query_count == 0
+    ), "Expected unmatched_query_count to be 0 when the single row has a non-zero rank."
+    assert result.mrr == pytest.approx(
+        0.5
+    ), "Expected mrr to equal the single row's reciprocal rank."
+    assert result.mean_rank == pytest.approx(
+        2.0
+    ), "Expected mean_rank to equal the single row's rank value."
+
+
+# ============================================================================
+# Test build_sayt_metrics_comparison_table function
+# ============================================================================
+
+
+@pytest.fixture
+def sayt_comparison_df():
+    """DataFrame with two suggestion columns for comparison table tests.
+
+    Codes are 4 characters; suggestions embed the code as the last 4 characters.
+    Row 0: model_a returns correct code first; model_b misses.
+    Row 1: both models miss.
+    """
+    return pd.DataFrame(
+        {
+            "correct_code": ["1111", "2222"],
+            "suggestions_model_a": [
+                ["label 1111", "label 3333"],
+                ["label 3333", "label 4444"],
+            ],
+            "suggestions_model_b": [
+                ["label 3333", "label 4444"],
+                ["label 3333", "label 4444"],
+            ],
+        }
+    )
+
+
+def test_build_sayt_metrics_comparison_table_returns_dataframe(sayt_comparison_df):
+    """The function should return a pandas DataFrame."""
+    result = build_sayt_metrics_comparison_table(
+        sayt_comparison_df,
+        suggestions_cols_to_compare=["suggestions_model_a", "suggestions_model_b"],
+        correct_code_col="correct_code",
+        k_values=[1],
+        ave_time_per_query_list=[10.0, 20.0],
+    )
+
+    assert isinstance(
+        result, pd.DataFrame
+    ), "Expected build_sayt_metrics_comparison_table to return a pandas DataFrame."
+
+
+def test_build_sayt_metrics_comparison_table_has_one_row_per_suggestions_column(
+    sayt_comparison_df,
+):
+    """The result should contain one row for each suggestions column compared."""
+    result = build_sayt_metrics_comparison_table(
+        sayt_comparison_df,
+        suggestions_cols_to_compare=["suggestions_model_a", "suggestions_model_b"],
+        correct_code_col="correct_code",
+        k_values=[1],
+        ave_time_per_query_list=[10.0, 20.0],
+    )
+
+    assert (
+        len(result) == 2
+    ), "Expected one row per suggestions column in the comparison table."
+
+
+def test_build_sayt_metrics_comparison_table_strips_suggestions_prefix(
+    sayt_comparison_df,
+):
+    """The model column should contain column names with the 'suggestions_' prefix removed."""
+    result = build_sayt_metrics_comparison_table(
+        sayt_comparison_df,
+        suggestions_cols_to_compare=["suggestions_model_a", "suggestions_model_b"],
+        correct_code_col="correct_code",
+        k_values=[1],
+        ave_time_per_query_list=[10.0, 20.0],
+    )
+
+    assert result["model"].tolist() == [
+        "model_a",
+        "model_b",
+    ], "Expected the model column to strip the 'suggestions_' prefix from each column name."
+
+
+def test_build_sayt_metrics_comparison_table_assigns_correct_ave_time_per_query(
+    sayt_comparison_df,
+):
+    """Each row should use the ave_time_per_query value at the matching list position."""
+    result = build_sayt_metrics_comparison_table(
+        sayt_comparison_df,
+        suggestions_cols_to_compare=["suggestions_model_a", "suggestions_model_b"],
+        correct_code_col="correct_code",
+        k_values=[1],
+        ave_time_per_query_list=[10.0, 20.0],
+    )
+
+    assert result["ave_time_per_query_ms"].tolist() == pytest.approx([10.0, 20.0]), (
+        "Expected ave_time_per_query_ms to be taken from ave_time_per_query_list "
+        "in column order."
+    )
+
+
+def test_build_sayt_metrics_comparison_table_computes_metrics_per_column(
+    sayt_comparison_df,
+):
+    """Each row should reflect the metrics for the corresponding suggestions column."""
+    result = build_sayt_metrics_comparison_table(
+        sayt_comparison_df,
+        suggestions_cols_to_compare=["suggestions_model_a", "suggestions_model_b"],
+        correct_code_col="correct_code",
+        k_values=[1],
+        ave_time_per_query_list=[10.0, 20.0],
+    )
+
+    assert result.loc[result["model"] == "model_a", "mrr"].iloc[0] == pytest.approx(
+        0.5
+    ), "Expected MRR of 0.5 for model_a where only the first row matches."
+    assert result.loc[result["model"] == "model_b", "mrr"].iloc[0] == pytest.approx(
+        0.0
+    ), "Expected MRR of 0.0 for model_b where no row matches."
+
+
+def test_build_sayt_metrics_comparison_table_single_column(sayt_comparison_df):
+    """The function should work correctly when only one suggestions column is provided."""
+    result = build_sayt_metrics_comparison_table(
+        sayt_comparison_df,
+        suggestions_cols_to_compare=["suggestions_model_a"],
+        correct_code_col="correct_code",
+        k_values=[1],
+        ave_time_per_query_list=[15.0],
+    )
+
+    assert (
+        len(result) == 1
+    ), "Expected exactly one row when a single suggestions column is provided."
+    assert (
+        result["model"].iloc[0] == "model_a"
+    ), "Expected the model name to be 'model_a' for the single column."
+
+
+def test_build_sayt_metrics_comparison_table_does_not_mutate_input(sayt_comparison_df):
+    """The function should not modify the input DataFrame."""
+    original_df = sayt_comparison_df.copy(deep=True)
+
+    build_sayt_metrics_comparison_table(
+        sayt_comparison_df,
+        suggestions_cols_to_compare=["suggestions_model_a", "suggestions_model_b"],
+        correct_code_col="correct_code",
+        k_values=[1],
+        ave_time_per_query_list=[10.0, 20.0],
+    )
+
+    assert sayt_comparison_df.equals(
+        original_df
+    ), "Expected build_sayt_metrics_comparison_table to leave the input DataFrame unchanged."
+
+
+# ============================================================================
+# Test SAYTPerformanceMetrics class
+# ============================================================================
+
+
+def test_sayt_performance_metrics_instantiation_with_valid_data():
+    """SAYTPerformanceMetrics should accept valid field values."""
+    metrics = SAYTPerformanceMetrics(
+        total_queries=100,
+        ave_time_per_query_ms=15.5,
+        unmatched_query_count=5,
+        mrr=0.85,
+        mean_rank=2.3,
+        precision_at_k={1: 0.9, 3: 0.8, 5: 0.7},
+        recall_at_k={1: 0.7, 3: 0.85, 5: 0.9},
+    )
+
+    assert (
+        metrics.total_queries == 100
+    ), "Expected total_queries to be stored as provided."
+    assert metrics.ave_time_per_query_ms == pytest.approx(
+        15.5
+    ), "Expected ave_time_per_query_ms to be stored as provided."
+    assert (
+        metrics.unmatched_query_count == 5
+    ), "Expected unmatched_query_count to be stored as provided."
+    assert metrics.mrr == pytest.approx(0.85), "Expected mrr to be stored as provided."
+    assert metrics.mean_rank == pytest.approx(
+        2.3
+    ), "Expected mean_rank to be stored as provided."
+    assert metrics.precision_at_k == {
+        1: 0.9,
+        3: 0.8,
+        5: 0.7,
+    }, "Expected precision_at_k to be stored as provided."
+    assert metrics.recall_at_k == {
+        1: 0.7,
+        3: 0.85,
+        5: 0.9,
+    }, "Expected recall_at_k to be stored as provided."
+
+
+def test_sayt_performance_metrics_instantiation_with_empty_k_dicts():
+    """SAYTPerformanceMetrics should accept empty precision_at_k and recall_at_k."""
+    metrics = SAYTPerformanceMetrics(
+        total_queries=50,
+        ave_time_per_query_ms=10.0,
+        unmatched_query_count=0,
+        mrr=1.0,
+        mean_rank=1.0,
+        precision_at_k={},
+        recall_at_k={},
+    )
+
+    assert (
+        metrics.precision_at_k == {}
+    ), "Expected precision_at_k to accept an empty dict."
+    assert metrics.recall_at_k == {}, "Expected recall_at_k to accept an empty dict."
+
+
+def test_sayt_performance_metrics_instantiation_with_zero_values():
+    """SAYTPerformanceMetrics should accept zero values for numeric fields."""
+    metrics = SAYTPerformanceMetrics(
+        total_queries=0,
+        ave_time_per_query_ms=0.0,
+        unmatched_query_count=0,
+        mrr=0.0,
+        mean_rank=0.0,
+        precision_at_k={1: 0.0},
+        recall_at_k={1: 0.0},
+    )
+
+    assert metrics.total_queries == 0, "Expected zero total_queries to be accepted."
+    assert metrics.ave_time_per_query_ms == pytest.approx(
+        0.0
+    ), "Expected zero ave_time_per_query_ms to be accepted."
+
+
+def test_sayt_performance_metrics_report_metrics_includes_all_fields():
+    """report_metrics should include all performance metrics in the output."""
+    metrics = SAYTPerformanceMetrics(
+        total_queries=100,
+        ave_time_per_query_ms=15.5,
+        unmatched_query_count=5,
+        mrr=0.85,
+        mean_rank=2.3,
+        precision_at_k={1: 0.9, 3: 0.8},
+        recall_at_k={1: 0.7, 3: 0.85},
+    )
+    report = metrics.report_metrics()
+
+    assert "100" in report, "Expected total_queries value in report."
+    assert "15.50" in report, "Expected ave_time_per_query_ms value in report."
+    assert "5" in report, "Expected unmatched_query_count in report."
+    assert "0.8500" in report, "Expected mrr value in report."
+    assert "2.30" in report, "Expected mean_rank value in report."
+    assert "Precision@1" in report, "Expected Precision@1 in report."
+    assert "Precision@3" in report, "Expected Precision@3 in report."
+    assert "Recall@1" in report, "Expected Recall@1 in report."
+    assert "Recall@3" in report, "Expected Recall@3 in report."
+
+
+def test_sayt_performance_metrics_report_metrics_returns_string():
+    """report_metrics should return a string."""
+    metrics = SAYTPerformanceMetrics(
+        total_queries=50,
+        ave_time_per_query_ms=10.0,
+        unmatched_query_count=0,
+        mrr=0.5,
+        mean_rank=2.0,
+        precision_at_k={1: 0.8},
+        recall_at_k={1: 0.6},
+    )
+    report = metrics.report_metrics()
+
+    assert isinstance(report, str), "Expected report_metrics to return a string."
+
+
+def test_sayt_performance_metrics_report_metrics_starts_with_header():
+    """report_metrics should begin with a header line."""
+    metrics = SAYTPerformanceMetrics(
+        total_queries=10,
+        ave_time_per_query_ms=5.0,
+        unmatched_query_count=1,
+        mrr=0.9,
+        mean_rank=1.5,
+        precision_at_k={},
+        recall_at_k={},
+    )
+    report = metrics.report_metrics()
+
+    assert report.startswith(
+        "\nSAYT Performance Metrics:"
+    ), "Expected report to start with header."
+
+
+def test_sayt_performance_metrics_report_metrics_contains_formatted_numbers():
+    """report_metrics should format numbers with appropriate precision."""
+    metrics = SAYTPerformanceMetrics(
+        total_queries=100,
+        ave_time_per_query_ms=12.3456,
+        unmatched_query_count=8,
+        mrr=0.123456,
+        mean_rank=3.6789,
+        precision_at_k={1: 0.789123},
+        recall_at_k={1: 0.456789},
+    )
+    report = metrics.report_metrics()
+
+    assert (
+        "12.35" in report
+    ), "Expected ave_time_per_query_ms formatted to 2 decimal places."
+    assert "0.1235" in report, "Expected mrr formatted to 4 decimal places."
+    assert "3.68" in report, "Expected mean_rank formatted to 2 decimal places."
+    assert (
+        "0.7891" in report
+    ), "Expected Precision@k values formatted to 4 decimal places."
+    assert "0.4568" in report, "Expected Recall@k values formatted to 4 decimal places."
+
+
+def test_sayt_performance_metrics_report_metrics_with_multiple_k_values():
+    """report_metrics should report all k values in precision_at_k and recall_at_k."""
+    metrics = SAYTPerformanceMetrics(
+        total_queries=100,
+        ave_time_per_query_ms=10.0,
+        unmatched_query_count=0,
+        mrr=0.8,
+        mean_rank=2.0,
+        precision_at_k={1: 0.9, 3: 0.7, 5: 0.6, 10: 0.4},
+        recall_at_k={1: 0.5, 3: 0.7, 5: 0.8, 10: 0.9},
+    )
+    report = metrics.report_metrics()
+
+    assert (
+        "Precision@1" in report and "0.9000" in report
+    ), "Expected Precision@1 with value in report."
+    assert (
+        "Precision@3" in report and "0.7000" in report
+    ), "Expected Precision@3 with value in report."
+    assert (
+        "Precision@5" in report and "0.6000" in report
+    ), "Expected Precision@5 with value in report."
+    assert (
+        "Precision@10" in report and "0.4000" in report
+    ), "Expected Precision@10 with value in report."
+    assert (
+        "Recall@1" in report and "0.5000" in report
+    ), "Expected Recall@1 with value in report."
+    assert (
+        "Recall@10" in report and "0.9000" in report
+    ), "Expected Recall@10 with value in report."
+
+
+def test_sayt_performance_metrics_report_metrics_with_empty_k_dicts():
+    """report_metrics should handle empty precision_at_k and recall_at_k gracefully."""
+    metrics = SAYTPerformanceMetrics(
+        total_queries=50,
+        ave_time_per_query_ms=8.0,
+        unmatched_query_count=2,
+        mrr=0.6,
+        mean_rank=3.0,
+        precision_at_k={},
+        recall_at_k={},
+    )
+    report = metrics.report_metrics()
+
+    assert isinstance(
+        report, str
+    ), "Expected report_metrics to return a string even with empty k dicts."
+    assert (
+        "SAYT Performance Metrics:" in report
+    ), "Expected header even with empty k dicts."
+    assert (
+        "Total queries: 50" in report
+    ), "Expected basic metrics even with empty k dicts."
+
+
+def test_sayt_performance_metrics_validates_field_types():
+    """SAYTPerformanceMetrics should validate field types via Pydantic."""
+    with pytest.raises(ValidationError):
+        SAYTPerformanceMetrics(
+            total_queries="not_an_int",
+            ave_time_per_query_ms=10.0,
+            unmatched_query_count=0,
+            mrr=0.8,
+            mean_rank=2.0,
+            precision_at_k={},
+            recall_at_k={},
+        )
+
+
+def test_sayt_performance_metrics_validates_required_fields():
+    """SAYTPerformanceMetrics should require all fields."""
+    with pytest.raises(ValidationError):
+        SAYTPerformanceMetrics(
+            total_queries=100,
+            ave_time_per_query_ms=10.0,
+            unmatched_query_count=0,
+            mrr=0.8,
+            # missing mean_rank
+            precision_at_k={},
+            recall_at_k={},
+        )
+
+
+def test_sayt_performance_metrics_report_metrics_sorts_k_values():
+    """report_metrics should print k values in sorted order."""
+    metrics = SAYTPerformanceMetrics(
+        total_queries=100,
+        ave_time_per_query_ms=10.0,
+        unmatched_query_count=0,
+        mrr=0.8,
+        mean_rank=2.0,
+        precision_at_k={5: 0.6, 1: 0.9, 3: 0.7},
+        recall_at_k={5: 0.8, 1: 0.5, 3: 0.7},
+    )
+    report = metrics.report_metrics()
+    lines = report.split("\n")
+
+    # Find indices of k values in the report
+    precision_lines = [
+        i for i, line in enumerate(lines) if line.startswith(" Precision@")
+    ]
+    recall_lines = [i for i, line in enumerate(lines) if line.startswith(" Recall@")]
+
+    assert precision_lines == sorted(
+        precision_lines
+    ), "Expected precision lines to appear in sorted order by k value."
+    assert recall_lines == sorted(
+        recall_lines
+    ), "Expected recall lines to appear in sorted order by k value."
+    # Verify the order is 1, 3, 5
+    assert (
+        "Precision@1" in lines[precision_lines[0]]
+    ), "Expected Precision@1 to appear first."
+    assert (
+        "Precision@3" in lines[precision_lines[1]]
+    ), "Expected Precision@3 to appear second."
+    assert (
+        "Precision@5" in lines[precision_lines[2]]
+    ), "Expected Precision@5 to appear third."

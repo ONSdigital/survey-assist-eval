@@ -131,7 +131,9 @@ def compute_reciprocal_rank(retrieved_codes: list[str], correct_code: str) -> fl
     return 0.0
 
 
-def get_rank_of_correct_code(retrieved_codes: list[str], correct_code: str) -> float:
+def get_rank_of_correct_code(
+    retrieved_codes: list[str], correct_code: str
+) -> float | None:
     """Get the rank of the correct code in the retrieved list for a single query.
 
     Args:
@@ -139,12 +141,12 @@ def get_rank_of_correct_code(retrieved_codes: list[str], correct_code: str) -> f
         correct_code: The correct code for the query.
 
     Returns:
-        float: Rank of the correct code, or 0.0 if not found.
+        float: Rank of the correct code, or None if not found.
     """
     for rank, item in enumerate(retrieved_codes, start=1):
         if item == correct_code:
             return float(rank)
-    return 0.0
+    return None
 
 
 def add_sayt_metrics_columns(
@@ -178,13 +180,13 @@ def add_sayt_metrics_columns(
             ),
             axis=1,
         )
-    df["mrr"] = df.apply(
+    df["reciprocal_rank"] = df.apply(
         lambda row: compute_reciprocal_rank(
             row[retrieved_codes_col], row[correct_code_col]
         ),
         axis=1,
     )
-    df["mean_rank"] = df.apply(
+    df["correct_code_rank"] = df.apply(
         lambda row: get_rank_of_correct_code(
             row[retrieved_codes_col], row[correct_code_col]
         ),
@@ -209,9 +211,9 @@ def summarise_performance_metrics(
     summary = {
         "total_queries": len(df),
         "ave_time_per_query_ms": ave_time_per_query,
-        "unmatched_query_count": (df["mean_rank"] == 0).sum(),
-        "mrr": df["mrr"].mean(),
-        "mean_rank": df["mean_rank"].mean(),
+        "unmatched_query_count": df["correct_code_rank"].isna().sum(),
+        "mrr": df["reciprocal_rank"].mean(),
+        "mean_rank": df["correct_code_rank"].mean(),
         "precision_at_k": {k: df[f"precision_at_{k}"].mean() for k in k_values},
         "recall_at_k": {k: df[f"recall_at_{k}"].mean() for k in k_values},
     }
