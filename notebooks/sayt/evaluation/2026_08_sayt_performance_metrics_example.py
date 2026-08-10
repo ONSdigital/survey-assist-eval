@@ -10,15 +10,15 @@ import pandas as pd
 from dotenv import load_dotenv
 from survey_assist_utils.logging import get_logger
 
-from notebooks.sayt.evaluation.performance_metrics_functions import (
-    build_sayt_metrics_comparison_table,
-    compute_performance_metrics_from_suggestions,
-)
 from notebooks.sayt.sayt_utils import (
     build_lookup_suggester,
     get_suggestions_for_row,
     timed_apply,
     validate_one_code,
+)
+from survey_assist_eval.evaluation.sayt.performance_metrics_functions import (
+    build_sayt_metrics_comparison_table,
+    compute_performance_metrics_from_suggestions,
 )
 
 # %%

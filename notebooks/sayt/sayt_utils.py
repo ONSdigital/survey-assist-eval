@@ -67,7 +67,7 @@ def validate_one_code(code: str, code_length=5) -> bool:
 
 
 def get_suggestions_for_row(
-    row: dict[str, Any],
+    row: pd.Series,
     suggester: Any,
     num_chars: int,
     max_suggestions: int,
@@ -85,12 +85,12 @@ def get_suggestions_for_row(
     """
     return suggester.suggest(
         row["full_entry"][:num_chars],
-        num_suggestions=max_suggestions,
+        max_suggestions=max_suggestions,
     )
 
 
 def rank_of_correct_code_in_suggestions(
-    row: dict[str, Any],
+    row: pd.Series,
     num_chars: int,
     suggester_label: str,
     code_length: int = 5,
@@ -125,7 +125,7 @@ def get_suggestions_by_chars(
     df: pd.DataFrame,
     suggesters_dict: dict[str, Any],
     characters: list | None = None,
-    suggestions_limit: int | None = 9,
+    suggestions_limit: int = 9,
 ) -> tuple[pd.DataFrame, dict]:
     """Gathers suggestions for specified number of characters using suggesters.
 
@@ -174,8 +174,8 @@ def get_suggestions_by_chars(
 
 def melt_results_for_analysis(
     df: pd.DataFrame,
-    suggestions_limit: int | None = 9,
-    correct_code_column: str | None = "correct_sic_code",
+    suggestions_limit: int = 9,
+    correct_code_column: str = "correct_sic_code",
 ) -> pd.DataFrame:
     """Melt results by suggester and num_chars for easier analysis.
 
@@ -216,7 +216,7 @@ def melt_results_for_analysis(
 def create_figure(
     df: pd.DataFrame,
     output_dir: str,
-    suggestions_limit: int | None = 9,
+    suggestions_limit: int = 9,
 ):
     """Compare rank histograms for suggesters at different num_chars.
 
