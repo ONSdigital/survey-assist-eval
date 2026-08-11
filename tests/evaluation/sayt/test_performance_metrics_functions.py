@@ -1,6 +1,7 @@
 """Tests for SAYT performance metric helper functions."""
 
-# pylint: disable=redefined-outer-name
+# pylint: disable=redefined-outer-name, too-many-lines
+
 
 import math
 
@@ -12,6 +13,7 @@ from survey_assist_eval.evaluation.sayt.performance_metrics_functions import (
     SAYTPerformanceMetrics,
     add_sayt_metrics_columns,
     build_sayt_metrics_comparison_table,
+    compute_performance_metrics_from_suggestions,
     compute_precision_at_k,
     compute_recall_at_k,
     compute_reciprocal_rank,
@@ -962,3 +964,208 @@ def test_sayt_performance_metrics_report_metrics_sorts_k_values():
     assert (
         "Precision@5" in lines[precision_lines[2]]
     ), "Expected Precision@5 to appear third."
+
+
+# ============================================================================
+# Test compute_performance_metrics_from_suggestions function
+# ============================================================================
+
+
+@pytest.fixture
+def suggestions_df():
+    """DataFrame with raw suggestion strings for compute_performance_metrics tests.
+
+    Codes are the last 4 characters of each suggestion string.
+    Row 0: correct code '1111' appears first in suggestions -> rank 1.
+    Row 1: correct code '2222' appears second -> rank 2.
+    Row 2: correct code '3333' absent from suggestions -> unmatched.
+    """
+    return pd.DataFrame(
+        {
+            "correct_code": ["1111", "2222", "3333"],
+            "suggestions": [
+                ["alpha 1111", "beta 4444"],
+                ["alpha 4444", "beta 2222"],
+                ["alpha 4444", "beta 5555"],
+            ],
+        }
+    )
+
+
+def test_compute_performance_metrics_from_suggestions_returns_sayt_performance_metrics_instance(
+    suggestions_df,
+):
+    """The function should return a SAYTPerformanceMetrics instance."""
+    result = compute_performance_metrics_from_suggestions(
+        suggestions_df,
+        correct_code_col="correct_code",
+        suggestions_col="suggestions",
+        code_length=4,
+        k_values=[1],
+        ave_time_per_query=10.0,
+    )
+
+    assert isinstance(result, SAYTPerformanceMetrics), (
+        "Expected compute_performance_metrics_from_suggestions to return a "
+        "SAYTPerformanceMetrics instance."
+    )
+
+
+def test_compute_performance_metrics_from_suggestions_does_not_mutate_input(
+    suggestions_df,
+):
+    """The function should leave the input DataFrame unchanged."""
+    original_df = suggestions_df.copy(deep=True)
+
+    compute_performance_metrics_from_suggestions(
+        suggestions_df,
+        correct_code_col="correct_code",
+        suggestions_col="suggestions",
+        code_length=4,
+        k_values=[1],
+        ave_time_per_query=5.0,
+    )
+
+    assert suggestions_df.equals(original_df), (
+        "Expected compute_performance_metrics_from_suggestions to leave the input "
+        "DataFrame unchanged."
+    )
+
+
+def test_compute_performance_metrics_from_suggestions_extracts_codes_by_code_length(
+    suggestions_df,
+):
+    """code_length controls how many trailing characters are used as the code."""
+    result = compute_performance_metrics_from_suggestions(
+        suggestions_df,
+        correct_code_col="correct_code",
+        suggestions_col="suggestions",
+        code_length=4,
+        k_values=[1],
+        ave_time_per_query=0.0,
+    )
+
+    # Row 0: '1111' found at rank 1, row 1: '2222' found at rank 2, row 2: unmatched
+    assert (
+        result.unmatched_query_count == 1
+    ), "Expected one unmatched query when code_length correctly extracts 4-char codes."
+    assert result.mrr == pytest.approx(
+        (1.0 + 0.5 + 0.0) / 3
+    ), "Expected MRR computed from correctly extracted codes."
+
+
+def test_compute_performance_metrics_from_suggestions_total_queries_equals_row_count(
+    suggestions_df,
+):
+    """total_queries in the result should equal the number of rows in the input."""
+    result = compute_performance_metrics_from_suggestions(
+        suggestions_df,
+        correct_code_col="correct_code",
+        suggestions_col="suggestions",
+        code_length=4,
+        k_values=[1],
+        ave_time_per_query=0.0,
+    )
+
+    assert result.total_queries == len(
+        suggestions_df
+    ), "Expected total_queries to equal the number of rows in the input DataFrame."
+
+
+def test_compute_performance_metrics_from_suggestions_stores_ave_time_per_query(
+    suggestions_df,
+):
+    """ave_time_per_query_ms should be stored from the argument without modification."""
+    result = compute_performance_metrics_from_suggestions(
+        suggestions_df,
+        correct_code_col="correct_code",
+        suggestions_col="suggestions",
+        code_length=4,
+        k_values=[1],
+        ave_time_per_query=99.9,
+    )
+
+    assert result.ave_time_per_query_ms == pytest.approx(
+        99.9
+    ), "Expected ave_time_per_query_ms to equal the supplied argument."
+
+
+def test_compute_performance_metrics_from_suggestions_all_unmatched():
+    """All queries unmatched should yield MRR of 0.0 and unmatched_query_count equal to total."""
+    df = pd.DataFrame(
+        {
+            "correct_code": ["9999", "8888"],
+            "suggestions": [
+                ["label 1111", "label 2222"],
+                ["label 3333", "label 4444"],
+            ],
+        }
+    )
+
+    result = compute_performance_metrics_from_suggestions(
+        df,
+        correct_code_col="correct_code",
+        suggestions_col="suggestions",
+        code_length=4,
+        k_values=[1],
+        ave_time_per_query=0.0,
+    )
+
+    assert (
+        result.unmatched_query_count == 2
+    ), "Expected unmatched_query_count to equal total_queries when no suggestion matches."
+    assert result.mrr == pytest.approx(
+        0.0
+    ), "Expected MRR of 0.0 when no suggestions contain the correct code."
+
+
+def test_compute_performance_metrics_from_suggestions_all_matched_at_rank_1():
+    """All queries matched at rank 1 should yield MRR of 1.0."""
+    df = pd.DataFrame(
+        {
+            "correct_code": ["1111", "2222"],
+            "suggestions": [
+                ["label 1111", "label 9999"],
+                ["label 2222", "label 9999"],
+            ],
+        }
+    )
+
+    result = compute_performance_metrics_from_suggestions(
+        df,
+        correct_code_col="correct_code",
+        suggestions_col="suggestions",
+        code_length=4,
+        k_values=[1],
+        ave_time_per_query=0.0,
+    )
+
+    assert (
+        result.unmatched_query_count == 0
+    ), "Expected no unmatched queries when all correct codes appear first."
+    assert result.mrr == pytest.approx(
+        1.0
+    ), "Expected MRR of 1.0 when all correct codes appear at rank 1."
+
+
+def test_compute_performance_metrics_from_suggestions_computes_precision_and_recall_at_k(
+    suggestions_df,
+):
+    """precision_at_k and recall_at_k dicts should contain the requested k values."""
+    result = compute_performance_metrics_from_suggestions(
+        suggestions_df,
+        correct_code_col="correct_code",
+        suggestions_col="suggestions",
+        code_length=4,
+        k_values=[1, 2],
+        ave_time_per_query=0.0,
+    )
+
+    assert set(result.precision_at_k.keys()) == {
+        1,
+        2,
+    }, "Expected precision_at_k to contain keys for each requested k value."
+    assert set(result.recall_at_k.keys()) == {
+        1,
+        2,
+    }, "Expected recall_at_k to contain keys for each requested k value."
