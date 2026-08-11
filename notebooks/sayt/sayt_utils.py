@@ -261,6 +261,8 @@ def create_figure(
 
     fig.write_html(f"{output_dir}/sayt_eval_100sample_rank_histograms.html")
 
+    return fig
+
 
 def get_codes_from_suggestions(
     row: pd.Series,

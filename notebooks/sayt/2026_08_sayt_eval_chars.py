@@ -1,5 +1,5 @@
 # %%
-"""Run small tests for industry/organisation descriptions SAYT.
+"""Run small tests for industry descriptions SAYT.
 
 Expects following environment variables to be set:
 - EVALUATION_BUCKET_NAME: name of GCS bucket where the data is stored
@@ -87,7 +87,7 @@ sayt_corpus = list(
 # create suggesters using only one of the retrievers:
 # PrefixRetrieverSpec, NgramRetrieverSpec, or SemanticRetrieverSpec.
 
-suggesters = {
+suggesters_simple = {
     "Blaise proxy method (prefix only)": build_lookup_suggester(
         sayt_corpus, retrievers=[PrefixRetrieverSpec()]
     ),
@@ -96,6 +96,33 @@ suggesters = {
     ),
     "Semantic retriever only": build_lookup_suggester(
         sayt_corpus, retrievers=[SemanticRetrieverSpec()]
+    ),
+}
+
+# %%
+# Test for interactions between suggesters
+
+suggesters_pairs = {
+    "Blaise proxy method (prefix and ngram)": build_lookup_suggester(
+        sayt_corpus, retrievers=[PrefixRetrieverSpec(), NgramRetrieverSpec()]
+    ),
+    "Hybrid approach (prefix and semantic)": build_lookup_suggester(
+        sayt_corpus, retrievers=[PrefixRetrieverSpec(), SemanticRetrieverSpec()]
+    ),
+    "Hybrid approach (ngram and semantic)": build_lookup_suggester(
+        sayt_corpus, retrievers=[NgramRetrieverSpec(), SemanticRetrieverSpec()]
+    ),
+}
+
+# %%
+suggesters_three = {
+    "Hybrid approach (ngram, prefix and semantic)": build_lookup_suggester(
+        sayt_corpus,
+        retrievers=[
+            NgramRetrieverSpec(),
+            PrefixRetrieverSpec(),
+            SemanticRetrieverSpec(),
+        ],
     ),
 }
 
@@ -121,19 +148,20 @@ def run_eval_for_suggesters(
             and number of characters.
 
     """
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    df_copy = df.copy()
+
     suggestions_df = get_suggestions_by_chars(
-        df, suggesters_dict=suggesters_dict, characters=characters
+        df_copy, suggesters_dict=suggesters_dict, characters=characters
     )[0]
 
     melt = melt_results_for_analysis(df=suggestions_df)
 
-    create_figure(melt, output_dir=output_dir)
+    fig = create_figure(melt, output_dir=output_dir)
 
-    return melt
-
-
-# %%
-melt_df = run_eval_for_suggesters(test_df, suggesters, (x for x in range(1, 10)))
+    return melt, fig
 
 
 # %%
@@ -178,10 +206,42 @@ def suggester_analysis_table(
 
 
 # %%
-m = melt_df.copy()
+melt_df_simple, fig_simple = run_eval_for_suggesters(
+    test_df, suggesters_simple, (x for x in range(4, 10)), output_dir=OUTPUT_DIR
+)
 
 # %%
-suggester_analysis_table(melt_df)
+suggester_analysis_table(melt_df_simple)
 
 # %%
-suggester_analysis_table(melt_df, characters=6)
+suggester_analysis_table(melt_df_simple, characters=6)
+
+# %%
+melt_df_pairs, fig_pairs = run_eval_for_suggesters(
+    test_df,
+    suggesters_pairs,
+    (x for x in range(4, 10)),
+    output_dir=f"{OUTPUT_DIR}_pairs",
+)
+
+# %%
+suggester_analysis_table(melt_df_pairs)
+
+# %%
+suggester_analysis_table(melt_df_pairs, characters=6)
+
+# %%
+melt_df_three, fig_three = run_eval_for_suggesters(
+    test_df,
+    suggesters_three,
+    (x for x in range(4, 10)),
+    output_dir=f"{OUTPUT_DIR}_three",
+)
+
+# %%
+suggesters_all = suggesters_simple | suggesters_pairs | suggesters_three
+
+# %%
+melt_df_all, fig_all = run_eval_for_suggesters(
+    test_df, suggesters_all, (x for x in range(4, 10)), output_dir=f"{OUTPUT_DIR}_all"
+)
