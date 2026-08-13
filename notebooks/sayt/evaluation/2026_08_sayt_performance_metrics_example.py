@@ -10,15 +10,14 @@ import pandas as pd
 from dotenv import load_dotenv
 from survey_assist_utils.logging import get_logger
 
-from notebooks.sayt.evaluation.performance_metrics_functions import (
-    build_sayt_metrics_comparison_table,
-    compute_performance_metrics_from_suggestions,
-)
 from notebooks.sayt.sayt_utils import (
     build_lookup_suggester,
-    get_suggestions_for_row,
-    timed_apply,
+    get_suggestions_by_chars,
     validate_one_code,
+)
+from survey_assist_eval.evaluation.sayt.performance_metrics_functions import (
+    build_sayt_metrics_comparison_table,
+    compute_performance_metrics_from_suggestions,
 )
 
 # %%
@@ -68,7 +67,6 @@ print(
     f"Clerical codes validated: {
         test_df[correct_code_col]
         .apply(validate_one_code,
-               logger=logger,
                code_length=SIC_CODE_LENGTH)
                .all()
                }"
@@ -119,51 +117,40 @@ suggesters = {
 
 
 # %%
-ave_elapsed_per_row_list = []
-suggestions_cols_to_compare = []
-for prefix_chars in [4, 5, 7, 10]:  # 150]:
-    for suggester_name, suggester_obj in suggesters.items():
-        logger.info(
-            "Starting SAYT suggesting - one loop",
-            num_chars=prefix_chars,
-            suggester_label=suggester_name,
-        )
 
-        test_df[f"suggestions_{prefix_chars}chars_{suggester_name}"], avg_ms = (
-            timed_apply(
-                test_df,
-                get_suggestions_for_row,
-                suggester=suggester_obj,
-                max_suggestions=MAX_SUGGESTIONS,
-                num_chars=prefix_chars,
-                axis=1,
-            )
-        )
-        logger.info(
-            "  -> suggestions done",
-            ave_elapsed_per_row_ms=avg_ms,
-        )
-        ave_elapsed_per_row_list.append(avg_ms)
+test_df, avg_ms_dict = get_suggestions_by_chars(
+    df=test_df,
+    suggesters_dict=suggesters,
+    characters=[4, 5, 7, 10],
+    suggestions_limit=MAX_SUGGESTIONS,
+)
 
-        suggestions_cols_to_compare.append(
-            f"suggestions_{prefix_chars}chars_{suggester_name}"
-        )
+suggestions_cols_to_compare = test_df.columns[
+    test_df.columns.str.startswith("suggestions_")
+].tolist()
 
 # %%
 # Performance metrics for one suggester and prefix length
 metrics = compute_performance_metrics_from_suggestions(
     test_df,
     correct_code_col=correct_code_col,
-    suggestions_col=suggestions_cols_to_compare[0],
+    suggestions_col=suggestions_cols_to_compare[2],
     code_length=SIC_CODE_LENGTH,
     k_values=[1, 3, 5, MAX_SUGGESTIONS],
-    ave_time_per_query=ave_elapsed_per_row_list[0],
+    ave_time_per_query=avg_ms_dict.get(
+        suggestions_cols_to_compare[2].removeprefix("suggestions_"), 0
+    ),
 )
 
 print(metrics.report_metrics())
 
 # %%
 # Comparison of performance metrics for the different suggesters and prefix lengths
+ave_elapsed_per_row_list = [
+    avg_ms_dict.get(col.removeprefix("suggestions_"), 0)
+    for col in suggestions_cols_to_compare
+]
+
 compare_performance_metrics = build_sayt_metrics_comparison_table(
     test_df,
     suggestions_cols_to_compare=suggestions_cols_to_compare,
