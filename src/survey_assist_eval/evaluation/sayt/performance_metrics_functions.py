@@ -9,6 +9,7 @@ from notebooks.sayt.sayt_utils import get_codes_from_suggestions
 class SAYTPerformanceMetrics(BaseModel):
     """Class to compute performance metrics for SAYT evaluation."""
 
+    code_length: int
     suggestions_col: str
     total_queries: int
     ave_time_per_query_ms: float
@@ -22,6 +23,7 @@ class SAYTPerformanceMetrics(BaseModel):
         """Pretty print the performance metrics."""
         lines = [
             f"\nSAYT Performance Metrics for column {self.suggestions_col}:",
+            f" Code length: {self.code_length}",
             f" Total queries: {self.total_queries}",
             f" Average time per query: {self.ave_time_per_query_ms:.2f} ms",
             f" Unmatched query count: {self.unmatched_query_count}",
@@ -42,6 +44,7 @@ def compute_performance_metrics_from_suggestions(  # noqa: PLR0913 pylint: disab
     code_length: int,
     k_values: list[int],
     ave_time_per_query: float,
+    code_digit_match_length: int | None = None,
 ) -> SAYTPerformanceMetrics:
     """Compute performance metrics from raw suggestion strings.
 
@@ -52,6 +55,7 @@ def compute_performance_metrics_from_suggestions(  # noqa: PLR0913 pylint: disab
         code_length: Number of trailing characters to extract as a code.
         k_values: List of k values for which to compute Precision@K and Recall@K.
         ave_time_per_query: Average time taken per query in milliseconds.
+        code_digit_match_length: Optional length of the code to match for evaluation.
 
     Returns:
         SAYTPerformanceMetrics: Computed performance metrics.
@@ -63,6 +67,13 @@ def compute_performance_metrics_from_suggestions(  # noqa: PLR0913 pylint: disab
         code_length=code_length,
         axis=1,
     )
+
+    if code_digit_match_length is not None:
+        df[correct_code_col] = df[correct_code_col].str[:code_digit_match_length]
+        df["_retrieved_codes"] = df["_retrieved_codes"].apply(
+            lambda codes: [code[:code_digit_match_length] for code in codes],
+        )
+
     df = add_sayt_metrics_columns(
         df,
         retrieved_codes_col="_retrieved_codes",
@@ -202,6 +213,38 @@ def add_sayt_metrics_columns(
     return df
 
 
+def compute_accuracy_at_k(df, correct_code_rank_col: str, k: int) -> float:
+    """Compute Accuracy@K for the entire DataFrame.
+
+    Args:
+        df: DataFrame containing one row per query and a rank column.
+        correct_code_rank_col: Name of the column with the rank (1-based)
+            of the correct code; NaN/None if not found.
+        k: Cutoff rank at which to compute accuracy.
+
+    Returns:
+        float: Accuracy@K for the DataFrame.
+    """
+    return df[correct_code_rank_col].le(k).fillna(False).mean()
+
+
+def compute_precision_at_k_from_rank(df, correct_code_rank_col: str, k: int) -> float:
+    """Compute Precision@K for the entire DataFrame using rank of correct code.
+
+    Args:
+        df: DataFrame containing one row per query and a rank column.
+        correct_code_rank_col: Column name containing the rank of the correct code.
+        k: The cutoff rank at which to compute precision.
+
+    Returns:
+        float: Precision@K for the DataFrame.
+    """
+    if k <= 0:
+        raise ValueError("k must be a positive integer.")
+
+    return df[correct_code_rank_col].le(k).fillna(False).mean() / k
+
+
 def summarise_performance_metrics(
     df,
     suggestions_col: str,
@@ -225,6 +268,7 @@ def summarise_performance_metrics(
         prefix = ""
 
     summary = {
+        "code_length": len(df[suggestions_col].iloc[0]),
         "suggestions_col": suggestions_col,
         "total_queries": len(df),
         "ave_time_per_query_ms": ave_time_per_query,

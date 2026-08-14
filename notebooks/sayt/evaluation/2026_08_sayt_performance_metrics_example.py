@@ -8,6 +8,7 @@ import os
 
 import pandas as pd
 from dotenv import load_dotenv
+from survey_assist_embed_core.sayt import PrefixRetrieverSpec
 from survey_assist_utils.logging import get_logger
 
 from notebooks.sayt.sayt_utils import (
@@ -50,16 +51,6 @@ rename_columns = {
 
 test_df = test_df.rename(columns=rename_columns)
 test_df = test_df[rename_columns.values()]
-
-# clean the rank values reported by the SAYT team
-for col in [
-    "rank_5chars_Blaise (as reported from SAYT team)",
-    "_rank_5chars_sa_shared",
-]:
-    test_df[col] = pd.to_numeric(
-        test_df[col].replace({"5 or 12": "5"}), errors="coerce"
-    )
-
 
 # %%
 # check the codes are well formed
@@ -104,14 +95,17 @@ sayt2_corpus = list(
 # %%
 # define bunch of different suggesters to evaluate
 suggesters = {
-    "Blaise proxy method (prefix + n_grams)": build_lookup_suggester(
-        sayt_corpus, semantic_weight=None
-    ),
-    "Hybrid method including semantic retriever": build_lookup_suggester(
-        sayt_corpus, semantic_weight=1.0
-    ),
-    "Hybrid method with extended knowledge base": build_lookup_suggester(
-        sayt2_corpus, semantic_weight=1.0
+    # "Blaise proxy method (prefix + n_grams)": build_lookup_suggester(
+    #     sayt_corpus, semantic_weight=None
+    # ),
+    # "Hybrid method including semantic retriever": build_lookup_suggester(
+    #     sayt_corpus, semantic_weight=1.0
+    # ),
+    # "Hybrid method with extended knowledge base": build_lookup_suggester(
+    #     sayt2_corpus, semantic_weight=1.0
+    # ),
+    "Prefix only": build_lookup_suggester(
+        sayt_corpus, retrievers=[PrefixRetrieverSpec()], semantic_weight=None
     ),
 }
 
@@ -123,6 +117,8 @@ test_df, avg_ms_dict = get_suggestions_by_chars(
     suggesters_dict=suggesters,
     characters=[4, 5, 7, 10],
     suggestions_limit=MAX_SUGGESTIONS,
+    hard_suggestions_limit=False,
+    with_scores=True,
 )
 
 suggestions_cols_to_compare = test_df.columns[
@@ -145,6 +141,22 @@ metrics = compute_performance_metrics_from_suggestions(
 print(metrics.report_metrics())
 
 # %%
+# Performance metrics for one suggester and prefix length
+metrics_2_digit_match = compute_performance_metrics_from_suggestions(
+    test_df,
+    correct_code_col=correct_code_col,
+    suggestions_col=suggestions_cols_to_compare[2],
+    code_length=SIC_CODE_LENGTH,
+    k_values=[1, 3, 5, MAX_SUGGESTIONS],
+    ave_time_per_query=avg_ms_dict.get(
+        suggestions_cols_to_compare[2].removeprefix("suggestions_"), 0
+    ),
+    code_digit_match_length=2,
+)
+
+print(metrics_2_digit_match.report_metrics())
+
+# %%
 # Comparison of performance metrics for the different suggesters and prefix lengths
 ave_elapsed_per_row_list = [
     avg_ms_dict.get(col.removeprefix("suggestions_"), 0)
@@ -161,4 +173,33 @@ compare_performance_metrics = build_sayt_metrics_comparison_table(
 
 compare_performance_metrics.head()
 
+# %%
+
+test_df_hard_limit, avg_ms_dict = get_suggestions_by_chars(
+    df=test_df,
+    suggesters_dict=suggesters,
+    characters=[4, 5, 7, 10],
+    suggestions_limit=MAX_SUGGESTIONS,
+    hard_suggestions_limit=True,
+    with_scores=True,
+)
+
+suggestions_cols_to_compare = test_df_hard_limit.columns[
+    test_df_hard_limit.columns.str.startswith("suggestions_")
+].tolist()
+
+ave_elapsed_per_row_list = [
+    avg_ms_dict.get(col.removeprefix("suggestions_"), 0)
+    for col in suggestions_cols_to_compare
+]
+
+compare_performance_metrics_hard_limit = build_sayt_metrics_comparison_table(
+    test_df_hard_limit,
+    suggestions_cols_to_compare=suggestions_cols_to_compare,
+    correct_code_col=correct_code_col,
+    k_values=[1, 3, 5, MAX_SUGGESTIONS],
+    ave_time_per_query_list=ave_elapsed_per_row_list,
+)
+
+compare_performance_metrics_hard_limit.head()
 # %%
