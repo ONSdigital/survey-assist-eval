@@ -13,6 +13,7 @@ from survey_assist_utils.logging import get_logger
 
 from notebooks.sayt.sayt_utils import (
     build_lookup_suggester,
+    build_sayt_corpus_from_df,
     get_suggestions_by_chars,
     validate_one_code,
 )
@@ -75,30 +76,28 @@ print(
 # %%
 LOOKUP_FILE_NAME = f"gs://{bucket_name}/evaluation-pipeline/SAYT/Lookup_IT3_Final.csv"
 sayt_df = pd.read_csv(LOOKUP_FILE_NAME, dtype=str)
-sayt_df["code"] = sayt_df["SIC07"].apply(
-    lambda x: x if len(x) == SIC_CODE_LENGTH else f"0{x}"
-)
-sayt_df["display_text_with_code"] = sayt_df["SIC_lookup"] + ": " + sayt_df["code"]
 
-sayt_corpus = list(
-    zip(sayt_df["SIC_lookup"], sayt_df["display_text_with_code"], strict=False)
+_, sayt_corpus = build_sayt_corpus_from_df(
+    df=sayt_df,
+    search_text_col="SIC_lookup",
+    display_text_col="SIC_lookup",
+    code_col="SIC07",
+    expected_code_length=SIC_CODE_LENGTH,
+    incl_code_in_display=True,
 )
 
 # %%
 sic_kb_for_classifai = pd.read_csv(
     f"gs://{bucket_name}/sic_knowledgebase/sic_kb_for_sayt.csv", dtype=str
 )
-sic_kb_for_classifai["display_text_with_code"] = (
-    sic_kb_for_classifai["display_text"] + ": " + sic_kb_for_classifai["code"]
-)
 
-
-sayt2_corpus = list(
-    zip(
-        sic_kb_for_classifai["search_text"],
-        sic_kb_for_classifai["display_text_with_code"],
-        strict=False,
-    )
+_, sayt2_corpus = build_sayt_corpus_from_df(
+    df=sic_kb_for_classifai,
+    search_text_col="search_text",
+    display_text_col="display_text",
+    code_col="code",
+    expected_code_length=SIC_CODE_LENGTH,
+    incl_code_in_display=True,
 )
 
 # %%

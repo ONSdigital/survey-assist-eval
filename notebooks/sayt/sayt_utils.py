@@ -66,6 +66,115 @@ def validate_one_code(code: str, code_length=5) -> bool:
     return True
 
 
+def pad_code_with_leading_zero(code: str, expected_length: int = 5) -> str:
+    """Pad a code string with leading zero if needed to match expected length.
+
+    Args:
+        code: Code string to normalize.
+        expected_length: Expected length of the code after padding.
+
+    Returns:
+        str: Code string padded with leading zero, or original code if already correct length
+            or if padding is not possible.
+    """
+    if pd.isna(code):
+        return code
+
+    code_str = str(code)
+    if len(code_str) == expected_length:
+        return code_str
+    if len(code_str) == expected_length - 1:
+        return f"0{code_str}"
+    if len(code_str) < expected_length - 1:
+        logger.warning(
+            "SIC code shorter than expected_length - 1; leaving unchanged",
+            code=code_str,
+            expected_length=expected_length,
+            observed_length=len(code_str),
+        )
+    return code_str
+
+
+def add_display_text_with_code(
+    df: pd.DataFrame,
+    text_col: str,
+    code_col: str,
+    output_col: str = "display_text_with_code",
+    separator: str = ": ",
+) -> pd.DataFrame:
+    """Return a copy of df with a combined display text + code column.
+
+    Args:
+        df: Input DataFrame containing text and code columns.
+        text_col: Column containing the human-readable text portion.
+        code_col: Column containing the code portion.
+        output_col: Name of the output combined column.
+        separator: Separator string placed between text and code.
+
+    Returns:
+        pd.DataFrame: Copy of df with `output_col` added.
+    """
+    if text_col not in df.columns:
+        raise KeyError(f"Missing required text column: {text_col}")
+    if code_col not in df.columns:
+        raise KeyError(f"Missing required code column: {code_col}")
+
+    output_df = df.copy()
+    output_df[output_col] = output_df[text_col] + separator + output_df[code_col]
+    return output_df
+
+
+def build_sayt_corpus_from_df(  # noqa: PLR0913, pylint: disable=R0917,R0913
+    df: pd.DataFrame,
+    search_text_col: str,
+    display_text_col: str,
+    code_col: str = "code",
+    expected_code_length: int = 5,
+    incl_code_in_display: bool = True,
+) -> tuple[pd.DataFrame, list[tuple[str, str]]]:
+    """Build a SAYT corpus from a DataFrame.
+
+    Normalises codes using `pad_code_with_leading_zero`, optionally appends
+    codes to display text, and returns both the updated DataFrame and the
+    resulting SAYT corpus.
+
+    Args:
+        df: Input DataFrame containing the required columns.
+        search_text_col: Column containing searchable text.
+        display_text_col: Column containing display text.
+        code_col: Column containing codes to normalise.
+        expected_code_length: Expected code length used for normalisation.
+        incl_code_in_display: Whether to append codes to display text.
+
+    Returns:
+        tuple[pd.DataFrame, list[tuple[str, str]]]:
+            Updated DataFrame and corpus as `(search_text, display_text)` tuples.
+    """
+    output_df = df.copy()
+
+    output_df[code_col] = output_df[code_col].apply(
+        pad_code_with_leading_zero, expected_length=expected_code_length
+    )
+
+    final_display_col = display_text_col
+
+    if incl_code_in_display:
+        final_display_col = f"{display_text_col}_with_code"
+        output_df = add_display_text_with_code(
+            output_df,
+            text_col=display_text_col,
+            code_col=code_col,
+            output_col=final_display_col,
+            separator=": ",
+        )
+
+    corpus = list(
+        zip(output_df[search_text_col], output_df[final_display_col], strict=False)
+    )
+
+    return output_df, corpus
+
+
 def get_suggestions_for_row(  # noqa: PLR0913 pylint: disable=R0917,R0913
     row: pd.Series,
     suggester: Any,
