@@ -9,7 +9,7 @@ from notebooks.sayt.sayt_utils import get_codes_from_suggestions
 class SAYTPerformanceMetrics(BaseModel):
     """Class to compute performance metrics for SAYT evaluation."""
 
-    code_length: int
+    code_digit_match_length: int
     suggestions_col: str
     total_queries: int
     ave_time_per_query_ms: float
@@ -23,7 +23,7 @@ class SAYTPerformanceMetrics(BaseModel):
         """Pretty print the performance metrics."""
         lines = [
             f"\nSAYT Performance Metrics for column {self.suggestions_col}:",
-            f" Code length: {self.code_length}",
+            f" Code digit match length: {self.code_digit_match_length}",
             f" Total queries: {self.total_queries}",
             f" Average time per query: {self.ave_time_per_query_ms:.2f} ms",
             f" Unmatched query count: {self.unmatched_query_count}",
@@ -84,7 +84,11 @@ def compute_performance_metrics_from_suggestions(  # noqa: PLR0913 pylint: disab
     return summarise_performance_metrics(
         df,
         suggestions_col=suggestions_col,
-        code_length=code_length,
+        code_digit_match_length=(
+            code_digit_match_length
+            if code_digit_match_length is not None
+            else code_length
+        ),
         k_values=k_values,
         ave_time_per_query=ave_time_per_query,
     )
@@ -214,21 +218,6 @@ def add_sayt_metrics_columns(
     return df
 
 
-def compute_accuracy_at_k(df, correct_code_rank_col: str, k: int) -> float:
-    """Compute Accuracy@K for the entire DataFrame.
-
-    Args:
-        df: DataFrame containing one row per query and a rank column.
-        correct_code_rank_col: Name of the column with the rank (1-based)
-            of the correct code; NaN/None if not found.
-        k: Cutoff rank at which to compute accuracy.
-
-    Returns:
-        float: Accuracy@K for the DataFrame.
-    """
-    return df[correct_code_rank_col].le(k).fillna(False).mean()
-
-
 def compute_precision_at_k_from_rank(df, correct_code_rank_col: str, k: int) -> float:
     """Compute Precision@K for the entire DataFrame using rank of correct code.
 
@@ -249,7 +238,7 @@ def compute_precision_at_k_from_rank(df, correct_code_rank_col: str, k: int) -> 
 def summarise_performance_metrics(  # noqa: PLR0913 pylint: disable = R0913, R0917
     df,
     suggestions_col: str,
-    code_length: int,
+    code_digit_match_length: int,
     k_values: list[int],
     ave_time_per_query: float,
     prefix: str | None = None,
@@ -259,7 +248,7 @@ def summarise_performance_metrics(  # noqa: PLR0913 pylint: disable = R0913, R09
     Args:
         df: DataFrame containing the performance metric columns.
         suggestions_col: Column name containing the retrieved suggestions.
-        code_length: Length of the codes being evaluated.
+        code_digit_match_length: Length of the code to match for evaluation.
         k_values: List of k values for which Precision@K and Recall@K were computed.
         ave_time_per_query: Average time taken per query in milliseconds.
         prefix: Optional prefix for the metric columns. Defaults to None.
@@ -271,7 +260,7 @@ def summarise_performance_metrics(  # noqa: PLR0913 pylint: disable = R0913, R09
         prefix = ""
 
     summary = {
-        "code_length": code_length,
+        "code_digit_match_length": code_digit_match_length,
         "suggestions_col": suggestions_col,
         "total_queries": len(df),
         "ave_time_per_query_ms": ave_time_per_query,
