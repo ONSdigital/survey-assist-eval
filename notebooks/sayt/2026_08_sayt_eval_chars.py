@@ -171,7 +171,7 @@ def suggester_analysis_table(
     """Allows suggesters analysis in a table format.
 
     Args:
-        df (pd.DataFrame): datframe with suggestions from suggester.
+        df (pd.DataFrame): dataframe with suggestions from suggester.
         suggester_name (str): suggester name to be analysed.
         characters (int): number of characters to be checked.
     """
@@ -185,7 +185,7 @@ def suggester_analysis_table(
     def print_for_suggester_and_chars(
         suggester_name: str | None = None, characters: int | None = None
     ):
-        """Allows printing tables for specified parameters. Handles if any or eithr are
+        """Allows printing tables for specified parameters. Handles if any or either are
             not specified.
 
         Args:
