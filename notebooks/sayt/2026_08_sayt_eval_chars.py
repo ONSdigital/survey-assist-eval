@@ -30,7 +30,6 @@ from notebooks.sayt.sayt_utils import (
 
 # %%
 SIC_CODE_LENGTH = 5
-MAX_SUGGESTIONS = 9
 
 # %%
 load_dotenv()
@@ -171,42 +170,56 @@ def run_eval_for_suggesters(
 
 # %%
 def suggester_analysis_table(
-    df: pd.DataFrame, suggester_name: str | None = None, characters: int | None = None
+    df: pd.DataFrame,
+    suggester_name: str | None = None,
+    characters: int | None = None,
+    max_suggestions: int = 9,
 ):
     """Allows suggesters analysis in a table format.
 
     Args:
         df (pd.DataFrame): dataframe with suggestions from suggester.
+            Requires columns: "suggester", "num_chars", "rank".
         suggester_name (str): suggester name to be analysed.
         characters (int): number of characters to be checked.
+        max_suggestions: the maximum rank of suggestions considered as valid.
+
+    Return:
+        filtered dataframe with specified suggester name and/or number of characters.
     """
     # replace ranks not shown with "NA"
     df_copy = df.copy()
-    df_copy.loc[df_copy["rank"] > MAX_SUGGESTIONS, "rank"] = np.nan
+    df_copy.loc[df_copy["rank"] > max_suggestions, "rank"] = np.nan
 
     results = df.groupby(["suggester", "num_chars", "rank"]).count()
 
     # Helper function
     def print_for_suggester_and_chars(
-        suggester_name: str | None = None, characters: int | None = None
+        df: pd.DataFrame,
+        suggester_name: str | None = None,
+        characters: int | None = None,
     ):
         """Allows printing tables for specified parameters. Handles if any or either are
             not specified.
 
         Args:
+            df (pd.DataFrame): dataframe containing grouped suggestions.
             suggester_name (str): suggester name to be analysed.
             characters (int): number of characters to be checked.
+
+        Return:
+            filtered dataframe with specified suggester name and/or number of characters.
         """
         if characters is None and suggester_name is None:
-            return results
+            return df
         if characters is None:
-            return results.loc[(suggester_name)]
+            return df.loc[(suggester_name)]
         if suggester_name is None:
-            return results.loc[pd.IndexSlice[:, characters], :]
-        return results.loc[(suggester_name, characters)]
+            return df.loc[pd.IndexSlice[:, characters], :]
+        return df.loc[(suggester_name, characters)]
 
     return print_for_suggester_and_chars(
-        suggester_name=suggester_name, characters=characters
+        df=results, suggester_name=suggester_name, characters=characters
     )
 
 
