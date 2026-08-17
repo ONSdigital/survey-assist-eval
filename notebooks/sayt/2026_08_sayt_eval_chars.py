@@ -132,6 +132,7 @@ def run_eval_for_suggesters(
     df: pd.DataFrame,
     suggesters_dict: dict,
     characters: list[int],
+    suggestions_limit: int = 9,
     output_dir: str = OUTPUT_DIR,
 ):
     """Use functions necessary to create a dataframe that allows for grouping by
@@ -141,6 +142,7 @@ def run_eval_for_suggesters(
         df (pd.DataFrame): dataframe to be tested.
         suggesters_dict (dict): a dictionary with suggester models.
         characters (list): number of characters to be tested.
+        suggestions_limit: the maximum rank of suggestions considered as valid.
         output_dir (str): path to file location to be saved.
 
     Return:
@@ -154,7 +156,10 @@ def run_eval_for_suggesters(
     df_copy = df.copy()
 
     suggestions_df = get_suggestions_by_chars(
-        df_copy, suggesters_dict=suggesters_dict, characters=characters
+        df_copy,
+        suggesters_dict=suggesters_dict,
+        characters=characters,
+        suggestions_limit=suggestions_limit,
     )[0]
 
     melt = melt_results_for_analysis(df=suggestions_df)
