@@ -83,6 +83,24 @@ sayt_corpus = list(
 )
 
 # %%
+# Commented out due to workstation limitations.
+# sic_kb_for_classifai = pd.read_csv(
+#     f"gs://{bucket_name}/sic_knowledgebase/sic_kb_for_sayt.csv", dtype=str
+# )
+# sic_kb_for_classifai["display_text_with_code"] = (
+#     sic_kb_for_classifai["display_text"] + ": " + sic_kb_for_classifai["code"]
+# )
+
+
+# sayt2_corpus = list(
+#     zip(
+#         sic_kb_for_classifai["search_text"],
+#         sic_kb_for_classifai["display_text_with_code"],
+#         strict=False,
+#     )
+# )
+
+# %%
 # create suggesters using only one of the retrievers:
 # PrefixRetrieverSpec, NgramRetrieverSpec, or SemanticRetrieverSpec.
 
@@ -124,6 +142,49 @@ suggesters_three = {
         ],
     ),
 }
+
+# # %%
+# # create suggesters using only one of the retrievers:
+# # PrefixRetrieverSpec, NgramRetrieverSpec, or SemanticRetrieverSpec.
+
+# suggesters_simple = {
+#     "Blaise proxy method (prefix only)": build_lookup_suggester(
+#         sayt2_corpus, retrievers=[PrefixRetrieverSpec()]
+#     ),
+#     "Blaise proxy method (ngram only)": build_lookup_suggester(
+#         sayt2_corpus, retrievers=[NgramRetrieverSpec()]
+#     ),
+#     "Semantic retriever only": build_lookup_suggester(
+#         sayt_corpus, retrievers=[SemanticRetrieverSpec()]
+#     ),
+# }
+
+# # %%
+# # Test for interactions between suggesters
+
+# suggesters_pairs = {
+#     "Blaise proxy method (prefix and ngram)": build_lookup_suggester(
+#         sayt2_corpus, retrievers=[PrefixRetrieverSpec(), NgramRetrieverSpec()]
+#     ),
+#     "Hybrid approach (prefix and semantic)": build_lookup_suggester(
+#         sayt2_corpus, retrievers=[PrefixRetrieverSpec(), SemanticRetrieverSpec()]
+#     ),
+#     "Hybrid approach (ngram and semantic)": build_lookup_suggester(
+#         sayt2_corpus, retrievers=[NgramRetrieverSpec(), SemanticRetrieverSpec()]
+#     ),
+# }
+
+# # %%
+# suggesters_three = {
+#     "Hybrid approach (ngram, prefix and semantic)": build_lookup_suggester(
+#         sayt2_corpus,
+#         retrievers=[
+#             NgramRetrieverSpec(),
+#             PrefixRetrieverSpec(),
+#             SemanticRetrieverSpec(),
+#         ],
+#     ),
+# }
 
 
 # %%
@@ -257,9 +318,11 @@ melt_df_three, fig_three = run_eval_for_suggesters(
 )
 
 # %%
-suggesters_all = suggesters_simple | suggesters_pairs | suggesters_three
+melt_df_all = (
+    pd.concat([melt_df_simple, melt_df_pairs, melt_df_three], ignore_index=True)
+    .drop_duplicates()
+    .copy()
+)
 
 # %%
-melt_df_all, fig_all = run_eval_for_suggesters(
-    test_df, suggesters_all, (x for x in range(4, 10)), output_dir=f"{OUTPUT_DIR}_all"
-)
+fig_all = create_figure(melt_df_all, output_dir=OUTPUT_DIR)
