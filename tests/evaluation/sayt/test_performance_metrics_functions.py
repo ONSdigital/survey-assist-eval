@@ -413,6 +413,7 @@ def test_summarise_performance_metrics_returns_sayt_performance_metrics_instance
     result = summarise_performance_metrics(
         sayt_metrics_df,
         suggestions_col="suggestions",
+        code_length=5,
         k_values=[1, 3],
         ave_time_per_query=12.5,
     )
@@ -430,6 +431,7 @@ def test_summarise_performance_metrics_total_queries_equals_row_count(
     result = summarise_performance_metrics(
         sayt_metrics_df,
         suggestions_col="suggestions",
+        code_length=5,
         k_values=[1],
         ave_time_per_query=10.0,
     )
@@ -446,6 +448,7 @@ def test_summarise_performance_metrics_stores_ave_time_per_query(
     result = summarise_performance_metrics(
         sayt_metrics_df,
         suggestions_col="suggestions",
+        code_length=5,
         k_values=[1],
         ave_time_per_query=42.7,
     )
@@ -462,6 +465,7 @@ def test_summarise_performance_metrics_counts_rows_with_zero_correct_code_rank(
     result = summarise_performance_metrics(
         sayt_metrics_df,
         suggestions_col="suggestions",
+        code_length=5,
         k_values=[1],
         ave_time_per_query=0.0,
     )
@@ -478,6 +482,7 @@ def test_summarise_performance_metrics_computes_mean_reciprocal_rank(
     result = summarise_performance_metrics(
         sayt_metrics_df,
         suggestions_col="suggestions",
+        code_length=5,
         k_values=[1],
         ave_time_per_query=0.0,
     )
@@ -494,6 +499,7 @@ def test_summarise_performance_metrics_computes_mean_rank(sayt_metrics_df):
     result = summarise_performance_metrics(
         sayt_metrics_df,
         suggestions_col="suggestions",
+        code_length=5,
         k_values=[1],
         ave_time_per_query=0.0,
     )
@@ -508,6 +514,7 @@ def test_summarise_performance_metrics_builds_precision_at_k_dict(sayt_metrics_d
     result = summarise_performance_metrics(
         sayt_metrics_df,
         suggestions_col="suggestions",
+        code_length=5,
         k_values=[1, 3],
         ave_time_per_query=0.0,
     )
@@ -523,6 +530,7 @@ def test_summarise_performance_metrics_builds_recall_at_k_dict(sayt_metrics_df):
     result = summarise_performance_metrics(
         sayt_metrics_df,
         suggestions_col="suggestions",
+        code_length=5,
         k_values=[1, 3],
         ave_time_per_query=0.0,
     )
@@ -545,7 +553,11 @@ def test_summarise_performance_metrics_all_matched():
     )
 
     result = summarise_performance_metrics(
-        df, suggestions_col="suggestions", k_values=[1], ave_time_per_query=0.0
+        df,
+        suggestions_col="suggestions",
+        code_length=5,
+        k_values=[1],
+        ave_time_per_query=0.0,
     )
 
     assert (
@@ -565,7 +577,11 @@ def test_summarise_performance_metrics_all_unmatched():
     )
 
     result = summarise_performance_metrics(
-        df, suggestions_col="suggestions", k_values=[1], ave_time_per_query=0.0
+        df,
+        suggestions_col="suggestions",
+        code_length=5,
+        k_values=[1],
+        ave_time_per_query=0.0,
     )
 
     assert (
@@ -591,7 +607,11 @@ def test_summarise_performance_metrics_single_row():
     )
 
     result = summarise_performance_metrics(
-        df, suggestions_col="suggestions", k_values=[2], ave_time_per_query=5.0
+        df,
+        suggestions_col="suggestions",
+        code_length=5,
+        k_values=[2],
+        ave_time_per_query=5.0,
     )
 
     assert (
@@ -609,14 +629,19 @@ def test_summarise_performance_metrics_single_row():
 
 
 def test_summarise_performance_metrics_stores_suggestions_col(sayt_metrics_df):
-    """suggestions_col should be stored in the result unchanged."""
+    """suggestions_col and code_length should be stored unchanged."""
     result = summarise_performance_metrics(
-        sayt_metrics_df, suggestions_col="my_col", k_values=[1], ave_time_per_query=0.0
+        sayt_metrics_df,
+        suggestions_col="my_col",
+        code_length=7,
+        k_values=[1],
+        ave_time_per_query=0.0,
     )
 
     assert (
         result.suggestions_col == "my_col"
     ), "Expected suggestions_col to be stored as provided."
+    assert result.code_length == 7, "Expected code_length to be stored as provided."
 
 
 def test_summarise_performance_metrics_with_prefix_reads_prefixed_columns():
@@ -633,6 +658,7 @@ def test_summarise_performance_metrics_with_prefix_reads_prefixed_columns():
     result = summarise_performance_metrics(
         df,
         suggestions_col="suggestions",
+        code_length=5,
         k_values=[1],
         ave_time_per_query=0.0,
         prefix="pfx_",
@@ -808,6 +834,7 @@ def test_build_sayt_metrics_comparison_table_does_not_mutate_input(sayt_comparis
 def test_sayt_performance_metrics_instantiation_with_valid_data():
     """SAYTPerformanceMetrics should accept valid field values."""
     metrics = SAYTPerformanceMetrics(
+        code_length=5,
         suggestions_col="suggestions",
         total_queries=100,
         ave_time_per_query_ms=15.5,
@@ -846,6 +873,7 @@ def test_sayt_performance_metrics_instantiation_with_valid_data():
 def test_sayt_performance_metrics_instantiation_with_empty_k_dicts():
     """SAYTPerformanceMetrics should accept empty precision_at_k and recall_at_k."""
     metrics = SAYTPerformanceMetrics(
+        code_length=5,
         suggestions_col="suggestions",
         total_queries=50,
         ave_time_per_query_ms=10.0,
@@ -865,6 +893,7 @@ def test_sayt_performance_metrics_instantiation_with_empty_k_dicts():
 def test_sayt_performance_metrics_instantiation_with_zero_values():
     """SAYTPerformanceMetrics should accept zero values for numeric fields."""
     metrics = SAYTPerformanceMetrics(
+        code_length=5,
         suggestions_col="suggestions",
         total_queries=0,
         ave_time_per_query_ms=0.0,
@@ -884,6 +913,7 @@ def test_sayt_performance_metrics_instantiation_with_zero_values():
 def test_sayt_performance_metrics_report_metrics_includes_all_fields():
     """report_metrics should include all performance metrics in the output."""
     metrics = SAYTPerformanceMetrics(
+        code_length=5,
         suggestions_col="test_suggestions",
         total_queries=100,
         ave_time_per_query_ms=15.5,
@@ -896,6 +926,7 @@ def test_sayt_performance_metrics_report_metrics_includes_all_fields():
     report = metrics.report_metrics()
 
     assert "100" in report, "Expected total_queries value in report."
+    assert "Code length: 5" in report, "Expected code_length in report."
     assert "15.50" in report, "Expected ave_time_per_query_ms value in report."
     assert "5" in report, "Expected unmatched_query_count in report."
     assert "0.8500" in report, "Expected mrr value in report."
@@ -910,6 +941,7 @@ def test_sayt_performance_metrics_report_metrics_includes_all_fields():
 def test_sayt_performance_metrics_report_metrics_returns_string():
     """report_metrics should return a string."""
     metrics = SAYTPerformanceMetrics(
+        code_length=5,
         suggestions_col="suggestions",
         total_queries=50,
         ave_time_per_query_ms=10.0,
@@ -927,6 +959,7 @@ def test_sayt_performance_metrics_report_metrics_returns_string():
 def test_sayt_performance_metrics_report_metrics_starts_with_header():
     """report_metrics should begin with a header line."""
     metrics = SAYTPerformanceMetrics(
+        code_length=5,
         suggestions_col="my_col",
         total_queries=10,
         ave_time_per_query_ms=5.0,
@@ -946,6 +979,7 @@ def test_sayt_performance_metrics_report_metrics_starts_with_header():
 def test_sayt_performance_metrics_report_metrics_contains_formatted_numbers():
     """report_metrics should format numbers with appropriate precision."""
     metrics = SAYTPerformanceMetrics(
+        code_length=5,
         suggestions_col="suggestions",
         total_queries=100,
         ave_time_per_query_ms=12.3456,
@@ -971,6 +1005,7 @@ def test_sayt_performance_metrics_report_metrics_contains_formatted_numbers():
 def test_sayt_performance_metrics_report_metrics_with_multiple_k_values():
     """report_metrics should report all k values in precision_at_k and recall_at_k."""
     metrics = SAYTPerformanceMetrics(
+        code_length=5,
         suggestions_col="suggestions",
         total_queries=100,
         ave_time_per_query_ms=10.0,
@@ -1005,6 +1040,7 @@ def test_sayt_performance_metrics_report_metrics_with_multiple_k_values():
 def test_sayt_performance_metrics_report_metrics_with_empty_k_dicts():
     """report_metrics should handle empty precision_at_k and recall_at_k gracefully."""
     metrics = SAYTPerformanceMetrics(
+        code_length=5,
         suggestions_col="suggestions",
         total_queries=50,
         ave_time_per_query_ms=8.0,
@@ -1031,6 +1067,7 @@ def test_sayt_performance_metrics_validates_field_types():
     """SAYTPerformanceMetrics should validate field types via Pydantic."""
     with pytest.raises(ValidationError):
         SAYTPerformanceMetrics(
+            code_length=5,
             suggestions_col="suggestions",
             total_queries="not_an_int",
             ave_time_per_query_ms=10.0,
@@ -1046,6 +1083,7 @@ def test_sayt_performance_metrics_validates_required_fields():
     """SAYTPerformanceMetrics should require all fields."""
     with pytest.raises(ValidationError):
         SAYTPerformanceMetrics(
+            code_length=5,
             suggestions_col="suggestions",
             total_queries=100,
             ave_time_per_query_ms=10.0,
@@ -1060,6 +1098,7 @@ def test_sayt_performance_metrics_validates_required_fields():
 def test_sayt_performance_metrics_report_metrics_sorts_k_values():
     """report_metrics should print k values in sorted order."""
     metrics = SAYTPerformanceMetrics(
+        code_length=5,
         suggestions_col="suggestions",
         total_queries=100,
         ave_time_per_query_ms=10.0,

@@ -8,7 +8,7 @@ import os
 
 import pandas as pd
 from dotenv import load_dotenv
-from survey_assist_embed_core.sayt import PrefixRetrieverSpec
+from survey_assist_embed_core.sayt import NgramRetrieverSpec
 from survey_assist_utils.logging import get_logger
 
 from notebooks.sayt.sayt_utils import (
@@ -51,6 +51,15 @@ rename_columns = {
 
 test_df = test_df.rename(columns=rename_columns)
 test_df = test_df[rename_columns.values()]
+
+# clean the rank values reported by the SAYT team
+for col in [
+    "rank_5chars_Blaise (as reported from SAYT team)",
+    "_rank_5chars_sa_shared",
+]:
+    test_df[col] = pd.to_numeric(
+        test_df[col].replace({"5 or 12": "5"}), errors="coerce"
+    )
 
 # %%
 # check the codes are well formed
@@ -105,7 +114,7 @@ suggesters = {
     #     sayt2_corpus, semantic_weight=1.0
     # ),
     "Prefix only": build_lookup_suggester(
-        sayt_corpus, retrievers=[PrefixRetrieverSpec()], semantic_weight=None
+        sayt_corpus, retrievers=[NgramRetrieverSpec()], semantic_weight=None
     ),
 }
 
