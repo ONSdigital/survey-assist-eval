@@ -130,7 +130,7 @@ suggesters_three = {
 def run_eval_for_suggesters(
     df: pd.DataFrame,
     suggesters_dict: dict,
-    characters: list[int],
+    num_chars: list[int],
     suggestions_limit: int = 9,
     output_dir: str = OUTPUT_DIR,
 ):
@@ -140,12 +140,12 @@ def run_eval_for_suggesters(
     Args:
         df (pd.DataFrame): dataframe to be tested.
         suggesters_dict (dict): a dictionary with suggester models.
-        characters (list): number of characters to be tested.
+        num_chars (list): number of characters to be tested.
         suggestions_limit: the maximum rank of suggestions considered as valid.
         output_dir (str): path to file location to be saved.
 
     Return:
-        pd.DataFrame: dataframe with results form suggesters, split by the type of suggester
+        pd.DataFrame: dataframe with results from suggesters, split by the type of suggester
             and number of characters.
 
     """
@@ -157,7 +157,7 @@ def run_eval_for_suggesters(
     suggestions_df = get_suggestions_by_chars(
         df_copy,
         suggesters_dict=suggesters_dict,
-        characters=characters,
+        num_chars=num_chars,
         suggestions_limit=suggestions_limit,
     )[0]
 
@@ -172,7 +172,7 @@ def run_eval_for_suggesters(
 def suggester_analysis_table(
     df: pd.DataFrame,
     suggester_name: str | None = None,
-    characters: int | None = None,
+    num_chars: int | None = None,
     max_suggestions: int = 9,
 ):
     """Allows suggesters analysis in a table format.
@@ -181,7 +181,7 @@ def suggester_analysis_table(
         df (pd.DataFrame): dataframe with suggestions from suggester.
             Requires columns: "suggester", "num_chars", "rank".
         suggester_name (str): suggester name to be analysed.
-        characters (int): number of characters to be checked.
+        num_chars (int): number of characters to be checked.
         max_suggestions: the maximum rank of suggestions considered as valid.
 
     Return:
@@ -197,7 +197,7 @@ def suggester_analysis_table(
     def print_for_suggester_and_chars(
         df: pd.DataFrame,
         suggester_name: str | None = None,
-        characters: int | None = None,
+        num_chars: int | None = None,
     ):
         """Allows printing tables for specified parameters. Handles if any or either are
             not specified.
@@ -205,34 +205,34 @@ def suggester_analysis_table(
         Args:
             df (pd.DataFrame): dataframe containing grouped suggestions.
             suggester_name (str): suggester name to be analysed.
-            characters (int): number of characters to be checked.
+            num_chars (int): number of characters to be checked.
 
         Return:
             filtered dataframe with specified suggester name and/or number of characters.
         """
-        if characters is None and suggester_name is None:
+        if num_chars is None and suggester_name is None:
             return df
-        if characters is None:
+        if num_chars is None:
             return df.loc[(suggester_name)]
         if suggester_name is None:
-            return df.loc[pd.IndexSlice[:, characters], :]
-        return df.loc[(suggester_name, characters)]
+            return df.loc[pd.IndexSlice[:, num_chars], :]
+        return df.loc[(suggester_name, num_chars)]
 
     return print_for_suggester_and_chars(
-        df=results, suggester_name=suggester_name, characters=characters
+        df=results, suggester_name=suggester_name, num_chars=num_chars
     )
 
 
 # %%
 melt_df_simple, fig_simple = run_eval_for_suggesters(
-    test_df, suggesters_simple, (x for x in range(4, 10)), output_dir=OUTPUT_DIR
+    test_df, suggesters_simple, range(4, 10), output_dir=OUTPUT_DIR
 )
 
 # %%
 suggester_analysis_table(melt_df_simple)
 
 # %%
-suggester_analysis_table(melt_df_simple, characters=6)
+suggester_analysis_table(melt_df_simple, num_chars=6)
 
 # %%
 melt_df_pairs, fig_pairs = run_eval_for_suggesters(
@@ -246,7 +246,7 @@ melt_df_pairs, fig_pairs = run_eval_for_suggesters(
 suggester_analysis_table(melt_df_pairs)
 
 # %%
-suggester_analysis_table(melt_df_pairs, characters=6)
+suggester_analysis_table(melt_df_pairs, num_chars=6)
 
 # %%
 melt_df_three, fig_three = run_eval_for_suggesters(
