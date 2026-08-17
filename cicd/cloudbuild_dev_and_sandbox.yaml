@@ -1,0 +1,42 @@
+steps:
+  - name: gcr.io/$PROJECT_ID/testrunner
+    id: Run unit tests plus build, tag and deploy SA API evaluation Cloud Run Job
+    entrypoint: bash
+    args:
+      - '-c'
+      - |
+        set -e
+        echo === Check Tooling Versions ===
+        gcloud --version
+        make --version
+        pip --version
+        python --version
+        poetry --version
+
+        echo === Install dependencies for tests ===
+        poetry install
+
+        echo === Running unit tests ===
+        poetry run pytest --maxfail=1 tests/pipeline/api/ --cov=survey_assist_eval.pipeline.api --cov-report=term-missing --cov-fail-under 80 | tee coverage-report.txt
+        if grep -q "FAIL Required test coverage" coverage-report.txt; then
+          echo "ERROR: Target coverage was not reached, stopping pipeline."
+          exit 1
+        fi
+
+        echo === Looking up config from parameter store ===
+        config=$(gcloud parametermanager parameters versions describe $_ENV_NAME --parameter=infra-test-config --location=global --project $PROJECT_ID --format=json | python3 -c "import sys, json; print(json.load(sys.stdin)['payload']['data'])" | base64 --decode)
+        IMAGE=$(echo $config | python3 -c "import sys, json; print(json.load(sys.stdin)['cr-api-eval-image'])")
+        CR_JOB_NAME=$(echo $config | python3 -c "import sys, json; print(json.load(sys.stdin)['cr-api-eval-job-name'])")
+        TARGET_PROJECT_ID=$(echo $config | python3 -c "import sys, json; print(json.load(sys.stdin)['project-id'])")
+
+        echo === Build Docker image, tag and push to GAR ===
+        docker build -t $$IMAGE:$SHORT_SHA -t $$IMAGE:latest -f containers/api_evaluation/Dockerfile .
+        docker push $$IMAGE:latest
+        docker push $$IMAGE:$SHORT_SHA
+
+        echo === Deploy SA API evaluation cloud run job ===
+        gcloud run jobs update $$CR_JOB_NAME --image=$$IMAGE:$SHORT_SHA --region $LOCATION --project $$TARGET_PROJECT_ID
+
+timeout: 600s
+options:
+  logging: CLOUD_LOGGING_ONLY

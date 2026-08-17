@@ -1,0 +1,36 @@
+# run gcloud meta list-files-for-upload at project root to test allowed files
+
+# explicit deny all
+*
+
+# allowed docker files
+!.dockerignore
+!containers/
+containers/*
+!containers/api_evaluation/
+containers/api_evaluation/*
+!containers/api_evaluation/Dockerfile
+
+# allowed survey-assist-eval source
+!src/
+!src/survey_assist_eval/**
+!poetry.lock
+!pyproject.toml
+!README.md
+!LICENSE
+
+# allowed additional API evaluation source files
+!scripts/
+scripts/*
+!scripts/api_evaluation/
+scripts/api_evaluation/*
+!scripts/api_evaluation/run.py
+
+# allowed CICD content
+!cicd/**
+
+# allowed tests content
+!tests/**
+
+# reject pycache
+**/__pycache__

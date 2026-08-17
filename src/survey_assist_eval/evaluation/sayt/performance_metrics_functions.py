@@ -9,6 +9,7 @@ from notebooks.sayt.sayt_utils import get_codes_from_suggestions
 class SAYTPerformanceMetrics(BaseModel):
     """Class to compute performance metrics for SAYT evaluation."""
 
+    suggestions_col: str
     total_queries: int
     ave_time_per_query_ms: float
     unmatched_query_count: int
@@ -20,7 +21,7 @@ class SAYTPerformanceMetrics(BaseModel):
     def report_metrics(self) -> str:
         """Pretty print the performance metrics."""
         lines = [
-            "\nSAYT Performance Metrics:",
+            f"\nSAYT Performance Metrics for column {self.suggestions_col}:",
             f" Total queries: {self.total_queries}",
             f" Average time per query: {self.ave_time_per_query_ms:.2f} ms",
             f" Unmatched query count: {self.unmatched_query_count}",
@@ -71,6 +72,7 @@ def compute_performance_metrics_from_suggestions(  # noqa: PLR0913 pylint: disab
 
     return summarise_performance_metrics(
         df,
+        suggestions_col=suggestions_col,
         k_values=k_values,
         ave_time_per_query=ave_time_per_query,
     )
@@ -131,7 +133,9 @@ def compute_reciprocal_rank(retrieved_codes: list[str], correct_code: str) -> fl
     return 0.0
 
 
-def get_rank_of_correct_code(retrieved_codes: list[str], correct_code: str) -> float:
+def get_rank_of_correct_code(
+    retrieved_codes: list[str], correct_code: str
+) -> float | None:
     """Get the rank of the correct code in the retrieved list for a single query.
 
     Args:
@@ -139,12 +143,12 @@ def get_rank_of_correct_code(retrieved_codes: list[str], correct_code: str) -> f
         correct_code: The correct code for the query.
 
     Returns:
-        float: Rank of the correct code, or 0.0 if not found.
+        float: Rank of the correct code, or None if not found.
     """
     for rank, item in enumerate(retrieved_codes, start=1):
         if item == correct_code:
             return float(rank)
-    return 0.0
+    return None
 
 
 def add_sayt_metrics_columns(
@@ -152,6 +156,7 @@ def add_sayt_metrics_columns(
     retrieved_codes_col: str,
     correct_code_col: str,
     k_values: list[int],
+    prefix: str | None = None,
 ):
     """Add performance metric columns to the DataFrame.
 
@@ -160,31 +165,35 @@ def add_sayt_metrics_columns(
         retrieved_codes_col: Column name containing the list of retrieved codes.
         correct_code_col: Column name containing the correct code.
         k_values: List of k values for which to compute Precision@K and Recall@K.
+        prefix: Optional prefix for the new metric columns. Defaults to None.
 
     Returns:
         pd.DataFrame: Copy of df with metric columns added.
     """
+    if prefix is None:
+        prefix = ""
+
     df = df.copy()
     for k in k_values:
-        df[f"precision_at_{k}"] = df.apply(
+        df[f"{prefix}precision_at_{k}"] = df.apply(
             lambda row, k=k: compute_precision_at_k(
                 row[retrieved_codes_col], row[correct_code_col], k=k
             ),
             axis=1,
         )
-        df[f"recall_at_{k}"] = df.apply(
+        df[f"{prefix}recall_at_{k}"] = df.apply(
             lambda row, k=k: compute_recall_at_k(
                 row[retrieved_codes_col], row[correct_code_col], k=k
             ),
             axis=1,
         )
-    df["mrr"] = df.apply(
+    df[f"{prefix}reciprocal_rank"] = df.apply(
         lambda row: compute_reciprocal_rank(
             row[retrieved_codes_col], row[correct_code_col]
         ),
         axis=1,
     )
-    df["mean_rank"] = df.apply(
+    df[f"{prefix}correct_code_rank"] = df.apply(
         lambda row: get_rank_of_correct_code(
             row[retrieved_codes_col], row[correct_code_col]
         ),
@@ -194,26 +203,36 @@ def add_sayt_metrics_columns(
 
 
 def summarise_performance_metrics(
-    df, k_values: list[int], ave_time_per_query: int
+    df,
+    suggestions_col: str,
+    k_values: list[int],
+    ave_time_per_query: float,
+    prefix: str | None = None,
 ) -> SAYTPerformanceMetrics:
     """Summarize performance metrics across the DataFrame.
 
     Args:
         df: DataFrame containing the performance metric columns.
+        suggestions_col: Column name containing the retrieved suggestions.
         k_values: List of k values for which Precision@K and Recall@K were computed.
         ave_time_per_query: Average time taken per query in milliseconds.
+        prefix: Optional prefix for the metric columns. Defaults to None.
 
     Returns:
         dict: Summary statistics for each performance metric.
     """
+    if prefix is None:
+        prefix = ""
+
     summary = {
+        "suggestions_col": suggestions_col,
         "total_queries": len(df),
         "ave_time_per_query_ms": ave_time_per_query,
-        "unmatched_query_count": (df["mean_rank"] == 0).sum(),
-        "mrr": df["mrr"].mean(),
-        "mean_rank": df["mean_rank"].mean(),
-        "precision_at_k": {k: df[f"precision_at_{k}"].mean() for k in k_values},
-        "recall_at_k": {k: df[f"recall_at_{k}"].mean() for k in k_values},
+        "unmatched_query_count": df[f"{prefix}correct_code_rank"].isna().sum(),
+        "mrr": df[f"{prefix}reciprocal_rank"].mean(),
+        "mean_rank": df[f"{prefix}correct_code_rank"].mean(),
+        "precision_at_k": {k: df[f"{prefix}precision_at_{k}"].mean() for k in k_values},
+        "recall_at_k": {k: df[f"{prefix}recall_at_{k}"].mean() for k in k_values},
     }
 
     return SAYTPerformanceMetrics(**summary)
