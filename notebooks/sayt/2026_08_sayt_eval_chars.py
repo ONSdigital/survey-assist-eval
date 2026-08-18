@@ -211,11 +211,6 @@ def run_eval_for_suggesters(
     Return:
         pd.DataFrame: dataframe with results from suggesters, split by the type of suggester
             and number of characters.
-        pd.DataFrame: dataframe with results from suggesters.
-        float: average milliseconds per row.
-        figure: plot representing the distribution of ranks for suggesters,
-            grouped by number of characters.
-
 
     """
     if not os.path.exists(output_dir):
@@ -349,8 +344,8 @@ fig_all = create_figure(melt_df_all, output_dir=OUTPUT_DIR)
 
 # %%
 # Specify datframe to check
-df_to_check = suggestions_df_three
-time_to_check = avg_ms_dict_three
+df_to_check = suggestions_df_simple
+time_to_check = avg_ms_dict_simple
 
 # %%
 # prepare column names
@@ -367,9 +362,7 @@ for _, suggester in enumerate(suggestions_cols_to_compare):
         suggestions_col=suggester,
         code_length=SIC_CODE_LENGTH,
         k_values=range(4, 10),
-        ave_time_per_query=time_to_check.get(
-            suggestions_cols_to_compare[2].removeprefix("suggestions_"), 0
-        ),
+        ave_time_per_query=time_to_check.get(suggester.removeprefix("suggestions_"), 0),
     )
 
     print(metrics.report_metrics())
