@@ -27,6 +27,9 @@ from notebooks.sayt.sayt_utils import (
     get_suggestions_by_chars,
     melt_results_for_analysis,
 )
+from survey_assist_eval.evaluation.sayt.performance_metrics_functions import (
+    compute_performance_metrics_from_suggestions,
+)
 
 # %%
 SIC_CODE_LENGTH = 5
@@ -208,6 +211,11 @@ def run_eval_for_suggesters(
     Return:
         pd.DataFrame: dataframe with results from suggesters, split by the type of suggester
             and number of characters.
+        pd.DataFrame: dataframe with results from suggesters.
+        float: average milliseconds per row.
+        figure: plot representing the distribution of ranks for suggesters,
+            grouped by number of characters.
+
 
     """
     if not os.path.exists(output_dir):
@@ -215,18 +223,18 @@ def run_eval_for_suggesters(
 
     df_copy = df.copy()
 
-    suggestions_df = get_suggestions_by_chars(
+    suggestions_df, avg_ms_dict = get_suggestions_by_chars(
         df_copy,
         suggesters_dict=suggesters_dict,
         num_chars=num_chars,
         suggestions_limit=suggestions_limit,
-    )[0]
+    )
 
     melt = melt_results_for_analysis(df=suggestions_df)
 
     fig = create_figure(melt, output_dir=output_dir)
 
-    return melt, fig
+    return melt, suggestions_df, avg_ms_dict, fig
 
 
 # %%
@@ -285,8 +293,10 @@ def suggester_analysis_table(
 
 
 # %%
-melt_df_simple, fig_simple = run_eval_for_suggesters(
-    test_df, suggesters_simple, range(4, 10), output_dir=OUTPUT_DIR
+melt_df_simple, suggestions_df_simple, avg_ms_dict_simple, fig_simple = (
+    run_eval_for_suggesters(
+        test_df, suggesters_simple, range(4, 10), output_dir=OUTPUT_DIR
+    )
 )
 
 # %%
@@ -296,11 +306,13 @@ suggester_analysis_table(melt_df_simple)
 suggester_analysis_table(melt_df_simple, num_chars=6)
 
 # %%
-melt_df_pairs, fig_pairs = run_eval_for_suggesters(
-    test_df,
-    suggesters_pairs,
-    (x for x in range(4, 10)),
-    output_dir=f"{OUTPUT_DIR}_pairs",
+melt_df_pairs, suggestions_df_pairs, avg_ms_dict_pairs, fig_pairs = (
+    run_eval_for_suggesters(
+        test_df,
+        suggesters_pairs,
+        (x for x in range(4, 10)),
+        output_dir=f"{OUTPUT_DIR}_pairs",
+    )
 )
 
 # %%
@@ -310,11 +322,13 @@ suggester_analysis_table(melt_df_pairs)
 suggester_analysis_table(melt_df_pairs, num_chars=6)
 
 # %%
-melt_df_three, fig_three = run_eval_for_suggesters(
-    test_df,
-    suggesters_three,
-    (x for x in range(4, 10)),
-    output_dir=f"{OUTPUT_DIR}_three",
+melt_df_three, suggestions_df_three, avg_ms_dict_three, fig_three = (
+    run_eval_for_suggesters(
+        test_df,
+        suggesters_three,
+        (x for x in range(4, 10)),
+        output_dir=f"{OUTPUT_DIR}_three",
+    )
 )
 
 # %%
@@ -325,4 +339,37 @@ melt_df_all = (
 )
 
 # %%
+suggestions_df_all = pd.concat(
+    [suggestions_df_simple, suggestions_df_pairs, suggestions_df_three],
+    ignore_index=True,
+).copy()
+
+# %%
 fig_all = create_figure(melt_df_all, output_dir=OUTPUT_DIR)
+
+# %%
+# Specify datframe to check
+df_to_check = suggestions_df_three
+time_to_check = avg_ms_dict_three
+
+# %%
+# prepare column names
+correct_code_col = "correct_sic_code"
+suggestions_cols_to_compare = df_to_check.columns[
+    df_to_check.columns.str.startswith("suggestions_")
+].tolist()
+
+# Performance metrics for one suggester and prefix length
+for _, suggester in enumerate(suggestions_cols_to_compare):
+    metrics = compute_performance_metrics_from_suggestions(
+        df_to_check,
+        correct_code_col=correct_code_col,
+        suggestions_col=suggester,
+        code_length=SIC_CODE_LENGTH,
+        k_values=range(4, 10),
+        ave_time_per_query=time_to_check.get(
+            suggestions_cols_to_compare[2].removeprefix("suggestions_"), 0
+        ),
+    )
+
+    print(metrics.report_metrics())
