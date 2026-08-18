@@ -11,7 +11,6 @@ The variables are loaded from the ".env" file.
 # %%
 import os
 
-import numpy as np
 import pandas as pd
 from dotenv import load_dotenv
 from survey_assist_embed_core.sayt import (
@@ -237,7 +236,6 @@ def suggester_analysis_table(
     df: pd.DataFrame,
     suggester_name: str | None = None,
     num_chars: int | None = None,
-    max_suggestions: int = 9,
 ):
     """Allows suggesters analysis in a table format.
 
@@ -246,16 +244,13 @@ def suggester_analysis_table(
             Requires columns: "suggester", "num_chars", "rank".
         suggester_name (str): suggester name to be analysed.
         num_chars (int): number of characters to be checked.
-        max_suggestions: the maximum rank of suggestions considered as valid.
 
     Return:
         filtered dataframe with specified suggester name and/or number of characters.
     """
-    # replace ranks not shown with "NA"
     df_copy = df.copy()
-    df_copy.loc[df_copy["rank"] > max_suggestions, "rank"] = np.nan
 
-    results = df.groupby(["suggester", "num_chars", "rank"]).count()
+    results = df_copy.groupby(["suggester", "num_chars", "rank"]).count()
 
     # Helper function
     def print_for_suggester_and_chars(
@@ -339,13 +334,37 @@ suggestions_df_all = pd.concat(
     ignore_index=True,
 ).copy()
 
+suggestions_columns = suggestions_df_all.columns[
+    suggestions_df_all.columns.str.startswith("suggestions_")
+].tolist()
+
+for col in suggestions_columns:
+    suggestions_df_all[col] = suggestions_df_all[col].apply(
+        lambda x: x if isinstance(x, list) else []
+    )
+
+
+# %%
+avg_ms_dict_all = avg_ms_dict_simple | avg_ms_dict_pairs | avg_ms_dict_three
+
 # %%
 fig_all = create_figure(melt_df_all, output_dir=OUTPUT_DIR)
 
 # %%
 # Specify datframe to check
-df_to_check = suggestions_df_simple
-time_to_check = avg_ms_dict_simple
+
+df_to_check = suggestions_df_three
+time_to_check = avg_ms_dict_three
+
+
+# Note: performance metrics doesn't allow NaN values (result of concatenating dataframes
+# from three different approaches). This results in metrics being unreliable and reults
+# should be assessed from using one of:
+# - suggestions_df_simple
+# - suggestions_df_pairs
+# - suggestions_df_three
+# df_to_check = suggestions_df_all
+# time_to_check = avg_ms_dict_all
 
 # %%
 # prepare column names
@@ -364,5 +383,4 @@ for _, suggester in enumerate(suggestions_cols_to_compare):
         k_values=range(4, 10),
         ave_time_per_query=time_to_check.get(suggester.removeprefix("suggestions_"), 0),
     )
-
     print(metrics.report_metrics())
