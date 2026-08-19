@@ -18,12 +18,33 @@ class SAYTHardLimitMetrics(BaseModel):
 
     num_queries: int  # Total number of queries evaluated
     cutoff_k: int  # The hard limit (e.g., 9)
-    actual_max_returned: int  # Max returned in this dataset
-    pct_queries_exceeding_limit: float  # % of queries returning > cutoff_k suggestions
-    pct_correct_outside_limit: float  # % of correct answers beyond the limit
+    max_suggestions_returned: int  # Max returned in this dataset
+    pct_exceeding_limit: float  # % of queries returning > cutoff_k suggestions
+    pct_correct_overall: float  # % of correct answers overall
     pct_correct_within_limit: float  # % of correct answers within the limit
-    pct_correct_total: float  # % of correct answers overall
-    pct_correct_tied_at_boundary: float  # % with correct answer only at boundary by tie
+    pct_correct_outside_limit: float  # % of correct answers beyond the limit
+    pct_correct_due_to_boundary_tie: (
+        float  # % with correct answer only at boundary by tie
+    )
+
+    def report_metrics(self) -> str:
+        """Generate a human-readable report of the metrics."""
+        report = (
+            "SAYT Hard Limit Metrics\n"
+            f" Number of queries: {self.num_queries}\n"
+            f" Suggestions limit (k): {self.cutoff_k}\n"
+            f" Maximum suggestions returned: {self.max_suggestions_returned}\n"
+            f" % of queries exceeding limit: {self.pct_exceeding_limit:.2%}\n"
+            f" % of queries with a correct suggestion: "
+            f"{self.pct_correct_overall:.2%}\n"
+            " % of queries with a correct suggestion within limit: "
+            f"{self.pct_correct_within_limit:.2%}\n"
+            " % of queries with a correct suggestion outside limit: "
+            f"{self.pct_correct_outside_limit:.2%}\n"
+            " % of queries with a correct suggestion due to a boundary tie: "
+            f"{self.pct_correct_due_to_boundary_tie:.2%}"
+        )
+        return report
 
 
 def compute_suggestions_hard_limit_metrics(  # noqa: PLR0913 pylint: disable = R0913, R0917
@@ -171,14 +192,12 @@ def summarise_hard_limit_metrics(
     summary = {
         "num_queries": len(df),
         "cutoff_k": cutoff_k,
-        "actual_max_returned": df[f"{prefix}num_retrieved_codes"].max(),
-        "pct_queries_exceeding_limit": df[f"{prefix}num_retrieved_codes"]
-        .gt(cutoff_k)
-        .mean(),
-        "pct_correct_outside_limit": df[f"{prefix}correct_code_outside_cutoff"].mean(),
+        "max_suggestions_returned": df[f"{prefix}num_retrieved_codes"].max(),
+        "pct_exceeding_limit": df[f"{prefix}num_retrieved_codes"].gt(cutoff_k).mean(),
+        "pct_correct_overall": (df[f"{prefix}correct_code_rank"] > 0).mean(),
         "pct_correct_within_limit": df[f"{prefix}correct_code_within_cutoff"].mean(),
-        "pct_correct_total": (df[f"{prefix}correct_code_rank"] > 0).mean(),
-        "pct_correct_tied_at_boundary": df[
+        "pct_correct_outside_limit": df[f"{prefix}correct_code_outside_cutoff"].mean(),
+        "pct_correct_due_to_boundary_tie": df[
             f"{prefix}correct_in_cutoff_by_default"
         ].mean(),
     }
