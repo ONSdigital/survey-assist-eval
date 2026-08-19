@@ -27,6 +27,7 @@ from notebooks.sayt.sayt_utils import (
     melt_results_for_analysis,
 )
 from survey_assist_eval.evaluation.sayt.performance_metrics_functions import (
+    build_sayt_metrics_comparison_table,
     compute_performance_metrics_from_suggestions,
 )
 
@@ -300,7 +301,7 @@ melt_df_pairs, suggestions_df_pairs, avg_ms_dict_pairs, fig_pairs = (
     run_eval_for_suggesters(
         test_df,
         suggesters_pairs,
-        (x for x in range(4, 10)),
+        range(4, 10),
         output_dir=f"{OUTPUT_DIR}_pairs",
     )
 )
@@ -316,7 +317,7 @@ melt_df_three, suggestions_df_three, avg_ms_dict_three, fig_three = (
     run_eval_for_suggesters(
         test_df,
         suggesters_three,
-        (x for x in range(4, 10)),
+        range(4, 10),
         output_dir=f"{OUTPUT_DIR}_three",
     )
 )
@@ -343,7 +344,6 @@ for col in suggestions_columns:
         lambda x: x if isinstance(x, list) else []
     )
 
-
 # %%
 avg_ms_dict_all = avg_ms_dict_simple | avg_ms_dict_pairs | avg_ms_dict_three
 
@@ -353,8 +353,8 @@ fig_all = create_figure(melt_df_all, output_dir=OUTPUT_DIR)
 # %%
 # Specify datframe to check
 
-df_to_check = suggestions_df_three
-time_to_check = avg_ms_dict_three
+df_to_check = suggestions_df_pairs
+time_to_check = avg_ms_dict_pairs
 
 
 # Note: performance metrics doesn't allow NaN values (result of concatenating dataframes
@@ -383,4 +383,21 @@ for _, suggester in enumerate(suggestions_cols_to_compare):
         k_values=range(4, 10),
         ave_time_per_query=time_to_check.get(suggester.removeprefix("suggestions_"), 0),
     )
-    print(metrics.report_metrics())
+    # print(metrics.report_metrics())
+
+# %%
+# Comparison of performance metrics for the different suggesters and prefix lengths
+ave_elapsed_per_row_list = [
+    time_to_check.get(col.removeprefix("suggestions_"), 0)
+    for col in suggestions_cols_to_compare
+]
+
+compare_performance_metrics = build_sayt_metrics_comparison_table(
+    df_to_check,
+    suggestions_cols_to_compare=suggestions_cols_to_compare,
+    correct_code_col=correct_code_col,
+    k_values=range(4, 10),
+    ave_time_per_query_list=ave_elapsed_per_row_list,
+)
+
+compare_performance_metrics.head()
