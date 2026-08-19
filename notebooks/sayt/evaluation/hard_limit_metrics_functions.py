@@ -16,6 +16,7 @@ class SAYTHardLimitMetrics(BaseModel):
     Aggregated across a dataframe of queries.
     """
 
+    suggestions_col: str
     num_queries: int  # Total number of queries evaluated
     cutoff_k: int  # The hard limit (e.g., 9)
     max_suggestions_returned: int  # Max returned in this dataset
@@ -30,7 +31,7 @@ class SAYTHardLimitMetrics(BaseModel):
     def report_metrics(self) -> str:
         """Generate a human-readable report of the metrics."""
         report = (
-            "SAYT Hard Limit Metrics\n"
+            f"SAYT Hard Limit Metrics for column '{self.suggestions_col}':\n"
             f" Number of queries: {self.num_queries}\n"
             f" Suggestions limit (k): {self.cutoff_k}\n"
             f" Maximum suggestions returned: {self.max_suggestions_returned}\n"
@@ -93,6 +94,7 @@ def compute_suggestions_hard_limit_metrics(  # noqa: PLR0913 pylint: disable = R
 
     return summarise_hard_limit_metrics(
         df=df,
+        suggestions_col=suggestions_col,
         cutoff_k=cutoff_k,
     )
 
@@ -176,6 +178,7 @@ def add_sayt_hard_limit_metrics_columns(  # noqa: PLR0913 pylint: disable = R091
 
 def summarise_hard_limit_metrics(
     df,
+    suggestions_col: str,
     cutoff_k: int,
     prefix: str = "",
 ) -> SAYTHardLimitMetrics:
@@ -183,6 +186,7 @@ def summarise_hard_limit_metrics(
 
     Args:
         df: DataFrame containing the suggestions and correct codes.
+        suggestions_col: The name of the column with the suggestions.
         cutoff_k: The hard limit on the number of suggestions returned.
         prefix: Optional prefix for the metric columns.
 
@@ -190,6 +194,7 @@ def summarise_hard_limit_metrics(
         SAYTHardLimitMetrics: The computed hard limit metrics.
     """
     summary = {
+        "suggestions_col": suggestions_col,
         "num_queries": len(df),
         "cutoff_k": cutoff_k,
         "max_suggestions_returned": df[f"{prefix}num_retrieved_codes"].max(),
@@ -203,3 +208,44 @@ def summarise_hard_limit_metrics(
     }
 
     return SAYTHardLimitMetrics(**summary)
+
+
+def build_sayt_hard_limit_metrics_comparison_table(
+    df,
+    suggestions_cols_to_compare: list[str],
+    correct_code_col: str,
+    cutoff_k: int,
+):
+    """Build a comparison table of performance metrics across suggestion columns.
+
+    Args:
+        df: DataFrame containing the retrieved suggestions and correct codes.
+        suggestions_cols_to_compare: List of column names containing
+            the retrieved suggestions to compare.
+        correct_code_col: Column name containing the correct code.
+        cutoff_k: The hard limit on the number of suggestions returned.
+
+    Returns:
+        pd.DataFrame: One row per suggestion column with all hard limit metrics.
+    """
+    performance_metrics = pd.DataFrame()
+    code_length = len(df[correct_code_col].iloc[0])  # inferred from first row
+
+    for col in suggestions_cols_to_compare:
+        score_col = col.replace("suggestions_", "scores_")
+        performance_metrics_tmp = {
+            **compute_suggestions_hard_limit_metrics(
+                df,
+                correct_code_col=correct_code_col,
+                suggestions_col=col,
+                cutoff_k=cutoff_k,
+                code_length=code_length,
+                score_col=score_col,
+            ).__dict__,
+        }
+
+        performance_metrics = pd.concat(
+            [performance_metrics, pd.DataFrame([performance_metrics_tmp])],
+            ignore_index=True,
+        )
+    return performance_metrics

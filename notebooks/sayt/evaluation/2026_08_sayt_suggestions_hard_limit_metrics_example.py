@@ -16,6 +16,7 @@ from survey_assist_embed_core.sayt import (
 from survey_assist_utils.logging import get_logger
 
 from notebooks.sayt.evaluation.hard_limit_metrics_functions import (
+    build_sayt_hard_limit_metrics_comparison_table,
     compute_suggestions_hard_limit_metrics,
 )
 from notebooks.sayt.sayt_utils import (
@@ -108,7 +109,7 @@ suggesters = {
 }
 
 # %%
-
+# get suggestions for the test queries with a hard limit on the number of suggestions returned
 test_df_hard_limit, avg_ms_dict = get_suggestions_by_chars(
     df=test_df,
     suggesters_dict=suggesters,
@@ -134,7 +135,7 @@ compare_performance_metrics_hard_limit = build_sayt_metrics_comparison_table(
 compare_performance_metrics_hard_limit.head()
 
 # %%
-
+# compute hard limit metrics for suggestions when no hard limit applied
 test_df_none_hard_limit, avg_ms_dict = get_suggestions_by_chars(
     df=test_df,
     suggesters_dict=suggesters,
@@ -144,16 +145,25 @@ test_df_none_hard_limit, avg_ms_dict = get_suggestions_by_chars(
     with_scores=True,
 )
 
-for suggester_col in suggestions_cols_to_compare:
-    hard_limit_metrics = compute_suggestions_hard_limit_metrics(
-        df=test_df_none_hard_limit,
-        correct_code_col=correct_code_col,
-        suggestions_col=suggester_col,
-        cutoff_k=MAX_SUGGESTIONS,
-        code_length=SIC_CODE_LENGTH,
-        score_col=suggester_col.replace("suggestions_", "scores_"),
-    )
-    print(f"Hard limit metrics for {suggester_col}:")
-    print(hard_limit_metrics.__dict__)
+compute_suggestions_hard_limit_metrics(
+    test_df_none_hard_limit,
+    correct_code_col=correct_code_col,
+    suggestions_col=suggestions_cols_to_compare[0],
+    cutoff_k=MAX_SUGGESTIONS,
+    code_length=SIC_CODE_LENGTH,
+    score_col=suggestions_cols_to_compare[0].replace("suggestions_", "scores_"),
+).report_metrics()
 
+suggestions_cols_to_compare = test_df_none_hard_limit.columns[
+    test_df_none_hard_limit.columns.str.startswith("suggestions_")
+].tolist()
+
+compare_hard_limit_metrics = build_sayt_hard_limit_metrics_comparison_table(
+    test_df_none_hard_limit,
+    suggestions_cols_to_compare=suggestions_cols_to_compare,
+    correct_code_col=correct_code_col,
+    cutoff_k=MAX_SUGGESTIONS,
+)
+
+compare_hard_limit_metrics.head()
 # %%

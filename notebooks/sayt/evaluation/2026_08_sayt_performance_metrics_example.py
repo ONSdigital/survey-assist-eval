@@ -10,6 +10,8 @@ import pandas as pd
 from dotenv import load_dotenv
 from survey_assist_embed_core.sayt import (
     NgramRetrieverSpec,
+    PrefixRetrieverSpec,
+    SemanticRetrieverSpec,
 )
 from survey_assist_utils.logging import get_logger
 
@@ -95,12 +97,12 @@ suggesters = {
     "Ngrams only": build_lookup_suggester(
         sayt2_corpus, retrievers=[NgramRetrieverSpec()]
     ),
-    # "Prefix only": build_lookup_suggester(
-    #     sayt2_corpus, retrievers=[PrefixRetrieverSpec()]
-    # ),
-    # "Semantic only": build_lookup_suggester(
-    #     sayt2_corpus, retrievers=[SemanticRetrieverSpec()]
-    # ),
+    "Prefix only": build_lookup_suggester(
+        sayt2_corpus, retrievers=[PrefixRetrieverSpec()]
+    ),
+    "Semantic only": build_lookup_suggester(
+        sayt2_corpus, retrievers=[SemanticRetrieverSpec()]
+    ),
 }
 
 
