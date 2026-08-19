@@ -156,7 +156,7 @@ def add_sayt_hard_limit_metrics_columns(  # noqa: PLR0913 pylint: disable = R091
 def summarise_hard_limit_metrics(
     df,
     cutoff_k: int,
-    prefix: str | None = None,
+    prefix: str = "",
 ) -> SAYTHardLimitMetrics:
     """Compute summary metrics for hard limit suggestions evaluation.
 
