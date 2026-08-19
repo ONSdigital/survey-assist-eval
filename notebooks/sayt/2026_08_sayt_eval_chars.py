@@ -236,68 +236,12 @@ def run_eval_for_suggesters(
 
 
 # %%
-def suggester_analysis_table(
-    df: pd.DataFrame,
-    suggester_name: str | None = None,
-    num_chars: int | None = None,
-):
-    """Allows suggesters analysis in a table format.
-
-    Args:
-        df (pd.DataFrame): dataframe with suggestions from suggester.
-            Requires columns: "suggester", "num_chars", "rank".
-        suggester_name (str): suggester name to be analysed.
-        num_chars (int): number of characters to be checked.
-
-    Return:
-        filtered dataframe with specified suggester name and/or number of characters.
-    """
-    df_copy = df.copy()
-
-    results = df_copy.groupby(["suggester", "num_chars", "rank"]).count()
-
-    # Helper function
-    def print_for_suggester_and_chars(
-        df: pd.DataFrame,
-        suggester_name: str | None = None,
-        num_chars: int | None = None,
-    ):
-        """Allows printing tables for specified parameters. Handles if any or either are
-            not specified.
-
-        Args:
-            df (pd.DataFrame): dataframe containing grouped suggestions.
-            suggester_name (str): suggester name to be analysed.
-            num_chars (int): number of characters to be checked.
-
-        Return:
-            filtered dataframe with specified suggester name and/or number of characters.
-        """
-        if num_chars is None and suggester_name is None:
-            return df
-        if num_chars is None:
-            return df.loc[(suggester_name)]
-        if suggester_name is None:
-            return df.loc[pd.IndexSlice[:, num_chars], :]
-        return df.loc[(suggester_name, num_chars)]
-
-    return print_for_suggester_and_chars(
-        df=results, suggester_name=suggester_name, num_chars=num_chars
-    )
-
-
-# %%
 melt_df_simple, suggestions_df_simple, avg_ms_dict_simple, fig_simple = (
     run_eval_for_suggesters(
         test_df, suggesters_simple, NUM_CHARACTERS_LIST, output_dir=OUTPUT_DIR
     )
 )
 
-# %%
-suggester_analysis_table(melt_df_simple)
-
-# %%
-suggester_analysis_table(melt_df_simple, num_chars=6)
 
 # %%
 melt_df_pairs, suggestions_df_pairs, avg_ms_dict_pairs, fig_pairs = (
@@ -308,12 +252,6 @@ melt_df_pairs, suggestions_df_pairs, avg_ms_dict_pairs, fig_pairs = (
         output_dir=f"{OUTPUT_DIR}_pairs",
     )
 )
-
-# %%
-suggester_analysis_table(melt_df_pairs)
-
-# %%
-suggester_analysis_table(melt_df_pairs, num_chars=6)
 
 # %%
 melt_df_three, suggestions_df_three, avg_ms_dict_three, fig_three = (
