@@ -27,6 +27,7 @@ from notebooks.sayt.sayt_utils import (
     melt_results_for_analysis,
 )
 from survey_assist_eval.evaluation.sayt.performance_metrics_functions import (
+    build_sayt_metrics_comparison_table,
     compute_performance_metrics_from_suggestions,
 )
 
@@ -219,7 +220,10 @@ def run_eval_for_suggesters(  # noqa: PLR0913 pylint: disable=R0913, R0914
     Return:
         pd.DataFrame: dataframe with results from suggesters, split by the type of suggester
             and number of characters.
-
+        pd.DataFrame: dataframe containing suggestions.
+        dict: dictionary containing average running time for each suggester.
+        dict: dictionary containing performance metrics for each suggester.
+        figure: plot showing distribution of ranks by suggestions and number of characters.
     """
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
@@ -343,23 +347,49 @@ fig_all = create_figure(melt_df_all, output_dir=OUTPUT_DIR)
 # df_to_check = suggestions_df_all
 # time_to_check = avg_ms_dict_all
 
+
 # %%
-# Comparison of performance metrics for the different suggesters and prefix lengths
-# suggestions_cols_to_compare = suggestions_df.columns[
-#     suggestions_df.columns.str.startswith("suggestions_")
-# ].tolist()
+def get_performance_metrics_table(
+    df: pd.DataFrame,
+    avg_time_dict: dict,
+    correct_code_col: str,
+    num_chars: list[int],
+):
+    """Comparison of performance metrics for the different suggesters and prefix lengths.
 
-# ave_elapsed_per_row_list = [
-#     time_to_check.get(col.removeprefix("suggestions_"), 0)
-#     for col in suggestions_cols_to_compare
-# ]
+    Args:
+        df (pd.DataFrame): dataframe containing suggestions.
+        avg_time_dict (dict): dictionary containing average time for each suggester.
+        correct_code_col (str): name of the column containing correct codes.
+        num_chars (list): number of characters to be tested.
 
-# compare_performance_metrics = build_sayt_metrics_comparison_table(
-#     df_to_check,
-#     suggestions_cols_to_compare=suggestions_cols_to_compare,
-#     correct_code_col=CORRECT_CODE_COL,
-#     k_values=NUM_CHARACTERS_LIST,
-#     ave_time_per_query_list=ave_elapsed_per_row_list,
-# )
+    Return:
+        pd.DataFrame: dataframe with performance metrics.
+    """
+    suggestions_cols_to_compare = df.columns[
+        df.columns.str.startswith("suggestions_")
+    ].tolist()
 
-# compare_performance_metrics.head()
+    ave_elapsed_per_row_list = [
+        avg_time_dict.get(col.removeprefix("suggestions_"), 0)
+        for col in suggestions_cols_to_compare
+    ]
+
+    compare_performance_metrics = build_sayt_metrics_comparison_table(
+        df,
+        suggestions_cols_to_compare=suggestions_cols_to_compare,
+        correct_code_col=correct_code_col,
+        k_values=num_chars,
+        ave_time_per_query_list=ave_elapsed_per_row_list,
+    )
+
+    return compare_performance_metrics
+
+
+# %%
+a = get_performance_metrics_table(
+    suggestions_df_one, avg_ms_dict_one, CORRECT_CODE_COL, NUM_CHARACTERS_LIST
+)
+
+# %%
+type(a)
