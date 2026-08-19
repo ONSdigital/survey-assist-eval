@@ -151,7 +151,7 @@ def compute_reciprocal_rank(retrieved_codes: list[str], correct_code: str) -> fl
 
 def get_rank_of_correct_code(
     retrieved_codes: list[str], correct_code: str
-) -> float | None:
+) -> int | None:
     """Get the rank of the correct code in the retrieved list for a single query.
 
     Args:
@@ -159,11 +159,11 @@ def get_rank_of_correct_code(
         correct_code: The correct code for the query.
 
     Returns:
-        float: Rank of the correct code, or None if not found.
+        int: Rank of the correct code, or None if not found.
     """
     for rank, item in enumerate(retrieved_codes, start=1):
         if item == correct_code:
-            return float(rank)
+            return int(rank)
     return None
 
 

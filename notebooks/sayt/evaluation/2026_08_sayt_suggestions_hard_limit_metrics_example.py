@@ -1,4 +1,4 @@
-"""A script showing an example of using SAYT performance metrics."""
+"""A script showing an example of using SAYT suggestions hard limit metrics."""
 
 # pylint: disable=invalid-name
 # pylint: disable=duplicate-code
@@ -15,6 +15,9 @@ from survey_assist_embed_core.sayt import (
 )
 from survey_assist_utils.logging import get_logger
 
+from notebooks.sayt.evaluation.hard_limit_metrics_functions import (
+    compute_hard_limit_suggestions_metrics_from_suggestions,
+)
 from notebooks.sayt.sayt_utils import (
     build_lookup_suggester,
     build_sayt_corpus_from_df,
@@ -23,7 +26,6 @@ from notebooks.sayt.sayt_utils import (
 )
 from survey_assist_eval.evaluation.sayt.performance_metrics_functions import (
     build_sayt_metrics_comparison_table,
-    compute_performance_metrics_from_suggestions,
 )
 
 # %%
@@ -105,67 +107,46 @@ suggesters = {
     ),
 }
 
-
 # %%
 
-test_df, avg_ms_dict = get_suggestions_by_chars(
+test_df_hard_limit, avg_ms_dict = get_suggestions_by_chars(
     df=test_df,
     suggesters_dict=suggesters,
     characters=[4, 5, 7, 10],
     suggestions_limit=MAX_SUGGESTIONS,
-    hard_suggestions_limit=False,
+    hard_suggestions_limit=True,
     with_scores=True,
 )
 
-suggestions_cols_to_compare = test_df.columns[
-    test_df.columns.str.startswith("suggestions_")
+suggestions_cols_to_compare = test_df_hard_limit.columns[
+    test_df_hard_limit.columns.str.startswith("suggestions_")
 ].tolist()
 
-# %%
-# Performance metrics for one suggester and prefix length
-metrics = compute_performance_metrics_from_suggestions(
-    test_df,
-    correct_code_col=correct_code_col,
-    suggestions_col=suggestions_cols_to_compare[2],
-    code_length=SIC_CODE_LENGTH,
-    k_values=[1, 3, 5, MAX_SUGGESTIONS],
-    ave_time_per_query=avg_ms_dict.get(
-        suggestions_cols_to_compare[2].removeprefix("suggestions_"), 0
-    ),
-)
-
-print(metrics.report_metrics())
-
-# %%
-# Performance metrics for one suggester and prefix length
-metrics_2_digit_match = compute_performance_metrics_from_suggestions(
-    test_df,
-    correct_code_col=correct_code_col,
-    suggestions_col=suggestions_cols_to_compare[2],
-    code_length=SIC_CODE_LENGTH,
-    k_values=[1, 3, 5, MAX_SUGGESTIONS],
-    ave_time_per_query=avg_ms_dict.get(
-        suggestions_cols_to_compare[2].removeprefix("suggestions_"), 0
-    ),
-    code_digit_match_length=2,
-)
-
-print(metrics_2_digit_match.report_metrics())
-
-# %%
-# Comparison of performance metrics for the different suggesters and prefix lengths
 ave_elapsed_per_row_list = [
     avg_ms_dict.get(col.removeprefix("suggestions_"), 0)
     for col in suggestions_cols_to_compare
 ]
 
-compare_performance_metrics = build_sayt_metrics_comparison_table(
-    test_df,
+compare_performance_metrics_hard_limit = build_sayt_metrics_comparison_table(
+    test_df_hard_limit,
     suggestions_cols_to_compare=suggestions_cols_to_compare,
     correct_code_col=correct_code_col,
     k_values=[1, 3, 5, MAX_SUGGESTIONS],
     ave_time_per_query_list=ave_elapsed_per_row_list,
 )
 
-compare_performance_metrics.head()
+compare_performance_metrics_hard_limit.head()
+
 # %%
+
+for suggester_col in suggestions_cols_to_compare:
+    hard_limit_metrics = compute_hard_limit_suggestions_metrics_from_suggestions(
+        df=test_df,
+        correct_code_col=correct_code_col,
+        suggestions_col=suggester_col,
+        cutoff_k=MAX_SUGGESTIONS,
+        code_length=SIC_CODE_LENGTH,
+        score_col=suggester_col.replace("suggestions_", "scores_"),
+    )
+    print(f"Hard limit metrics for {suggester_col}:")
+    print(hard_limit_metrics.__dict__)

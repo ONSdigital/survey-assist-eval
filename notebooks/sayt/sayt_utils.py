@@ -280,6 +280,8 @@ def get_suggestions_by_chars(  # noqa: PLR0913 pylint: disable=R0917,R0913
         tuple[pd.DataFrame, float]: Suggestions for specified characters typed;
             average milliseconds per row.
     """
+    df = df.copy()
+
     avg_ms_dict = {}
     if characters is None:
         characters = [4, 5, 7, 10]
@@ -292,7 +294,7 @@ def get_suggestions_by_chars(  # noqa: PLR0913 pylint: disable=R0917,R0913
             )
 
             suggestions_col = f"suggestions_{prefix_chars}chars_{suggester_name}"
-            scores_col = f"scores_{prefix_chars}chars_{suggester_name}"
+            scores_col = suggestions_col.replace("suggestions_", "scores_")
 
             suggestions_result, avg_ms = timed_apply(
                 df,
