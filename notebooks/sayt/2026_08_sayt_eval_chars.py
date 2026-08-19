@@ -27,13 +27,13 @@ from notebooks.sayt.sayt_utils import (
     melt_results_for_analysis,
 )
 from survey_assist_eval.evaluation.sayt.performance_metrics_functions import (
-    build_sayt_metrics_comparison_table,
     compute_performance_metrics_from_suggestions,
 )
 
 # %%
 SIC_CODE_LENGTH = 5
 MAX_SUGGESTIONS = 9
+CORRECT_CODE_COL = "correct_sic_code"
 
 NUM_CHARACTERS_LIST = range(4, MAX_SUGGESTIONS)
 
@@ -110,7 +110,7 @@ sayt_corpus = list(
 # create suggesters using only one of the retrievers:
 # PrefixRetrieverSpec, NgramRetrieverSpec, or SemanticRetrieverSpec.
 
-suggesters_simple = {
+suggesters_one = {
     "Blaise proxy method (prefix only)": build_lookup_suggester(
         sayt_corpus, retrievers=[PrefixRetrieverSpec()]
     ),
@@ -125,7 +125,7 @@ suggesters_simple = {
 # %%
 # Test for interactions between suggesters
 
-suggesters_pairs = {
+suggesters_two = {
     "Blaise proxy method (prefix and ngram)": build_lookup_suggester(
         sayt_corpus, retrievers=[PrefixRetrieverSpec(), NgramRetrieverSpec()]
     ),
@@ -153,7 +153,7 @@ suggesters_three = {
 # # create suggesters using only one of the retrievers:
 # # PrefixRetrieverSpec, NgramRetrieverSpec, or SemanticRetrieverSpec.
 
-# suggesters_simple = {
+# suggesters_one = {
 #     "Blaise proxy method (prefix only)": build_lookup_suggester(
 #         sayt2_corpus, retrievers=[PrefixRetrieverSpec()]
 #     ),
@@ -168,7 +168,7 @@ suggesters_three = {
 # # %%
 # # Test for interactions between suggesters
 
-# suggesters_pairs = {
+# suggesters_two = {
 #     "Blaise proxy method (prefix and ngram)": build_lookup_suggester(
 #         sayt2_corpus, retrievers=[PrefixRetrieverSpec(), NgramRetrieverSpec()]
 #     ),
@@ -194,11 +194,14 @@ suggesters_three = {
 
 
 # %%
-def run_eval_for_suggesters(
+def run_eval_for_suggesters(  # noqa: PLR0913 pylint: disable=R0913, R0914
+    *,
     df: pd.DataFrame,
+    correct_code_col: str,
     suggesters_dict: dict,
     num_chars: list[int],
     suggestions_limit: int = 9,
+    code_length: int = 5,
     output_dir: str = OUTPUT_DIR,
 ):
     """Use functions necessary to create a dataframe that allows for grouping by
@@ -206,9 +209,11 @@ def run_eval_for_suggesters(
 
     Args:
         df (pd.DataFrame): dataframe to be tested.
+        correct_code_col (str): name of the column containing correct codes.
         suggesters_dict (dict): a dictionary with suggester models.
         num_chars (list): number of characters to be tested.
         suggestions_limit: the maximum rank of suggestions considered as valid.
+        code_length (int): expected SIC/SOC code length.
         output_dir (str): path to file location to be saved.
 
     Return:
@@ -232,47 +237,78 @@ def run_eval_for_suggesters(
 
     fig = create_figure(melt, output_dir=output_dir)
 
-    return melt, suggestions_df, avg_ms_dict, fig
+    suggestions_cols_to_compare = suggestions_df.columns[
+        suggestions_df.columns.str.startswith("suggestions_")
+    ].tolist()
+
+    metrics_dict = {}
+
+    # Performance metrics for one suggester and prefix length
+    for _, suggester in enumerate(suggestions_cols_to_compare):
+        metrics = compute_performance_metrics_from_suggestions(
+            suggestions_df,
+            correct_code_col=correct_code_col,
+            suggestions_col=suggester,
+            code_length=code_length,
+            k_values=num_chars,
+            ave_time_per_query=avg_ms_dict.get(
+                suggester.removeprefix("suggestions_"), 0
+            ),
+        )
+        metrics_dict[suggester] = metrics.report_metrics()
+
+    return melt, suggestions_df, avg_ms_dict, metrics_dict, fig
 
 
 # %%
-melt_df_simple, suggestions_df_simple, avg_ms_dict_simple, fig_simple = (
+melt_df_one, suggestions_df_one, avg_ms_dict_one, metrics_one, fig_one = (
     run_eval_for_suggesters(
-        test_df, suggesters_simple, NUM_CHARACTERS_LIST, output_dir=OUTPUT_DIR
+        df=test_df,
+        suggesters_dict=suggesters_one,
+        num_chars=NUM_CHARACTERS_LIST,
+        suggestions_limit=MAX_SUGGESTIONS,
+        code_length=SIC_CODE_LENGTH,
+        correct_code_col=CORRECT_CODE_COL,
+        output_dir=OUTPUT_DIR,
     )
 )
 
-
 # %%
-melt_df_pairs, suggestions_df_pairs, avg_ms_dict_pairs, fig_pairs = (
+melt_df_two, suggestions_df_two, avg_ms_dict_two, metrics_two, fig_two = (
     run_eval_for_suggesters(
-        test_df,
-        suggesters_pairs,
-        NUM_CHARACTERS_LIST,
-        output_dir=f"{OUTPUT_DIR}_pairs",
+        df=test_df,
+        suggesters_dict=suggesters_two,
+        num_chars=NUM_CHARACTERS_LIST,
+        suggestions_limit=MAX_SUGGESTIONS,
+        code_length=SIC_CODE_LENGTH,
+        correct_code_col=CORRECT_CODE_COL,
+        output_dir=f"{OUTPUT_DIR}_two",
     )
 )
 
 # %%
-melt_df_three, suggestions_df_three, avg_ms_dict_three, fig_three = (
+melt_df_three, suggestions_df_three, avg_ms_dict_three, metrics_three, fig_three = (
     run_eval_for_suggesters(
-        test_df,
-        suggesters_three,
-        NUM_CHARACTERS_LIST,
+        df=test_df,
+        suggesters_dict=suggesters_three,
+        num_chars=NUM_CHARACTERS_LIST,
+        suggestions_limit=MAX_SUGGESTIONS,
+        code_length=SIC_CODE_LENGTH,
+        correct_code_col=CORRECT_CODE_COL,
         output_dir=f"{OUTPUT_DIR}_three",
     )
 )
 
 # %%
 melt_df_all = (
-    pd.concat([melt_df_simple, melt_df_pairs, melt_df_three], ignore_index=True)
+    pd.concat([melt_df_one, melt_df_two, melt_df_three], ignore_index=True)
     .drop_duplicates()
     .copy()
 )
 
 # %%
 suggestions_df_all = pd.concat(
-    [suggestions_df_simple, suggestions_df_pairs, suggestions_df_three],
+    [suggestions_df_one, suggestions_df_two, suggestions_df_three],
     ignore_index=True,
 ).copy()
 
@@ -286,7 +322,7 @@ for col in suggestions_columns:
     )
 
 # %%
-avg_ms_dict_all = avg_ms_dict_simple | avg_ms_dict_pairs | avg_ms_dict_three
+avg_ms_dict_all = avg_ms_dict_one | avg_ms_dict_two | avg_ms_dict_three
 
 # %%
 fig_all = create_figure(melt_df_all, output_dir=OUTPUT_DIR)
@@ -294,51 +330,36 @@ fig_all = create_figure(melt_df_all, output_dir=OUTPUT_DIR)
 # %%
 # Specify datframe to check
 
-df_to_check = suggestions_df_pairs
-time_to_check = avg_ms_dict_pairs
+# df_to_check = suggestions_df_two
+# time_to_check = avg_ms_dict_two
 
 
 # Note: performance metrics doesn't allow NaN values (result of concatenating dataframes
 # from three different approaches). This results in metrics being unreliable and reults
 # should be assessed from using one of:
-# - suggestions_df_simple
-# - suggestions_df_pairs
+# - suggestions_df_one
+# - suggestions_df_two
 # - suggestions_df_three
 # df_to_check = suggestions_df_all
 # time_to_check = avg_ms_dict_all
 
 # %%
-# prepare column names
-correct_code_col = "correct_sic_code"
-suggestions_cols_to_compare = df_to_check.columns[
-    df_to_check.columns.str.startswith("suggestions_")
-].tolist()
-
-# Performance metrics for one suggester and prefix length
-for _, suggester in enumerate(suggestions_cols_to_compare):
-    metrics = compute_performance_metrics_from_suggestions(
-        df_to_check,
-        correct_code_col=correct_code_col,
-        suggestions_col=suggester,
-        code_length=SIC_CODE_LENGTH,
-        k_values=NUM_CHARACTERS_LIST,
-        ave_time_per_query=time_to_check.get(suggester.removeprefix("suggestions_"), 0),
-    )
-    # print(metrics.report_metrics())
-
-# %%
 # Comparison of performance metrics for the different suggesters and prefix lengths
-ave_elapsed_per_row_list = [
-    time_to_check.get(col.removeprefix("suggestions_"), 0)
-    for col in suggestions_cols_to_compare
-]
+# suggestions_cols_to_compare = suggestions_df.columns[
+#     suggestions_df.columns.str.startswith("suggestions_")
+# ].tolist()
 
-compare_performance_metrics = build_sayt_metrics_comparison_table(
-    df_to_check,
-    suggestions_cols_to_compare=suggestions_cols_to_compare,
-    correct_code_col=correct_code_col,
-    k_values=NUM_CHARACTERS_LIST,
-    ave_time_per_query_list=ave_elapsed_per_row_list,
-)
+# ave_elapsed_per_row_list = [
+#     time_to_check.get(col.removeprefix("suggestions_"), 0)
+#     for col in suggestions_cols_to_compare
+# ]
 
-compare_performance_metrics.head()
+# compare_performance_metrics = build_sayt_metrics_comparison_table(
+#     df_to_check,
+#     suggestions_cols_to_compare=suggestions_cols_to_compare,
+#     correct_code_col=CORRECT_CODE_COL,
+#     k_values=NUM_CHARACTERS_LIST,
+#     ave_time_per_query_list=ave_elapsed_per_row_list,
+# )
+
+# compare_performance_metrics.head()
