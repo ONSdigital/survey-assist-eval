@@ -311,19 +311,24 @@ melt_df_all = (
 )
 
 # %%
-suggestions_df_all = pd.concat(
-    [suggestions_df_one, suggestions_df_two, suggestions_df_three],
-    ignore_index=True,
-).copy()
+suggestions_df_all = suggestions_df_one.merge(
+    suggestions_df_two, on="correct_sic_code", how="outer"
+).merge(suggestions_df_three, on="correct_sic_code", how="outer")
 
-suggestions_columns = suggestions_df_all.columns[
-    suggestions_df_all.columns.str.startswith("suggestions_")
-].tolist()
+# %%
+# suggestions_df_all = pd.concat(
+#     [suggestions_df_one, suggestions_df_two, suggestions_df_three],
+#     ignore_index=True,
+# ).copy()
 
-for col in suggestions_columns:
-    suggestions_df_all[col] = suggestions_df_all[col].apply(
-        lambda x: x if isinstance(x, list) else []
-    )
+# suggestions_columns = suggestions_df_all.columns[
+#     suggestions_df_all.columns.str.startswith("suggestions_")
+# ].tolist()
+
+# for col in suggestions_columns:
+#     suggestions_df_all[col] = suggestions_df_all[col].apply(
+#         lambda x: x if isinstance(x, list) else []
+#     )
 
 # %%
 avg_ms_dict_all = avg_ms_dict_one | avg_ms_dict_two | avg_ms_dict_three
@@ -387,9 +392,28 @@ def get_performance_metrics_table(
 
 
 # %%
-a = get_performance_metrics_table(
+metrics_table_one = get_performance_metrics_table(
     suggestions_df_one, avg_ms_dict_one, CORRECT_CODE_COL, NUM_CHARACTERS_LIST
+).head()
+
+# %%
+metrics_table_two = get_performance_metrics_table(
+    suggestions_df_two, avg_ms_dict_two, CORRECT_CODE_COL, NUM_CHARACTERS_LIST
+).head()
+
+# %%
+metrics_table_three = get_performance_metrics_table(
+    suggestions_df_three, avg_ms_dict_three, CORRECT_CODE_COL, NUM_CHARACTERS_LIST
+).head()
+
+
+# %%
+metrics_table_all = get_performance_metrics_table(
+    suggestions_df_all, avg_ms_dict_all, CORRECT_CODE_COL, NUM_CHARACTERS_LIST
 )
 
 # %%
-type(a)
+metrics_table_one.head()
+
+# %%
+metrics_table_all.head()
