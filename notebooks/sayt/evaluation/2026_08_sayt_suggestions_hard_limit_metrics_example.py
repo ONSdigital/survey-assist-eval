@@ -106,6 +106,14 @@ suggesters = {
     "Semantic only": build_lookup_suggester(
         sayt2_corpus, retrievers=[SemanticRetrieverSpec()]
     ),
+    "All Suggesters": build_lookup_suggester(
+        sayt2_corpus,
+        retrievers=[
+            NgramRetrieverSpec(),
+            PrefixRetrieverSpec(),
+            SemanticRetrieverSpec(),
+        ],
+    ),
 }
 
 # %%
@@ -145,14 +153,16 @@ test_df_none_hard_limit, avg_ms_dict = get_suggestions_by_chars(
     with_scores=True,
 )
 
-compute_suggestions_hard_limit_metrics(
-    test_df_none_hard_limit,
-    correct_code_col=correct_code_col,
-    suggestions_col=suggestions_cols_to_compare[0],
-    cutoff_k=MAX_SUGGESTIONS,
-    code_length=SIC_CODE_LENGTH,
-    score_col=suggestions_cols_to_compare[0].replace("suggestions_", "scores_"),
-).report_metrics()
+print(
+    compute_suggestions_hard_limit_metrics(
+        test_df_none_hard_limit,
+        correct_code_col=correct_code_col,
+        suggestions_col=suggestions_cols_to_compare[0],
+        cutoff_k=MAX_SUGGESTIONS,
+        code_length=SIC_CODE_LENGTH,
+        score_col=suggestions_cols_to_compare[0].replace("suggestions_", "scores_"),
+    ).report_metrics()
+)
 
 suggestions_cols_to_compare = test_df_none_hard_limit.columns[
     test_df_none_hard_limit.columns.str.startswith("suggestions_")
