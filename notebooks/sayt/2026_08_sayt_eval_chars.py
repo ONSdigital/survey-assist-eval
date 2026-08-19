@@ -261,37 +261,33 @@ def run_eval_for_suggesters(  # noqa: PLR0913 pylint: disable=R0913, R0914
         )
         metrics_dict[suggester] = metrics.report_metrics()
 
-    return melt, suggestions_df, avg_ms_dict, metrics_dict, fig
+    return suggestions_df, avg_ms_dict, metrics_dict, fig
 
 
 # %%
-melt_df_one, suggestions_df_one, avg_ms_dict_one, metrics_one, fig_one = (
-    run_eval_for_suggesters(
-        df=test_df,
-        suggesters_dict=suggesters_one,
-        num_chars=NUM_CHARACTERS_LIST,
-        suggestions_limit=MAX_SUGGESTIONS,
-        code_length=SIC_CODE_LENGTH,
-        correct_code_col=CORRECT_CODE_COL,
-        output_dir=OUTPUT_DIR,
-    )
+suggestions_df_one, avg_ms_dict_one, metrics_one, fig_one = run_eval_for_suggesters(
+    df=test_df,
+    suggesters_dict=suggesters_one,
+    num_chars=NUM_CHARACTERS_LIST,
+    suggestions_limit=MAX_SUGGESTIONS,
+    code_length=SIC_CODE_LENGTH,
+    correct_code_col=CORRECT_CODE_COL,
+    output_dir=OUTPUT_DIR,
 )
 
 # %%
-melt_df_two, suggestions_df_two, avg_ms_dict_two, metrics_two, fig_two = (
-    run_eval_for_suggesters(
-        df=test_df,
-        suggesters_dict=suggesters_two,
-        num_chars=NUM_CHARACTERS_LIST,
-        suggestions_limit=MAX_SUGGESTIONS,
-        code_length=SIC_CODE_LENGTH,
-        correct_code_col=CORRECT_CODE_COL,
-        output_dir=f"{OUTPUT_DIR}_two",
-    )
+suggestions_df_two, avg_ms_dict_two, metrics_two, fig_two = run_eval_for_suggesters(
+    df=test_df,
+    suggesters_dict=suggesters_two,
+    num_chars=NUM_CHARACTERS_LIST,
+    suggestions_limit=MAX_SUGGESTIONS,
+    code_length=SIC_CODE_LENGTH,
+    correct_code_col=CORRECT_CODE_COL,
+    output_dir=f"{OUTPUT_DIR}_two",
 )
 
 # %%
-melt_df_three, suggestions_df_three, avg_ms_dict_three, metrics_three, fig_three = (
+suggestions_df_three, avg_ms_dict_three, metrics_three, fig_three = (
     run_eval_for_suggesters(
         df=test_df,
         suggesters_dict=suggesters_three,
@@ -304,53 +300,18 @@ melt_df_three, suggestions_df_three, avg_ms_dict_three, metrics_three, fig_three
 )
 
 # %%
-melt_df_all = (
-    pd.concat([melt_df_one, melt_df_two, melt_df_three], ignore_index=True)
-    .drop_duplicates()
-    .copy()
+suggesters_all = {**suggesters_one, **suggesters_two, **suggesters_three}
+
+# %%
+suggestions_df_all, avg_ms_dict_all, metrics_all, fig_all = run_eval_for_suggesters(
+    df=test_df,
+    suggesters_dict=suggesters_all,
+    num_chars=NUM_CHARACTERS_LIST,
+    suggestions_limit=MAX_SUGGESTIONS,
+    code_length=SIC_CODE_LENGTH,
+    correct_code_col=CORRECT_CODE_COL,
+    output_dir=f"{OUTPUT_DIR}_all",
 )
-
-# %%
-suggestions_df_all = suggestions_df_one.merge(
-    suggestions_df_two, on="correct_sic_code", how="outer"
-).merge(suggestions_df_three, on="correct_sic_code", how="outer")
-
-# %%
-# suggestions_df_all = pd.concat(
-#     [suggestions_df_one, suggestions_df_two, suggestions_df_three],
-#     ignore_index=True,
-# ).copy()
-
-# suggestions_columns = suggestions_df_all.columns[
-#     suggestions_df_all.columns.str.startswith("suggestions_")
-# ].tolist()
-
-# for col in suggestions_columns:
-#     suggestions_df_all[col] = suggestions_df_all[col].apply(
-#         lambda x: x if isinstance(x, list) else []
-#     )
-
-# %%
-avg_ms_dict_all = avg_ms_dict_one | avg_ms_dict_two | avg_ms_dict_three
-
-# %%
-fig_all = create_figure(melt_df_all, output_dir=OUTPUT_DIR)
-
-# %%
-# Specify datframe to check
-
-# df_to_check = suggestions_df_two
-# time_to_check = avg_ms_dict_two
-
-
-# Note: performance metrics doesn't allow NaN values (result of concatenating dataframes
-# from three different approaches). This results in metrics being unreliable and reults
-# should be assessed from using one of:
-# - suggestions_df_one
-# - suggestions_df_two
-# - suggestions_df_three
-# df_to_check = suggestions_df_all
-# time_to_check = avg_ms_dict_all
 
 
 # %%
