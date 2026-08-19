@@ -33,6 +33,9 @@ from survey_assist_eval.evaluation.sayt.performance_metrics_functions import (
 
 # %%
 SIC_CODE_LENGTH = 5
+MAX_SUGGESTIONS = 9
+
+NUM_CHARACTERS_LIST = range(4, MAX_SUGGESTIONS)
 
 # %%
 load_dotenv()
@@ -286,7 +289,7 @@ def suggester_analysis_table(
 # %%
 melt_df_simple, suggestions_df_simple, avg_ms_dict_simple, fig_simple = (
     run_eval_for_suggesters(
-        test_df, suggesters_simple, range(4, 10), output_dir=OUTPUT_DIR
+        test_df, suggesters_simple, NUM_CHARACTERS_LIST, output_dir=OUTPUT_DIR
     )
 )
 
@@ -301,7 +304,7 @@ melt_df_pairs, suggestions_df_pairs, avg_ms_dict_pairs, fig_pairs = (
     run_eval_for_suggesters(
         test_df,
         suggesters_pairs,
-        range(4, 10),
+        NUM_CHARACTERS_LIST,
         output_dir=f"{OUTPUT_DIR}_pairs",
     )
 )
@@ -317,7 +320,7 @@ melt_df_three, suggestions_df_three, avg_ms_dict_three, fig_three = (
     run_eval_for_suggesters(
         test_df,
         suggesters_three,
-        range(4, 10),
+        NUM_CHARACTERS_LIST,
         output_dir=f"{OUTPUT_DIR}_three",
     )
 )
@@ -380,7 +383,7 @@ for _, suggester in enumerate(suggestions_cols_to_compare):
         correct_code_col=correct_code_col,
         suggestions_col=suggester,
         code_length=SIC_CODE_LENGTH,
-        k_values=range(4, 10),
+        k_values=NUM_CHARACTERS_LIST,
         ave_time_per_query=time_to_check.get(suggester.removeprefix("suggestions_"), 0),
     )
     # print(metrics.report_metrics())
@@ -396,7 +399,7 @@ compare_performance_metrics = build_sayt_metrics_comparison_table(
     df_to_check,
     suggestions_cols_to_compare=suggestions_cols_to_compare,
     correct_code_col=correct_code_col,
-    k_values=range(4, 10),
+    k_values=NUM_CHARACTERS_LIST,
     ave_time_per_query_list=ave_elapsed_per_row_list,
 )
 
