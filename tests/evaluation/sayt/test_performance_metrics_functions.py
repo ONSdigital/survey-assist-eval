@@ -712,7 +712,10 @@ def test_build_sayt_metrics_comparison_table_returns_dataframe(sayt_comparison_d
         suggestions_cols_to_compare=["suggestions_model_a", "suggestions_model_b"],
         correct_code_col="correct_code",
         k_values=[1],
-        ave_time_per_query_list=[10.0, 20.0],
+        ave_time_per_query_dict={
+            "suggestions_model_a": 10.0,
+            "suggestions_model_b": 20.0,
+        },
     )
 
     assert isinstance(
@@ -729,7 +732,10 @@ def test_build_sayt_metrics_comparison_table_has_one_row_per_suggestions_column(
         suggestions_cols_to_compare=["suggestions_model_a", "suggestions_model_b"],
         correct_code_col="correct_code",
         k_values=[1],
-        ave_time_per_query_list=[10.0, 20.0],
+        ave_time_per_query_dict={
+            "suggestions_model_a": 10.0,
+            "suggestions_model_b": 20.0,
+        },
     )
 
     assert (
@@ -737,39 +743,45 @@ def test_build_sayt_metrics_comparison_table_has_one_row_per_suggestions_column(
     ), "Expected one row per suggestions column in the comparison table."
 
 
-def test_build_sayt_metrics_comparison_table_strips_suggestions_prefix(
+def test_build_sayt_metrics_comparison_table_keeps_suggestions_col_name(
     sayt_comparison_df,
 ):
-    """The model column should contain column names with the 'suggestions_' prefix removed."""
+    """Rows should retain the original suggestion column name in suggestions_col."""
     result = build_sayt_metrics_comparison_table(
         sayt_comparison_df,
         suggestions_cols_to_compare=["suggestions_model_a", "suggestions_model_b"],
         correct_code_col="correct_code",
         k_values=[1],
-        ave_time_per_query_list=[10.0, 20.0],
+        ave_time_per_query_dict={
+            "suggestions_model_a": 10.0,
+            "suggestions_model_b": 20.0,
+        },
     )
 
-    assert result["model"].tolist() == [
-        "model_a",
-        "model_b",
-    ], "Expected the model column to strip the 'suggestions_' prefix from each column name."
+    assert result["suggestions_col"].tolist() == [
+        "suggestions_model_a",
+        "suggestions_model_b",
+    ], "Expected suggestions_col to match each compared suggestions column name."
 
 
 def test_build_sayt_metrics_comparison_table_assigns_correct_ave_time_per_query(
     sayt_comparison_df,
 ):
-    """Each row should use the ave_time_per_query value at the matching list position."""
+    """Each row should use ave_time_per_query keyed by the suggestions column name."""
     result = build_sayt_metrics_comparison_table(
         sayt_comparison_df,
         suggestions_cols_to_compare=["suggestions_model_a", "suggestions_model_b"],
         correct_code_col="correct_code",
         k_values=[1],
-        ave_time_per_query_list=[10.0, 20.0],
+        ave_time_per_query_dict={
+            "suggestions_model_a": 10.0,
+            "suggestions_model_b": 20.0,
+        },
     )
 
     assert result["ave_time_per_query_ms"].tolist() == pytest.approx([10.0, 20.0]), (
-        "Expected ave_time_per_query_ms to be taken from ave_time_per_query_list "
-        "in column order."
+        "Expected ave_time_per_query_ms to be taken from ave_time_per_query_dict "
+        "for each suggestions column."
     )
 
 
@@ -782,15 +794,20 @@ def test_build_sayt_metrics_comparison_table_computes_metrics_per_column(
         suggestions_cols_to_compare=["suggestions_model_a", "suggestions_model_b"],
         correct_code_col="correct_code",
         k_values=[1],
-        ave_time_per_query_list=[10.0, 20.0],
+        ave_time_per_query_dict={
+            "suggestions_model_a": 10.0,
+            "suggestions_model_b": 20.0,
+        },
     )
 
-    assert result.loc[result["model"] == "model_a", "mrr"].iloc[0] == pytest.approx(
+    assert result.loc[result["suggestions_col"] == "suggestions_model_a", "mrr"].iloc[
+        0
+    ] == pytest.approx(
         0.5
     ), "Expected MRR of 0.5 for model_a where only the first row matches."
-    assert result.loc[result["model"] == "model_b", "mrr"].iloc[0] == pytest.approx(
-        0.0
-    ), "Expected MRR of 0.0 for model_b where no row matches."
+    assert result.loc[result["suggestions_col"] == "suggestions_model_b", "mrr"].iloc[
+        0
+    ] == pytest.approx(0.0), "Expected MRR of 0.0 for model_b where no row matches."
 
 
 def test_build_sayt_metrics_comparison_table_single_column(sayt_comparison_df):
@@ -800,15 +817,15 @@ def test_build_sayt_metrics_comparison_table_single_column(sayt_comparison_df):
         suggestions_cols_to_compare=["suggestions_model_a"],
         correct_code_col="correct_code",
         k_values=[1],
-        ave_time_per_query_list=[15.0],
+        ave_time_per_query_dict={"suggestions_model_a": 15.0},
     )
 
     assert (
         len(result) == 1
     ), "Expected exactly one row when a single suggestions column is provided."
     assert (
-        result["model"].iloc[0] == "model_a"
-    ), "Expected the model name to be 'model_a' for the single column."
+        result["suggestions_col"].iloc[0] == "suggestions_model_a"
+    ), "Expected suggestions_col to match the single compared column."
 
 
 def test_build_sayt_metrics_comparison_table_does_not_mutate_input(sayt_comparison_df):
@@ -820,7 +837,10 @@ def test_build_sayt_metrics_comparison_table_does_not_mutate_input(sayt_comparis
         suggestions_cols_to_compare=["suggestions_model_a", "suggestions_model_b"],
         correct_code_col="correct_code",
         k_values=[1],
-        ave_time_per_query_list=[10.0, 20.0],
+        ave_time_per_query_dict={
+            "suggestions_model_a": 10.0,
+            "suggestions_model_b": 20.0,
+        },
     )
 
     assert sayt_comparison_df.equals(
@@ -1360,3 +1380,51 @@ def test_compute_performance_metrics_from_suggestions_stores_suggestions_col(
     assert (
         result.suggestions_col == "suggestions"
     ), "Expected suggestions_col to be stored in the result."
+
+
+def test_compute_performance_metrics_from_suggestions_applies_code_digit_match_length():
+    """code_digit_match_length should truncate both correct and retrieved codes before scoring."""
+    df = pd.DataFrame(
+        {
+            "correct_code": ["1234"],
+            "suggestions": [["alpha 1239", "beta 9999"]],
+        }
+    )
+
+    # Without truncation: no exact match between 1234 and 1239.
+    without_truncation = compute_performance_metrics_from_suggestions(
+        df,
+        correct_code_col="correct_code",
+        suggestions_col="suggestions",
+        code_length=4,
+        k_values=[1],
+        ave_time_per_query=0.0,
+    )
+
+    # With truncation to 3 digits: 1234 -> 123 and 1239 -> 123, so rank becomes 1.
+    with_truncation = compute_performance_metrics_from_suggestions(
+        df,
+        correct_code_col="correct_code",
+        suggestions_col="suggestions",
+        code_length=4,
+        k_values=[1],
+        ave_time_per_query=0.0,
+        code_digit_match_length=3,
+    )
+
+    assert (
+        without_truncation.unmatched_query_count == 1
+    ), "Expected query to be unmatched when full 4-digit codes are compared."
+    assert without_truncation.mrr == pytest.approx(
+        0.0
+    ), "Expected MRR to be 0.0 when full 4-digit codes do not match."
+
+    assert (
+        with_truncation.unmatched_query_count == 0
+    ), "Expected truncation to make the query matched."
+    assert with_truncation.mrr == pytest.approx(
+        1.0
+    ), "Expected MRR to be 1.0 when truncated codes match at rank 1."
+    assert (
+        with_truncation.code_digit_match_length == 3
+    ), "Expected result to report the requested truncated match length."

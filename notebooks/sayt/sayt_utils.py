@@ -323,7 +323,7 @@ def get_suggestions_by_chars(  # noqa: PLR0913 pylint: disable=R0917,R0913
                 num_chars=prefix_chars,
                 axis=1,
             )
-            avg_ms_dict.update({f"{prefix_chars}chars_{suggester_name}": avg_ms})
+            avg_ms_dict.update({suggestions_col: avg_ms})
 
     return df, avg_ms_dict
 

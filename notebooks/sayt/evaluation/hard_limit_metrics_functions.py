@@ -26,7 +26,7 @@ class SAYTHardLimitMetrics(BaseModel):
     pct_correct_tied_at_boundary: float  # % with correct answer only at boundary by tie
 
 
-def compute_hard_limit_suggestions_metrics_from_suggestions(  # noqa: PLR0913 pylint: disable = R0913, R0917
+def compute_suggestions_hard_limit_metrics(  # noqa: PLR0913 pylint: disable = R0913, R0917
     df,
     correct_code_col: str,
     suggestions_col: str,
@@ -49,6 +49,12 @@ def compute_hard_limit_suggestions_metrics_from_suggestions(  # noqa: PLR0913 py
     """
     df = df.copy()
 
+    if score_col not in df.columns:
+        raise ValueError(
+            f"Score column '{score_col}' not found in DataFrame. Please "
+            f"ensure with_scores is set to True when generating suggestions."
+        )
+
     df["_retrieved_codes"] = df.apply(
         get_codes_from_suggestions,
         suggestions_col=suggestions_col,
@@ -56,11 +62,17 @@ def compute_hard_limit_suggestions_metrics_from_suggestions(  # noqa: PLR0913 py
         axis=1,
     )
 
-    return summary_hardlimit_metrics(
+    df = add_sayt_hard_limit_metrics_columns(
         df=df,
+        retrieved_codes_col="_retrieved_codes",
         correct_code_col=correct_code_col,
         cutoff_k=cutoff_k,
         score_col=score_col,
+    )
+
+    return summarise_hard_limit_metrics(
+        df=df,
+        cutoff_k=cutoff_k,
     )
 
 
@@ -92,47 +104,83 @@ def is_correct_code_tied_with_boundary(
     return retrieved_codes_scores[rank_idx] == retrieved_codes_scores[boundary_idx]
 
 
-def summary_hardlimit_metrics(
-    df, correct_code_col: str, cutoff_k: int, score_col: str
+def add_sayt_hard_limit_metrics_columns(  # noqa: PLR0913 pylint: disable = R0913, R0917
+    df,
+    retrieved_codes_col: str,
+    correct_code_col: str,
+    cutoff_k: int,
+    score_col: str = "score",
+    prefix: str | None = None,
+):
+    """Add columns to the DataFrame for hard limit metrics evaluation.
+
+    Args:
+        df: DataFrame containing the suggestions and correct codes.
+        retrieved_codes_col: The name of the column with the retrieved codes.
+        correct_code_col: The name of the column with the correct codes.
+        cutoff_k: The hard limit on the number of suggestions returned.
+        score_col: The name of the column with the suggestion scores.
+        prefix: Optional prefix for the new columns.
+
+    Returns:
+        DataFrame: The DataFrame with added hard limit metrics columns.
+    """
+    if prefix is None:
+        prefix = ""
+
+    df = df.copy()
+
+    df[f"{prefix}correct_code_rank"] = df.apply(
+        lambda row: get_rank_of_correct_code(
+            row[retrieved_codes_col], row[correct_code_col]
+        ),
+        axis=1,
+    )
+
+    df[f"{prefix}num_retrieved_codes"] = df[retrieved_codes_col].apply(len)
+    df[f"{prefix}correct_code_within_cutoff"] = (
+        df[f"{prefix}correct_code_rank"] <= cutoff_k
+    )
+    df[f"{prefix}correct_code_outside_cutoff"] = (
+        df[f"{prefix}correct_code_rank"] > cutoff_k
+    )
+    df[f"{prefix}correct_in_cutoff_by_default"] = df.apply(
+        lambda row: is_correct_code_tied_with_boundary(
+            row[score_col], row[f"{prefix}correct_code_rank"], cutoff_k
+        ),
+        axis=1,
+    )
+    return df
+
+
+def summarise_hard_limit_metrics(
+    df,
+    cutoff_k: int,
+    prefix: str | None = None,
 ) -> SAYTHardLimitMetrics:
     """Compute summary metrics for hard limit suggestions evaluation.
 
     Args:
         df: DataFrame containing the suggestions and correct codes.
-        correct_code_col: The name of the column with the correct codes.
         cutoff_k: The hard limit on the number of suggestions returned.
-        score_col: The name of the column with the suggestion scores.
+        prefix: Optional prefix for the metric columns.
 
     Returns:
         SAYTHardLimitMetrics: The computed hard limit metrics.
     """
-    df["correct_code_rank"] = df.apply(
-        lambda row: get_rank_of_correct_code(
-            row["_retrieved_codes"], row[correct_code_col]
-        ),
-        axis=1,
-    )
-
-    pct_queries_exceeding_limit = (df["_retrieved_codes"].apply(len) > cutoff_k).mean()
-
-    df["correct_in_cutoff_by_default"] = df.apply(
-        lambda row: is_correct_code_tied_with_boundary(
-            row[score_col], row["correct_code_rank"], cutoff_k
-        ),
-        axis=1,
-    )
-
     summary = {
-        "num_queries": df.shape[0],
+        "num_queries": len(df),
         "cutoff_k": cutoff_k,
-        "actual_max_returned": df["_retrieved_codes"].apply(len).max(),
-        "pct_queries_exceeding_limit": pct_queries_exceeding_limit,
-        "pct_correct_outside_limit": df[df["correct_code_rank"] > cutoff_k].shape[0]
-        / df.shape[0],
-        "pct_correct_within_limit": df[df["correct_code_rank"] <= cutoff_k].shape[0]
-        / df.shape[0],
-        "pct_correct_total": df[df["correct_code_rank"] > 0].shape[0] / df.shape[0],
-        "pct_correct_tied_at_boundary": df["correct_in_cutoff_by_default"].mean(),
+        "actual_max_returned": df[f"{prefix}num_retrieved_codes"].max(),
+        "pct_queries_exceeding_limit": df[f"{prefix}num_retrieved_codes"]
+        .gt(cutoff_k)
+        .mean(),
+        "pct_correct_outside_limit": df[f"{prefix}correct_code_outside_cutoff"].mean(),
+        "pct_correct_within_limit": df[f"{prefix}correct_code_within_cutoff"].mean(),
+        "pct_correct_total": (df[f"{prefix}correct_code_rank"] > 0).mean(),
+        "pct_correct_tied_at_boundary": df[
+            f"{prefix}correct_in_cutoff_by_default"
+        ].mean(),
     }
 
     return SAYTHardLimitMetrics(**summary)

@@ -16,7 +16,7 @@ from survey_assist_embed_core.sayt import (
 from survey_assist_utils.logging import get_logger
 
 from notebooks.sayt.evaluation.hard_limit_metrics_functions import (
-    compute_hard_limit_suggestions_metrics_from_suggestions,
+    compute_suggestions_hard_limit_metrics,
 )
 from notebooks.sayt.sayt_utils import (
     build_lookup_suggester,
@@ -122,26 +122,31 @@ suggestions_cols_to_compare = test_df_hard_limit.columns[
     test_df_hard_limit.columns.str.startswith("suggestions_")
 ].tolist()
 
-ave_elapsed_per_row_list = [
-    avg_ms_dict.get(col.removeprefix("suggestions_"), 0)
-    for col in suggestions_cols_to_compare
-]
 
 compare_performance_metrics_hard_limit = build_sayt_metrics_comparison_table(
     test_df_hard_limit,
     suggestions_cols_to_compare=suggestions_cols_to_compare,
     correct_code_col=correct_code_col,
     k_values=[1, 3, 5, MAX_SUGGESTIONS],
-    ave_time_per_query_list=ave_elapsed_per_row_list,
+    ave_time_per_query_dict=avg_ms_dict,
 )
 
 compare_performance_metrics_hard_limit.head()
 
 # %%
 
+test_df_none_hard_limit, avg_ms_dict = get_suggestions_by_chars(
+    df=test_df,
+    suggesters_dict=suggesters,
+    characters=[4, 5, 7, 10],
+    suggestions_limit=MAX_SUGGESTIONS,
+    hard_suggestions_limit=False,
+    with_scores=True,
+)
+
 for suggester_col in suggestions_cols_to_compare:
-    hard_limit_metrics = compute_hard_limit_suggestions_metrics_from_suggestions(
-        df=test_df,
+    hard_limit_metrics = compute_suggestions_hard_limit_metrics(
+        df=test_df_none_hard_limit,
         correct_code_col=correct_code_col,
         suggestions_col=suggester_col,
         cutoff_k=MAX_SUGGESTIONS,
@@ -150,3 +155,5 @@ for suggester_col in suggestions_cols_to_compare:
     )
     print(f"Hard limit metrics for {suggester_col}:")
     print(hard_limit_metrics.__dict__)
+
+# %%

@@ -10,8 +10,6 @@ import pandas as pd
 from dotenv import load_dotenv
 from survey_assist_embed_core.sayt import (
     NgramRetrieverSpec,
-    PrefixRetrieverSpec,
-    SemanticRetrieverSpec,
 )
 from survey_assist_utils.logging import get_logger
 
@@ -97,12 +95,12 @@ suggesters = {
     "Ngrams only": build_lookup_suggester(
         sayt2_corpus, retrievers=[NgramRetrieverSpec()]
     ),
-    "Prefix only": build_lookup_suggester(
-        sayt2_corpus, retrievers=[PrefixRetrieverSpec()]
-    ),
-    "Semantic only": build_lookup_suggester(
-        sayt2_corpus, retrievers=[SemanticRetrieverSpec()]
-    ),
+    # "Prefix only": build_lookup_suggester(
+    #     sayt2_corpus, retrievers=[PrefixRetrieverSpec()]
+    # ),
+    # "Semantic only": build_lookup_suggester(
+    #     sayt2_corpus, retrievers=[SemanticRetrieverSpec()]
+    # ),
 }
 
 
@@ -129,9 +127,7 @@ metrics = compute_performance_metrics_from_suggestions(
     suggestions_col=suggestions_cols_to_compare[2],
     code_length=SIC_CODE_LENGTH,
     k_values=[1, 3, 5, MAX_SUGGESTIONS],
-    ave_time_per_query=avg_ms_dict.get(
-        suggestions_cols_to_compare[2].removeprefix("suggestions_"), 0
-    ),
+    ave_time_per_query=avg_ms_dict.get(suggestions_cols_to_compare[2], 0),
 )
 
 print(metrics.report_metrics())
@@ -144,9 +140,7 @@ metrics_2_digit_match = compute_performance_metrics_from_suggestions(
     suggestions_col=suggestions_cols_to_compare[2],
     code_length=SIC_CODE_LENGTH,
     k_values=[1, 3, 5, MAX_SUGGESTIONS],
-    ave_time_per_query=avg_ms_dict.get(
-        suggestions_cols_to_compare[2].removeprefix("suggestions_"), 0
-    ),
+    ave_time_per_query=avg_ms_dict.get(suggestions_cols_to_compare[2], 0),
     code_digit_match_length=2,
 )
 
@@ -154,17 +148,13 @@ print(metrics_2_digit_match.report_metrics())
 
 # %%
 # Comparison of performance metrics for the different suggesters and prefix lengths
-ave_elapsed_per_row_list = [
-    avg_ms_dict.get(col.removeprefix("suggestions_"), 0)
-    for col in suggestions_cols_to_compare
-]
 
 compare_performance_metrics = build_sayt_metrics_comparison_table(
     test_df,
     suggestions_cols_to_compare=suggestions_cols_to_compare,
     correct_code_col=correct_code_col,
     k_values=[1, 3, 5, MAX_SUGGESTIONS],
-    ave_time_per_query_list=ave_elapsed_per_row_list,
+    ave_time_per_query_dict=avg_ms_dict,
 )
 
 compare_performance_metrics.head()

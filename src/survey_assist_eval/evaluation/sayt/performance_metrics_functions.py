@@ -9,8 +9,8 @@ from notebooks.sayt.sayt_utils import get_codes_from_suggestions
 class SAYTPerformanceMetrics(BaseModel):
     """Class to compute performance metrics for SAYT evaluation."""
 
-    code_digit_match_length: int
     suggestions_col: str
+    code_digit_match_length: int
     total_queries: int
     ave_time_per_query_ms: float
     unmatched_query_count: int
@@ -42,8 +42,8 @@ def compute_performance_metrics_from_suggestions(  # noqa: PLR0913 pylint: disab
     correct_code_col: str,
     suggestions_col: str,
     code_length: int,
-    k_values: list[int],
     ave_time_per_query: float,
+    k_values: list[int] | None = None,
     code_digit_match_length: int | None = None,
 ) -> SAYTPerformanceMetrics:
     """Compute performance metrics from raw suggestion strings.
@@ -89,7 +89,7 @@ def compute_performance_metrics_from_suggestions(  # noqa: PLR0913 pylint: disab
             if code_digit_match_length is not None
             else code_length
         ),
-        k_values=k_values,
+        k_values=k_values if k_values is not None else [],
         ave_time_per_query=ave_time_per_query,
     )
 
@@ -171,7 +171,7 @@ def add_sayt_metrics_columns(
     df,
     retrieved_codes_col: str,
     correct_code_col: str,
-    k_values: list[int],
+    k_values: list[int] | None = None,
     prefix: str | None = None,
 ):
     """Add performance metric columns to the DataFrame.
@@ -190,19 +190,22 @@ def add_sayt_metrics_columns(
         prefix = ""
 
     df = df.copy()
-    for k in k_values:
-        df[f"{prefix}precision_at_{k}"] = df.apply(
-            lambda row, k=k: compute_precision_at_k(
-                row[retrieved_codes_col], row[correct_code_col], k=k
-            ),
-            axis=1,
-        )
-        df[f"{prefix}recall_at_{k}"] = df.apply(
-            lambda row, k=k: compute_recall_at_k(
-                row[retrieved_codes_col], row[correct_code_col], k=k
-            ),
-            axis=1,
-        )
+
+    if k_values:
+        for k in k_values:
+            df[f"{prefix}precision_at_{k}"] = df.apply(
+                lambda row, k=k: compute_precision_at_k(
+                    row[retrieved_codes_col], row[correct_code_col], k=k
+                ),
+                axis=1,
+            )
+            df[f"{prefix}recall_at_{k}"] = df.apply(
+                lambda row, k=k: compute_recall_at_k(
+                    row[retrieved_codes_col], row[correct_code_col], k=k
+                ),
+                axis=1,
+            )
+
     df[f"{prefix}reciprocal_rank"] = df.apply(
         lambda row: compute_reciprocal_rank(
             row[retrieved_codes_col], row[correct_code_col]
@@ -218,29 +221,12 @@ def add_sayt_metrics_columns(
     return df
 
 
-def compute_precision_at_k_from_rank(df, correct_code_rank_col: str, k: int) -> float:
-    """Compute Precision@K for the entire DataFrame using rank of correct code.
-
-    Args:
-        df: DataFrame containing one row per query and a rank column.
-        correct_code_rank_col: Column name containing the rank of the correct code.
-        k: The cutoff rank at which to compute precision.
-
-    Returns:
-        float: Precision@K for the DataFrame.
-    """
-    if k <= 0:
-        raise ValueError("k must be a positive integer.")
-
-    return df[correct_code_rank_col].le(k).fillna(False).mean() / k
-
-
 def summarise_performance_metrics(  # noqa: PLR0913 pylint: disable = R0913, R0917
     df,
     suggestions_col: str,
     code_digit_match_length: int,
-    k_values: list[int],
     ave_time_per_query: float,
+    k_values: list[int] | None = None,
     prefix: str | None = None,
 ) -> SAYTPerformanceMetrics:
     """Summarize performance metrics across the DataFrame.
@@ -258,6 +244,9 @@ def summarise_performance_metrics(  # noqa: PLR0913 pylint: disable = R0913, R09
     """
     if prefix is None:
         prefix = ""
+
+    if k_values is None:
+        k_values = []
 
     summary = {
         "code_digit_match_length": code_digit_match_length,
@@ -278,8 +267,8 @@ def build_sayt_metrics_comparison_table(
     df,
     suggestions_cols_to_compare: list[str],
     correct_code_col: str,
-    k_values: list[int],
-    ave_time_per_query_list: list[float],
+    ave_time_per_query_dict: dict[str, float],
+    k_values: list[int] | None = None,
 ):
     """Build a comparison table of performance metrics across suggestion columns.
 
@@ -289,8 +278,8 @@ def build_sayt_metrics_comparison_table(
             the retrieved suggestions to compare.
         correct_code_col: Column name containing the correct code.
         k_values: List of k values for which to compute Precision@K and Recall@K.
-        ave_time_per_query_list: Average time per query (ms) for each suggestion column,
-            in the same order as suggestions_cols_to_compare.
+        ave_time_per_query_dict: Average time per query (ms) for each suggestion column,
+            keyed by the suggestion column name.
 
     Returns:
         pd.DataFrame: One row per suggestion column with all performance metrics.
@@ -298,16 +287,15 @@ def build_sayt_metrics_comparison_table(
     performance_metrics = pd.DataFrame()
     code_length = len(df[correct_code_col].iloc[0])  # inferred from first row
 
-    for i, col in enumerate(suggestions_cols_to_compare):
+    for col in suggestions_cols_to_compare:
         performance_metrics_tmp = {
-            "model": col.removeprefix("suggestions_"),
             **compute_performance_metrics_from_suggestions(
                 df,
                 correct_code_col=correct_code_col,
                 suggestions_col=col,
                 code_length=code_length,
-                k_values=k_values,
-                ave_time_per_query=ave_time_per_query_list[i],
+                k_values=k_values if k_values is not None else [],
+                ave_time_per_query=ave_time_per_query_dict[col],
             ).__dict__,
         }
 
