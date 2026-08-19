@@ -257,7 +257,6 @@ def create_figure(
             "x": 0.5,
         },
     )
-    fig.show()
 
     fig.write_html(f"{output_dir}/sayt_eval_100sample_rank_histograms.html")
 
