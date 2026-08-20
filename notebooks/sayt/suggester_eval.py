@@ -21,6 +21,7 @@ def run_eval_for_suggesters(  # noqa: PLR0913 pylint: disable=R0913, R0914
     suggesters_dict: dict,
     num_chars: list[int],
     output_dir: str,
+    suggestions_list: list | None = None,
     suggestions_limit: int = 9,
 ):
     """Use functions necessary to create a dataframe that allows for grouping by
@@ -32,8 +33,9 @@ def run_eval_for_suggesters(  # noqa: PLR0913 pylint: disable=R0913, R0914
         suggesters_dict (dict): a dictionary with suggester models.
         num_chars (list): number of characters to be tested.
         suggestions_limit: the maximum rank of suggestions considered as valid.
-        code_length (int): expected SIC/SOC code length.
         output_dir (str): path to file location to be saved.
+        suggestions_list (list): optional variable; list of suggestions to be checked.
+        code_length (int): expected SIC/SOC code length.
 
     Return:
         pd.DataFrame: dataframe containing suggestions.
@@ -42,6 +44,9 @@ def run_eval_for_suggesters(  # noqa: PLR0913 pylint: disable=R0913, R0914
     """
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
+
+    if suggestions_list is None:
+        suggestions_list = range(1, suggestions_limit)
 
     df_copy = df.copy()
 
@@ -69,7 +74,7 @@ def run_eval_for_suggesters(  # noqa: PLR0913 pylint: disable=R0913, R0914
         suggestions_df,
         suggestions_cols_to_compare=suggestions_cols_to_compare,
         correct_code_col=correct_code_col,
-        k_values=range(1, suggestions_limit),
+        k_values=suggestions_list,
         ave_time_per_query_list=ave_elapsed_per_row_list,
     )
 
