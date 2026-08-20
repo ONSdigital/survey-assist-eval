@@ -11,7 +11,6 @@ from notebooks.sayt.sayt_utils import (
 )
 from survey_assist_eval.evaluation.sayt.performance_metrics_functions import (
     build_sayt_metrics_comparison_table,
-    compute_performance_metrics_from_suggestions,
 )
 
 
@@ -23,7 +22,6 @@ def run_eval_for_suggesters(  # noqa: PLR0913 pylint: disable=R0913, R0914
     num_chars: list[int],
     output_dir: str,
     suggestions_limit: int = 9,
-    code_length: int = 5,
 ):
     """Use functions necessary to create a dataframe that allows for grouping by
         rank and suggester type. Create plots.
@@ -38,10 +36,7 @@ def run_eval_for_suggesters(  # noqa: PLR0913 pylint: disable=R0913, R0914
         output_dir (str): path to file location to be saved.
 
     Return:
-        pd.DataFrame: dataframe with results from suggesters, split by the type of suggester
-            and number of characters.
         pd.DataFrame: dataframe containing suggestions.
-        dict: dictionary containing performance metrics for each suggester.
         figure: plot showing distribution of ranks by suggestions and number of characters.
         pd.DataFrame: dataframe with performance metrics.
     """
@@ -65,22 +60,6 @@ def run_eval_for_suggesters(  # noqa: PLR0913 pylint: disable=R0913, R0914
         suggestions_df.columns.str.startswith("suggestions_")
     ].tolist()
 
-    metrics_dict = {}
-
-    # Performance metrics for one suggester and prefix length
-    for _, suggester in enumerate(suggestions_cols_to_compare):
-        metrics = compute_performance_metrics_from_suggestions(
-            suggestions_df,
-            correct_code_col=correct_code_col,
-            suggestions_col=suggester,
-            code_length=code_length,
-            k_values=num_chars,
-            ave_time_per_query=avg_ms_dict.get(
-                suggester.removeprefix("suggestions_"), 0
-            ),
-        )
-        metrics_dict[suggester] = metrics.report_metrics()
-
     ave_elapsed_per_row_list = [
         avg_ms_dict.get(col.removeprefix("suggestions_"), 0)
         for col in suggestions_cols_to_compare
@@ -94,4 +73,4 @@ def run_eval_for_suggesters(  # noqa: PLR0913 pylint: disable=R0913, R0914
         ave_time_per_query_list=ave_elapsed_per_row_list,
     )
 
-    return suggestions_df, metrics_dict, fig, compare_performance_metrics
+    return suggestions_df, fig, compare_performance_metrics
