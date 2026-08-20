@@ -124,14 +124,14 @@ def rank_of_correct_code_in_suggestions(
 def get_suggestions_by_chars(
     df: pd.DataFrame,
     suggesters_dict: dict[str, Any],
-    characters: list | None = None,
+    num_chars: list | None = None,
     suggestions_limit: int = 9,
 ) -> tuple[pd.DataFrame, dict]:
     """Gathers suggestions for specified number of characters using suggesters.
 
     Args:
         df: dataframe containing melted suggestions.
-        characters: number of characters to be tested.
+        num_chars: number of characters to be tested.
         suggesters_dict: a dictionary with initialised suggester models.
         suggestions_limit: the maximum rank of suggestions considered as valid.
 
@@ -140,9 +140,9 @@ def get_suggestions_by_chars(
             average milliseconds per row.
     """
     avg_ms_dict = {}
-    if characters is None:
-        characters = [4, 5, 7, 10]
-    for prefix_chars in characters:
+    if num_chars is None:
+        num_chars = [4, 5, 7, 10]
+    for prefix_chars in num_chars:
         for suggester_name, suggester_obj in suggesters_dict.items():
             logger.info(
                 "Starting SAYT suggesting - one loop",
@@ -257,9 +257,10 @@ def create_figure(
             "x": 0.5,
         },
     )
-    fig.show()
 
     fig.write_html(f"{output_dir}/sayt_eval_100sample_rank_histograms.html")
+
+    return fig
 
 
 def get_codes_from_suggestions(
