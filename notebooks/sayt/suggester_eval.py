@@ -69,7 +69,7 @@ def run_eval_for_suggesters(  # noqa: PLR0913 pylint: disable=R0913, R0914
         suggestions_df,
         suggestions_cols_to_compare=suggestions_cols_to_compare,
         correct_code_col=correct_code_col,
-        k_values=num_chars,
+        k_values=range(1, suggestions_limit),
         ave_time_per_query_list=ave_elapsed_per_row_list,
     )
 
