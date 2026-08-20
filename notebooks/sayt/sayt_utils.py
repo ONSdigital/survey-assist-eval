@@ -66,27 +66,54 @@ def validate_one_code(code: str, code_length=5) -> bool:
     return True
 
 
-def get_suggestions_for_row(
+def get_suggestions_for_row(  # noqa: PLR0913 pylint: disable=R0917,R0913
     row: pd.Series,
     suggester: Any,
     num_chars: int,
     max_suggestions: int,
-) -> list[str]:
+    query_col: str = "full_entry",
+    hard_suggestions_limit: bool = False,
+    with_scores: bool = False,
+) -> list[str] | tuple[list[str], list[float]]:
     """Return suggester output for a single input row.
 
     Args:
-        row: Input row containing a `full_entry` text field.
+        row: Input row containing a text field specified by `query_col`.
         suggester: Suggester object exposing a `suggest` method.
-        num_chars: Number of leading characters from `full_entry` to use as input.
+        num_chars: Number of leading characters from `query_col` to use as input.
         max_suggestions: Maximum number of suggestions to request.
+        query_col: Column name containing the text to be used for suggestions.
+        hard_suggestions_limit: If True, limit the number of suggestions to the
+            specified max_suggestions, otherwise allow more suggestions to be
+             returned based on score.
+        with_scores: If True, return suggestions with scores instead of just strings.
 
     Returns:
-        list[str]: Ordered suggestion strings returned by the suggester.
+        list[str] | tuple[list[str], list[float]]: Ordered suggestion strings,
+            or suggestions and scores when with_scores is True.
     """
-    return suggester.suggest(
-        row["full_entry"][:num_chars],
+    query_text = row[query_col][:num_chars]
+
+    if with_scores:
+        suggestions_with_scores = suggester.suggest_with_scores(
+            query_text,
+            num_suggestions=max_suggestions,
+        )
+        if hard_suggestions_limit:
+            suggestions_with_scores = suggestions_with_scores[:max_suggestions]
+
+        display_text = [s.display_text for s in suggestions_with_scores]
+        scores = [s.score for s in suggestions_with_scores]
+        return display_text, scores
+
+    suggestions = suggester.suggest(
+        query_text,
         num_suggestions=max_suggestions,
     )
+    if hard_suggestions_limit:
+        suggestions = suggestions[:max_suggestions]
+
+    return suggestions
 
 
 def rank_of_correct_code_in_suggestions(
@@ -121,11 +148,13 @@ def rank_of_correct_code_in_suggestions(
     return None
 
 
-def get_suggestions_by_chars(
+def get_suggestions_by_chars(  # noqa: PLR0913 pylint: disable=R0917,R0913
     df: pd.DataFrame,
     suggesters_dict: dict[str, Any],
     characters: list | None = None,
     suggestions_limit: int = 9,
+    hard_suggestions_limit: bool = False,
+    with_scores: bool = False,
 ) -> tuple[pd.DataFrame, dict]:
     """Gathers suggestions for specified number of characters using suggesters.
 
@@ -134,11 +163,16 @@ def get_suggestions_by_chars(
         characters: number of characters to be tested.
         suggesters_dict: a dictionary with initialised suggester models.
         suggestions_limit: the maximum rank of suggestions considered as valid.
+        hard_suggestions_limit: if True, limit the number of suggestions to the
+            specified suggestions_limit, otherwise allow more suggestions to be returned.
+        with_scores: if True, return suggestions with scores instead of just strings.
 
     Returns:
         tuple[pd.DataFrame, float]: Suggestions for specified characters typed;
             average milliseconds per row.
     """
+    df = df.copy()
+
     avg_ms_dict = {}
     if characters is None:
         characters = [4, 5, 7, 10]
@@ -150,16 +184,28 @@ def get_suggestions_by_chars(
                 suggester_label=suggester_name,
             )
 
-            df[f"suggestions_{prefix_chars}chars_{suggester_name}"], avg_ms = (
-                timed_apply(
-                    df,
-                    get_suggestions_for_row,
-                    suggester=suggester_obj,
-                    max_suggestions=suggestions_limit,
-                    num_chars=prefix_chars,
-                    axis=1,
-                )
+            suggestions_col = f"suggestions_{prefix_chars}chars_{suggester_name}"
+            scores_col = suggestions_col.replace("suggestions_", "scores_")
+
+            suggestions_result, avg_ms = timed_apply(
+                df,
+                get_suggestions_for_row,
+                suggester=suggester_obj,
+                max_suggestions=suggestions_limit,
+                num_chars=prefix_chars,
+                hard_suggestions_limit=hard_suggestions_limit,
+                with_scores=with_scores,
+                axis=1,
             )
+
+            if with_scores:
+                df[[suggestions_col, scores_col]] = pd.DataFrame(
+                    suggestions_result.tolist(),
+                    index=df.index,
+                )
+            else:
+                df[suggestions_col] = suggestions_result
+
             logger.info("  -> suggestions done", elapsed_sec=avg_ms)
             df[f"rank_{prefix_chars}chars_{suggester_name}"] = df.apply(
                 rank_of_correct_code_in_suggestions,
@@ -168,7 +214,8 @@ def get_suggestions_by_chars(
                 num_chars=prefix_chars,
                 axis=1,
             )
-            avg_ms_dict.update({f"{prefix_chars}chars_{suggester_name}": avg_ms})
+            avg_ms_dict.update({suggestions_col: avg_ms})
+
     return df, avg_ms_dict
 
 
