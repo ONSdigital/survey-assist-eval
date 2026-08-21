@@ -234,3 +234,13 @@ metrics_table_one.head()
 
 # %%
 metrics_table_all.head()
+
+# %%
+for char in NUM_CHARACTERS_LIST:
+    pattern = f"{char}chars"
+    mask_all = metrics_table_all["model"].str.contains(pattern, case=False, na=False)
+    print(
+        metrics_table_all[mask_all][["model", "mrr"]]
+        .sort_values(by="mrr", ascending=False)
+        .iloc[0][["model", "mrr"]]
+    )

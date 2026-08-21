@@ -36,7 +36,7 @@ def build_lookup_suggester(
         SAYTSuggester: Configured suggester instance.
     """
     if retrievers is None:
-        retrievers = [PrefixRetrieverSpec(), NgramRetrieverSpec()]
+        retrievers = [PrefixRetrieverSpec(weight=1.0), NgramRetrieverSpec(weight=1.0)]
 
     if semantic_weight is not None:
         retrievers.append(SemanticRetrieverSpec(weight=semantic_weight))
