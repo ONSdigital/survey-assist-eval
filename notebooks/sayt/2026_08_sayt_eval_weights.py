@@ -134,20 +134,36 @@ for characters in NUM_CHARACTERS_LIST:
 # combine separate test results into one file
 
 folderpath = "notebooks/sayt/weights"
+remove_files = True
 
 master_dict = {}
+files_to_delete = []
+character_file = 8
+main_file_name = f"{folder}/weight_{character_file}_test_n_p_s.json"
 
-for filename in sorted(os.listdir(folderpath)):
-    if filename.startswith("w_7_n") and filename.endswith(".json"):
-        full_path = os.path.join(folderpath, filename)
-        key_name = filename[:-5]  # remove .json from the file name
-        test_name = f"test{key_name[3:]}"
-        with open(full_path, encoding="utf-8") as f:
-            master_dict[test_name] = json.load(f)
+if os.path.exists(main_file_name):
+    print("Final file already exists.")
+else:
+    for filename in sorted(os.listdir(folderpath)):
+        if filename.startswith(f"w_{character_file}_n") and filename.endswith(".json"):
+            full_path = os.path.join(folderpath, filename)
+            key_name = filename[:-5]  # remove .json from the file name
+            test_name = f"test{key_name[3:]}"
+            with open(full_path, encoding="utf-8") as f:
+                master_dict[test_name] = json.load(f)
+            files_to_delete.append(full_path)
 
-with open(
-    os.path.join(folderpath, "weight_7_test_n_p_s.json"), "w", encoding="utf-8"
-) as f:
-    json.dump(master_dict, f, indent=4)
+    with open(
+        os.path.join(folderpath, f"weight_{character_file}_test_n_p_s.json"),
+        "w",
+        encoding="utf-8",
+    ) as f:
+        json.dump(master_dict, f, indent=4)
 
-# add removing separate test files after combining
+# remove files
+if remove_files:
+    for file_path in files_to_delete:
+        os.remove(file_path)
+    print("Source files removed.")
+else:
+    print("Source files not removed.")
