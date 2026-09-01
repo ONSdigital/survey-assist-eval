@@ -9,8 +9,6 @@ import os
 import gcsfs
 from dotenv import load_dotenv
 
-# %%
-
 
 # %%
 def find_best_performing_setup(path: str):
@@ -33,32 +31,65 @@ def find_best_performing_setup(path: str):
 
 
 # %%
-# weights_5 = "notebooks/sayt/weights/weight_5_test_n_p_s.json"
-# weights_6 = "notebooks/sayt/weights/weight_6_test_n_p_s.json"
-# weights_7 = "notebooks/sayt/weights/weight_7_test_n_p_s.json"
-weights_8 = "notebooks/sayt/weights/weight_8_test_n_p_s.json"
-weights_9 = "notebooks/sayt/weights/weight_9_test_n_p_s.json"
+def get_ranked_setups(path):
+    """Get all tests orgered descending by MRR score.
+
+    Args:
+        path (str): path to the json file to be tested. Needs to contain MRR (Mean Reciprocal Rank).
+
+    Return:
+        dict: A dictionary of tests, ordered by their MRR scores.
+    """
+    with open(path, encoding="utf-8") as f:
+        data = json.load(f)
+
+    # Sort by MRR descending
+    sorted_items = sorted(data.items(), key=lambda x: x[1]["MRR"], reverse=True)
+
+    rankings = {}
+
+    for key, value in sorted_items:
+        score = value["MRR"]
+        rankings.setdefault(score, {})[key] = value
+
+    return rankings
+
 
 # %%
-# ms5, bd5 = find_best_performing_setup(weights_5)
+weights_5 = "notebooks/sayt/weights/weight_5_test_n_p_s.json"
+# weights_6 = "notebooks/sayt/weights/weight_6_test_n_p_s.json"
+# weights_7 = "notebooks/sayt/weights/weight_7_test_n_p_s.json"
+# weights_8 = "notebooks/sayt/weights/weight_8_test_n_p_s.json"
+# weights_9 = "notebooks/sayt/weights/weight_9_test_n_p_s.json"
+
+# %%
+ms5, bd5 = find_best_performing_setup(weights_5)
 # ms6, bd6 = find_best_performing_setup(weights_6)
 # ms7, bd7 = find_best_performing_setup(weights_7)
-ms8, bd8 = find_best_performing_setup(weights_8)
-ms9, bd9 = find_best_performing_setup(weights_9)
+# ms8, bd8 = find_best_performing_setup(weights_8)
+# ms9, bd9 = find_best_performing_setup(weights_9)
 
 # %%
 # print("5 characters:", ms5, "\n", bd5.keys())
 # print("6 characters:", ms6, "\n", bd6.keys())
 # print("7 characters:", ms7, "\n", bd7.keys())
-print("8 characters:", ms8, "\n", bd8.keys())
-print("9 characters:", ms9, "\n", bd9.keys())
+# print("8 characters:", ms8, "\n", bd8.keys())
+# print("9 characters:", ms9, "\n", bd9.keys())
+
+# %%
+rankings_by_weight = get_ranked_setups(weights_5)
+
+for rank, (individual_score, setups) in enumerate(rankings_by_weight.items(), start=1):
+    print(f"Rank {rank}: MRR={individual_score}")
+    print(f"  {list(setups.keys())}")
+    if rank == 5:  # noqa: PLR2004
+        break
 
 # %%
 load_dotenv()
 bucket_name = os.getenv("EVALUATION_BUCKET_NAME")
 if not bucket_name:
     raise ValueError("EVALUATION_BUCKET_NAME environment variable not set")
-
 
 # %%
 characters = [8, 9]
@@ -68,14 +99,16 @@ fs = gcsfs.GCSFileSystem()
 
 # %%
 for character in characters:
-    save_path = f"gs://{bucket_name}/evaluation-pipeline/SAYT/weights_by_character/weight_{character}_test_n_p_s.json"
+    save_path = f"gs://{bucket_name}/evaluation-pipeline/SAYT/weights_by_character/weight_{character}_test_n_p_s.json"  # pylint:disable=C0301 # disable line-too-long
 
     with open(
         f"notebooks/sayt/weights/weight_{character}_test_n_p_s.json", encoding="utf-8"
-    ) as f:
-        file = json.load(f)
+    ) as weight_to_save:
+        file_to_save = json.load(weight_to_save)
 
-    with fs.open(save_path, "w", encoding="utf-8") as f:
-        json.dump(file, f, ensure_ascii=False, indent=4)
+    with fs.open(save_path, "w", encoding="utf-8") as weight_to_save:
+        json.dump(
+            file_to_save, weight_to_save, ensure_ascii=False, indent=4, encoding="utf-8"
+        )
 
     print(f"Saved dictionary to: {save_path}")
