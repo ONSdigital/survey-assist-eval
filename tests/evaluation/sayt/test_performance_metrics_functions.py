@@ -17,7 +17,7 @@ from survey_assist_eval.evaluation.sayt.performance_metrics_functions import (
     compute_precision_at_k,
     compute_recall_at_k,
     compute_reciprocal_rank,
-    get_rank_of_correct_code,
+    get_rank_of_first_matching_code,
     summarise_performance_metrics,
 )
 
@@ -88,6 +88,33 @@ def test_compute_precision_at_k_uses_requested_k_when_fewer_results_returned():
     )
 
 
+def test_compute_precision_at_k_with_list_of_correct_codes():
+    """Precision@k should count matches against any code in the list."""
+    precision = compute_precision_at_k(["1111", "2222", "3333"], ["2222", "4444"], 2)
+
+    assert precision == pytest.approx(
+        0.5
+    ), "Expected Precision@2 to count one match (2222) from the list in top 2."
+
+
+def test_compute_precision_at_k_with_multiple_matches_in_list():
+    """Precision@k should count all matches when list codes appear in top-k."""
+    precision = compute_precision_at_k(["1111", "2222", "3333"], ["1111", "2222"], 2)
+
+    assert precision == pytest.approx(
+        1.0
+    ), "Expected Precision@2 to count two matches from the list in top 2."
+
+
+def test_compute_precision_at_k_with_empty_correct_codes_list():
+    """Precision@k should return 0 when correct_codes list is empty."""
+    precision = compute_precision_at_k(["1111", "2222", "3333"], [], 3)
+
+    assert precision == pytest.approx(
+        0.0
+    ), "Expected Precision@3 to be 0.0 when no correct codes to match."
+
+
 # ============================================================================
 # Test compute_recall_at_k function
 # ============================================================================
@@ -133,9 +160,45 @@ def test_compute_recall_at_k_handles_k_larger_than_retrieved_results():
     recall = compute_recall_at_k(["1111"], "1111", 3)
 
     assert recall == pytest.approx(1.0), (
-        "Expected Recall@3 to be 1.0 when the correct code is present even if fewer "
-        "than k results are returned."
+        "Expected Recall@3 to be 1.0 (1 found / 1 total correct) when the correct "
+        "code is present even if fewer than k results are returned."
     )
+
+
+def test_compute_recall_at_k_with_list_of_correct_codes():
+    """Recall@k should be relevant_found / total_correct using a list."""
+    recall = compute_recall_at_k(["1111", "2222", "3333"], ["2222", "4444", "5555"], 2)
+
+    assert recall == pytest.approx(
+        1 / 3
+    ), "Expected Recall@2 to be 1/3 (1 found: 2222 / 3 total correct codes)."
+
+
+def test_compute_recall_at_k_with_multiple_matches_in_list():
+    """Recall@k should count all matching codes from the list in top-k."""
+    recall = compute_recall_at_k(["1111", "2222", "3333"], ["1111", "2222", "4444"], 3)
+
+    assert recall == pytest.approx(
+        2 / 3
+    ), "Expected Recall@3 to be 2/3 (2 found: 1111, 2222 / 3 total correct codes)."
+
+
+def test_compute_recall_at_k_with_empty_correct_codes_list():
+    """Recall@k should return 0 when correct_codes list is empty."""
+    recall = compute_recall_at_k(["1111", "2222", "3333"], [], 3)
+
+    assert recall == pytest.approx(
+        0.0
+    ), "Expected Recall@3 to be 0.0 when no correct codes to recall."
+
+
+def test_compute_recall_at_k_with_no_matches_in_top_k():
+    """Recall@k should be 0 when none of the correct codes appear in top-k."""
+    recall = compute_recall_at_k(["1111", "2222"], ["3333", "4444"], 2)
+
+    assert recall == pytest.approx(
+        0.0
+    ), "Expected Recall@2 to be 0.0 (0 found / 2 total correct codes)."
 
 
 # ============================================================================
@@ -173,14 +236,47 @@ def test_compute_reciprocal_rank_returns_inverse_for_match_beyond_first_position
     )
 
 
+def test_compute_reciprocal_rank_with_list_of_correct_codes():
+    """Reciprocal rank should find first match in list."""
+    reciprocal_rank = compute_reciprocal_rank(
+        ["1111", "2222", "3333"], ["3333", "4444"]
+    )
+
+    assert reciprocal_rank == pytest.approx(1 / 3), (
+        "Expected reciprocal rank to equal 1/3 when first matching code from list "
+        "is at rank 3."
+    )
+
+
+def test_compute_reciprocal_rank_finds_earliest_in_list():
+    """Reciprocal rank should return earliest matching position from list."""
+    reciprocal_rank = compute_reciprocal_rank(
+        ["1111", "2222", "3333", "4444"], ["3333", "2222"]
+    )
+
+    assert reciprocal_rank == pytest.approx(1 / 2), (
+        "Expected reciprocal rank to equal 1/2 when earliest match from list "
+        "is 2222 at rank 2."
+    )
+
+
+def test_compute_reciprocal_rank_with_empty_correct_codes_list():
+    """Reciprocal rank should return 0 when correct_codes list is empty."""
+    reciprocal_rank = compute_reciprocal_rank(["1111", "2222", "3333"], [])
+
+    assert reciprocal_rank == pytest.approx(
+        0.0
+    ), "Expected reciprocal rank to be 0.0 when no correct codes in list."
+
+
 # ============================================================================
-# Test get_rank_of_correct_code function
+# Test get_rank_of_first_matching_code function
 # ============================================================================
 
 
-def test_get_rank_of_correct_code_returns_first_matching_rank():
+def test_get_rank_of_first_matching_code_returns_first_matching_rank():
     """Rank should report the first position containing the correct code."""
-    rank = get_rank_of_correct_code(["1111", "2222", "1111"], "1111")
+    rank = get_rank_of_first_matching_code(["1111", "2222", "1111"], "1111")
 
     assert rank == pytest.approx(1.0), (
         "Expected rank to report the first matching position when duplicates appear "
@@ -188,9 +284,9 @@ def test_get_rank_of_correct_code_returns_first_matching_rank():
     )
 
 
-def test_get_rank_of_correct_code_returns_zero_when_code_not_found():
+def test_get_rank_of_first_matching_code_returns_zero_when_code_not_found():
     """Rank should be None when the correct code is absent."""
-    rank = get_rank_of_correct_code(["1111", "2222", "3333"], "4444")
+    rank = get_rank_of_first_matching_code(["1111", "2222", "3333"], "4444")
 
     assert rank is None, (
         "Expected rank to be None when the correct code is absent from the retrieved "
@@ -198,14 +294,65 @@ def test_get_rank_of_correct_code_returns_zero_when_code_not_found():
     )
 
 
-def test_get_rank_of_correct_code_returns_rank_beyond_first_position():
+def test_get_rank_of_first_matching_code_returns_rank_beyond_first_position():
     """Rank should reflect the first matching position when it is not first."""
-    rank = get_rank_of_correct_code(["1111", "2222", "3333"], "3333")
+    rank = get_rank_of_first_matching_code(["1111", "2222", "3333"], "3333")
 
     assert rank == pytest.approx(3.0), (
         "Expected rank to equal 3.0 when the correct code is first found in the "
         "third position."
     )
+
+
+def test_get_rank_of_first_matching_code_works_with_list_of_correct_codes():
+    """Rank should find first match when given a list of correct codes."""
+    rank = get_rank_of_first_matching_code(["1111", "2222", "3333"], ["3333", "4444"])
+
+    assert rank == 3, (
+        "Expected rank to equal 3 when the first code in the list matches at "
+        "position 3."
+    )
+
+
+def test_get_rank_of_first_matching_code_finds_first_match_in_list():
+    """Rank should return the earliest matching position from a list of codes."""
+    rank = get_rank_of_first_matching_code(
+        ["1111", "2222", "3333", "4444"], ["3333", "2222"]
+    )
+
+    assert rank == 2, (
+        "Expected rank to equal 2 when the earliest match from the list is at "
+        "position 2."
+    )
+
+
+def test_get_rank_of_first_matching_code_returns_none_when_list_has_no_match():
+    """Rank should be None when no codes in the list are found."""
+    rank = get_rank_of_first_matching_code(["1111", "2222", "3333"], ["4444", "5555"])
+
+    assert rank is None, (
+        "Expected rank to be None when none of the codes in the list match the "
+        "retrieved codes."
+    )
+
+
+def test_get_rank_of_first_matching_code_handles_empty_list_of_correct_codes():
+    """Rank should be None when given an empty list of correct codes."""
+    rank = get_rank_of_first_matching_code(["1111", "2222", "3333"], [])
+
+    assert (
+        rank is None
+    ), "Expected rank to be None when the list of correct codes is empty."
+
+
+def test_get_rank_of_first_matching_code_single_code_in_list():
+    """Rank should work with a single-item list equivalently to a string."""
+    rank_from_list = get_rank_of_first_matching_code(["1111", "2222", "3333"], ["2222"])
+    rank_from_string = get_rank_of_first_matching_code(["1111", "2222", "3333"], "2222")
+
+    assert (
+        rank_from_list == rank_from_string == 2
+    ), "Expected single-item list and string to produce the same rank."
 
 
 # ============================================================================
@@ -222,7 +369,7 @@ def test_add_sayt_metrics_columns_does_not_mutate_input_dataframe(
     add_sayt_metrics_columns(
         sayt_metrics_input_df,
         retrieved_codes_col="retrieved_codes",
-        correct_code_col="correct_code",
+        correct_codes_col="correct_code",
         k_values=[1, 2],
     )
 
@@ -238,7 +385,7 @@ def test_add_sayt_metrics_columns_adds_precision_and_recall_columns(
     result_df = add_sayt_metrics_columns(
         sayt_metrics_input_df,
         retrieved_codes_col="retrieved_codes",
-        correct_code_col="correct_code",
+        correct_codes_col="correct_code",
         k_values=[1, 2],
     )
 
@@ -282,7 +429,7 @@ def test_add_sayt_metrics_columns_adds_rank_based_summary_columns(
     result_df = add_sayt_metrics_columns(
         sayt_metrics_input_df,
         retrieved_codes_col="retrieved_codes",
-        correct_code_col="correct_code",
+        correct_codes_col="correct_code",
         k_values=[1],
     )
 
@@ -303,7 +450,7 @@ def test_add_sayt_metrics_columns_handles_empty_k_values(sayt_metrics_input_df):
     result_df = add_sayt_metrics_columns(
         sayt_metrics_input_df,
         retrieved_codes_col="retrieved_codes",
-        correct_code_col="correct_code",
+        correct_codes_col="correct_code",
         k_values=[],
     )
 
@@ -330,7 +477,7 @@ def test_add_sayt_metrics_columns_raises_for_non_positive_k(sayt_metrics_input_d
         add_sayt_metrics_columns(
             sayt_metrics_input_df,
             retrieved_codes_col="retrieved_codes",
-            correct_code_col="correct_code",
+            correct_codes_col="correct_code",
             k_values=[k],
         )
 
@@ -340,7 +487,7 @@ def test_add_sayt_metrics_columns_uses_prefix_for_column_names(sayt_metrics_inpu
     result_df = add_sayt_metrics_columns(
         sayt_metrics_input_df,
         retrieved_codes_col="retrieved_codes",
-        correct_code_col="correct_code",
+        correct_codes_col="correct_code",
         k_values=[1],
         prefix="model_a_",
     )
@@ -369,7 +516,7 @@ def test_add_sayt_metrics_columns_default_prefix_produces_unprefixed_columns(
     result_df = add_sayt_metrics_columns(
         sayt_metrics_input_df,
         retrieved_codes_col="retrieved_codes",
-        correct_code_col="correct_code",
+        correct_codes_col="correct_code",
         k_values=[1],
     )
 
@@ -710,7 +857,7 @@ def test_build_sayt_metrics_comparison_table_returns_dataframe(sayt_comparison_d
     result = build_sayt_metrics_comparison_table(
         sayt_comparison_df,
         suggestions_cols_to_compare=["suggestions_model_a", "suggestions_model_b"],
-        correct_code_col="correct_code",
+        correct_codes_col="correct_code",
         k_values=[1],
         ave_time_per_query_dict={
             "suggestions_model_a": 10.0,
@@ -730,7 +877,7 @@ def test_build_sayt_metrics_comparison_table_has_one_row_per_suggestions_column(
     result = build_sayt_metrics_comparison_table(
         sayt_comparison_df,
         suggestions_cols_to_compare=["suggestions_model_a", "suggestions_model_b"],
-        correct_code_col="correct_code",
+        correct_codes_col="correct_code",
         k_values=[1],
         ave_time_per_query_dict={
             "suggestions_model_a": 10.0,
@@ -750,7 +897,7 @@ def test_build_sayt_metrics_comparison_table_keeps_suggestions_col_name(
     result = build_sayt_metrics_comparison_table(
         sayt_comparison_df,
         suggestions_cols_to_compare=["suggestions_model_a", "suggestions_model_b"],
-        correct_code_col="correct_code",
+        correct_codes_col="correct_code",
         k_values=[1],
         ave_time_per_query_dict={
             "suggestions_model_a": 10.0,
@@ -771,7 +918,7 @@ def test_build_sayt_metrics_comparison_table_assigns_correct_ave_time_per_query(
     result = build_sayt_metrics_comparison_table(
         sayt_comparison_df,
         suggestions_cols_to_compare=["suggestions_model_a", "suggestions_model_b"],
-        correct_code_col="correct_code",
+        correct_codes_col="correct_code",
         k_values=[1],
         ave_time_per_query_dict={
             "suggestions_model_a": 10.0,
@@ -792,7 +939,7 @@ def test_build_sayt_metrics_comparison_table_computes_metrics_per_column(
     result = build_sayt_metrics_comparison_table(
         sayt_comparison_df,
         suggestions_cols_to_compare=["suggestions_model_a", "suggestions_model_b"],
-        correct_code_col="correct_code",
+        correct_codes_col="correct_code",
         k_values=[1],
         ave_time_per_query_dict={
             "suggestions_model_a": 10.0,
@@ -815,7 +962,7 @@ def test_build_sayt_metrics_comparison_table_single_column(sayt_comparison_df):
     result = build_sayt_metrics_comparison_table(
         sayt_comparison_df,
         suggestions_cols_to_compare=["suggestions_model_a"],
-        correct_code_col="correct_code",
+        correct_codes_col="correct_code",
         k_values=[1],
         ave_time_per_query_dict={"suggestions_model_a": 15.0},
     )
@@ -835,7 +982,7 @@ def test_build_sayt_metrics_comparison_table_does_not_mutate_input(sayt_comparis
     build_sayt_metrics_comparison_table(
         sayt_comparison_df,
         suggestions_cols_to_compare=["suggestions_model_a", "suggestions_model_b"],
-        correct_code_col="correct_code",
+        correct_codes_col="correct_code",
         k_values=[1],
         ave_time_per_query_dict={
             "suggestions_model_a": 10.0,
@@ -1191,7 +1338,7 @@ def test_compute_performance_metrics_from_suggestions_returns_sayt_performance_m
     """The function should return a SAYTPerformanceMetrics instance."""
     result = compute_performance_metrics_from_suggestions(
         suggestions_df,
-        correct_code_col="correct_code",
+        correct_codes_col="correct_code",
         suggestions_col="suggestions",
         code_length=4,
         k_values=[1],
@@ -1212,7 +1359,7 @@ def test_compute_performance_metrics_from_suggestions_does_not_mutate_input(
 
     compute_performance_metrics_from_suggestions(
         suggestions_df,
-        correct_code_col="correct_code",
+        correct_codes_col="correct_code",
         suggestions_col="suggestions",
         code_length=4,
         k_values=[1],
@@ -1231,7 +1378,7 @@ def test_compute_performance_metrics_from_suggestions_extracts_codes_by_code_len
     """code_length controls how many trailing characters are used as the code."""
     result = compute_performance_metrics_from_suggestions(
         suggestions_df,
-        correct_code_col="correct_code",
+        correct_codes_col="correct_code",
         suggestions_col="suggestions",
         code_length=4,
         k_values=[1],
@@ -1253,7 +1400,7 @@ def test_compute_performance_metrics_from_suggestions_total_queries_equals_row_c
     """total_queries in the result should equal the number of rows in the input."""
     result = compute_performance_metrics_from_suggestions(
         suggestions_df,
-        correct_code_col="correct_code",
+        correct_codes_col="correct_code",
         suggestions_col="suggestions",
         code_length=4,
         k_values=[1],
@@ -1271,7 +1418,7 @@ def test_compute_performance_metrics_from_suggestions_stores_ave_time_per_query(
     """ave_time_per_query_ms should be stored from the argument without modification."""
     result = compute_performance_metrics_from_suggestions(
         suggestions_df,
-        correct_code_col="correct_code",
+        correct_codes_col="correct_code",
         suggestions_col="suggestions",
         code_length=4,
         k_values=[1],
@@ -1297,7 +1444,7 @@ def test_compute_performance_metrics_from_suggestions_all_unmatched():
 
     result = compute_performance_metrics_from_suggestions(
         df,
-        correct_code_col="correct_code",
+        correct_codes_col="correct_code",
         suggestions_col="suggestions",
         code_length=4,
         k_values=[1],
@@ -1326,7 +1473,7 @@ def test_compute_performance_metrics_from_suggestions_all_matched_at_rank_1():
 
     result = compute_performance_metrics_from_suggestions(
         df,
-        correct_code_col="correct_code",
+        correct_codes_col="correct_code",
         suggestions_col="suggestions",
         code_length=4,
         k_values=[1],
@@ -1347,7 +1494,7 @@ def test_compute_performance_metrics_from_suggestions_computes_precision_and_rec
     """precision_at_k and recall_at_k dicts should contain the requested k values."""
     result = compute_performance_metrics_from_suggestions(
         suggestions_df,
-        correct_code_col="correct_code",
+        correct_codes_col="correct_code",
         suggestions_col="suggestions",
         code_length=4,
         k_values=[1, 2],
@@ -1370,7 +1517,7 @@ def test_compute_performance_metrics_from_suggestions_stores_suggestions_col(
     """The result should store the suggestions column name."""
     result = compute_performance_metrics_from_suggestions(
         suggestions_df,
-        correct_code_col="correct_code",
+        correct_codes_col="correct_code",
         suggestions_col="suggestions",
         code_length=4,
         k_values=[1],
@@ -1394,7 +1541,7 @@ def test_compute_performance_metrics_from_suggestions_applies_code_digit_match_l
     # Without truncation: no exact match between 1234 and 1239.
     without_truncation = compute_performance_metrics_from_suggestions(
         df,
-        correct_code_col="correct_code",
+        correct_codes_col="correct_code",
         suggestions_col="suggestions",
         code_length=4,
         k_values=[1],
@@ -1404,7 +1551,7 @@ def test_compute_performance_metrics_from_suggestions_applies_code_digit_match_l
     # With truncation to 3 digits: 1234 -> 123 and 1239 -> 123, so rank becomes 1.
     with_truncation = compute_performance_metrics_from_suggestions(
         df,
-        correct_code_col="correct_code",
+        correct_codes_col="correct_code",
         suggestions_col="suggestions",
         code_length=4,
         k_values=[1],

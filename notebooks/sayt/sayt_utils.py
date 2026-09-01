@@ -230,7 +230,7 @@ def rank_of_correct_code_in_suggestions(
     num_chars: int,
     suggester_label: str,
     code_length: int = 5,
-    correct_code_col: str = "correct_sic_code",
+    correct_codes_col: str = "correct_sic_code",
 ) -> int | None:
     """Return the rank of the correct code in generated suggestions.
 
@@ -239,12 +239,12 @@ def rank_of_correct_code_in_suggestions(
         num_chars: Prefix length used to generate suggestions.
         suggester_label: Label used in the suggestion column name.
         code_length: Number of trailing characters to compare as code.
-        correct_code_col: Column name holding the correct SIC code.
+        correct_codes_col: Column name holding the correct SIC code.
 
     Returns:
         int | None: 1-based rank of the correct code, or None if not found.
     """
-    correct_code = row[correct_code_col]
+    correct_code = row[correct_codes_col]
     suggested_codes = get_codes_from_suggestions(
         row,
         suggestions_col=f"suggestions_{num_chars}chars_{suggester_label}",
@@ -318,7 +318,7 @@ def get_suggestions_by_chars(  # noqa: PLR0913 pylint: disable=R0917,R0913
             logger.info("  -> suggestions done", elapsed_sec=avg_ms)
             df[f"rank_{prefix_chars}chars_{suggester_name}"] = df.apply(
                 rank_of_correct_code_in_suggestions,
-                correct_code_col="correct_sic_code",
+                correct_codes_col="correct_sic_code",
                 suggester_label=suggester_name,
                 num_chars=prefix_chars,
                 axis=1,

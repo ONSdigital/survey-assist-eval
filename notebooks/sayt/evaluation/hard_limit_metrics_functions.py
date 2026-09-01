@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 from notebooks.sayt.sayt_utils import get_codes_from_suggestions
 from survey_assist_eval.evaluation.sayt.performance_metrics_functions import (
-    get_rank_of_correct_code,
+    get_rank_of_first_matching_code,
 )
 
 
@@ -50,7 +50,7 @@ class SAYTHardLimitMetrics(BaseModel):
 
 def compute_suggestions_hard_limit_metrics(  # noqa: PLR0913 pylint: disable = R0913, R0917
     df,
-    correct_code_col: str,
+    correct_codes_col: str,
     suggestions_col: str,
     cutoff_k: int,
     code_length: int,
@@ -60,7 +60,7 @@ def compute_suggestions_hard_limit_metrics(  # noqa: PLR0913 pylint: disable = R
 
     Args:
         df: The DataFrame containing the data.
-        correct_code_col: The name of the column with the correct codes.
+        correct_codes_col: The name of the column with correct code(s) (string or list).
         suggestions_col: The name of the column with the suggestions.
         cutoff_k: The hard limit on the number of suggestions returned.
         code_length: The length of the code prefix used for suggestions.
@@ -87,7 +87,7 @@ def compute_suggestions_hard_limit_metrics(  # noqa: PLR0913 pylint: disable = R
     df = add_sayt_hard_limit_metrics_columns(
         df=df,
         retrieved_codes_col="_retrieved_codes",
-        correct_code_col=correct_code_col,
+        correct_codes_col=correct_codes_col,
         cutoff_k=cutoff_k,
         score_col=score_col,
     )
@@ -130,7 +130,7 @@ def is_correct_code_tied_with_boundary(
 def add_sayt_hard_limit_metrics_columns(  # noqa: PLR0913 pylint: disable = R0913, R0917
     df,
     retrieved_codes_col: str,
-    correct_code_col: str,
+    correct_codes_col: str,
     cutoff_k: int,
     score_col: str = "score",
     prefix: str | None = None,
@@ -140,7 +140,7 @@ def add_sayt_hard_limit_metrics_columns(  # noqa: PLR0913 pylint: disable = R091
     Args:
         df: DataFrame containing the suggestions and correct codes.
         retrieved_codes_col: The name of the column with the retrieved codes.
-        correct_code_col: The name of the column with the correct codes.
+        correct_codes_col: The name of the column with correct code(s) (string or list).
         cutoff_k: The hard limit on the number of suggestions returned.
         score_col: The name of the column with the suggestion scores.
         prefix: Optional prefix for the new columns.
@@ -154,8 +154,8 @@ def add_sayt_hard_limit_metrics_columns(  # noqa: PLR0913 pylint: disable = R091
     df = df.copy()
 
     df[f"{prefix}correct_code_rank"] = df.apply(
-        lambda row: get_rank_of_correct_code(
-            row[retrieved_codes_col], row[correct_code_col]
+        lambda row: get_rank_of_first_matching_code(
+            row[retrieved_codes_col], row[correct_codes_col]
         ),
         axis=1,
     )
@@ -213,7 +213,7 @@ def summarise_hard_limit_metrics(
 def build_sayt_hard_limit_metrics_comparison_table(
     df,
     suggestions_cols_to_compare: list[str],
-    correct_code_col: str,
+    correct_codes_col: str,
     cutoff_k: int,
 ):
     """Build a comparison table of performance metrics across suggestion columns.
@@ -222,21 +222,21 @@ def build_sayt_hard_limit_metrics_comparison_table(
         df: DataFrame containing the retrieved suggestions and correct codes.
         suggestions_cols_to_compare: List of column names containing
             the retrieved suggestions to compare.
-        correct_code_col: Column name containing the correct code.
+        correct_codes_col: Column name containing correct code(s) (string or list).
         cutoff_k: The hard limit on the number of suggestions returned.
 
     Returns:
         pd.DataFrame: One row per suggestion column with all hard limit metrics.
     """
     performance_metrics = pd.DataFrame()
-    code_length = len(df[correct_code_col].iloc[0])  # inferred from first row
+    code_length = len(df[correct_codes_col].iloc[0])  # inferred from first row
 
     for col in suggestions_cols_to_compare:
         score_col = col.replace("suggestions_", "scores_")
         performance_metrics_tmp = {
             **compute_suggestions_hard_limit_metrics(
                 df,
-                correct_code_col=correct_code_col,
+                correct_codes_col=correct_codes_col,
                 suggestions_col=col,
                 cutoff_k=cutoff_k,
                 code_length=code_length,

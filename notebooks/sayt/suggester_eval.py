@@ -17,7 +17,7 @@ from survey_assist_eval.evaluation.sayt.performance_metrics_functions import (
 def run_eval_for_suggesters(  # noqa: PLR0913 pylint: disable=R0913, R0914
     *,
     df: pd.DataFrame,
-    correct_code_col: str,
+    correct_codes_col: str,
     suggesters_dict: dict,
     num_chars: list[int],
     output_dir: str,
@@ -29,7 +29,7 @@ def run_eval_for_suggesters(  # noqa: PLR0913 pylint: disable=R0913, R0914
 
     Args:
         df (pd.DataFrame): dataframe to be tested.
-        correct_code_col (str): name of the column containing correct codes.
+        correct_codes_col (str): name of the column containing correct codes.
         suggesters_dict (dict): a dictionary with suggester models.
         num_chars (list): number of characters to be tested.
         suggestions_limit: the maximum rank of suggestions considered as valid.
@@ -68,7 +68,7 @@ def run_eval_for_suggesters(  # noqa: PLR0913 pylint: disable=R0913, R0914
     compare_performance_metrics = build_sayt_metrics_comparison_table(
         suggestions_df,
         suggestions_cols_to_compare=suggestions_cols_to_compare,
-        correct_code_col=correct_code_col,
+        correct_codes_col=correct_codes_col,
         k_values=suggestions_list,
         ave_time_per_query_dict=avg_ms_dict,
     )

@@ -39,7 +39,7 @@ class SAYTPerformanceMetrics(BaseModel):
 
 def compute_performance_metrics_from_suggestions(  # noqa: PLR0913 pylint: disable = R0913, R0917
     df,
-    correct_code_col: str,
+    correct_codes_col: str,
     suggestions_col: str,
     code_length: int,
     ave_time_per_query: float,
@@ -50,7 +50,7 @@ def compute_performance_metrics_from_suggestions(  # noqa: PLR0913 pylint: disab
 
     Args:
         df: DataFrame containing the queries and suggestions.
-        correct_code_col: Column name containing the correct code.
+        correct_codes_col: Column name containing correct code(s) (string or list).
         suggestions_col: Column name containing the list of suggestion strings.
         code_length: Number of trailing characters to extract as a code.
         k_values: List of k values for which to compute Precision@K and Recall@K.
@@ -69,7 +69,7 @@ def compute_performance_metrics_from_suggestions(  # noqa: PLR0913 pylint: disab
     )
 
     if code_digit_match_length is not None:
-        df[correct_code_col] = df[correct_code_col].str[:code_digit_match_length]
+        df[correct_codes_col] = df[correct_codes_col].str[:code_digit_match_length]
         df["_retrieved_codes"] = df["_retrieved_codes"].apply(
             lambda codes: [code[:code_digit_match_length] for code in codes],
         )
@@ -77,7 +77,7 @@ def compute_performance_metrics_from_suggestions(  # noqa: PLR0913 pylint: disab
     df = add_sayt_metrics_columns(
         df,
         retrieved_codes_col="_retrieved_codes",
-        correct_code_col=correct_code_col,
+        correct_codes_col=correct_codes_col,
         k_values=k_values,
     )
 
@@ -95,13 +95,13 @@ def compute_performance_metrics_from_suggestions(  # noqa: PLR0913 pylint: disab
 
 
 def compute_precision_at_k(
-    retrieved_codes: list[str], correct_code: str, k: int
+    retrieved_codes: list[str], correct_codes: str | list[str], k: int
 ) -> float:
     """Compute Precision@K for a single query.
 
     Args:
         retrieved_codes: List of codes retrieved by the system (ordered by relevance).
-        correct_code: The correct code for the query.
+        correct_codes: A single correct code or list of correct codes to match against.
         k: The cutoff rank at which to compute precision.
 
     Returns:
@@ -110,59 +110,78 @@ def compute_precision_at_k(
     if k <= 0:
         raise ValueError("k must be a positive integer.")
 
+    if isinstance(correct_codes, str):
+        correct_codes = [correct_codes]
+
     top_k_retrieved = retrieved_codes[:k]
-    relevant_count = sum(1 for item in top_k_retrieved if item == correct_code)
+    relevant_count = sum(1 for item in top_k_retrieved if item in correct_codes)
     return relevant_count / k
 
 
-def compute_recall_at_k(retrieved_codes: list[str], correct_code: str, k: int) -> float:
+def compute_recall_at_k(
+    retrieved_codes: list[str], correct_codes: str | list[str], k: int
+) -> float:
     """Compute Recall@K for a single query.
 
     Args:
         retrieved_codes: List of codes retrieved by the system (ordered by relevance).
-        correct_code: The correct code for the query.
+        correct_codes: A single correct code or list of correct codes to match against.
         k: The cutoff rank at which to compute recall.
 
     Returns:
-        float: Recall@K value.
+        float: Recall@K value (relevant codes in top-k / total correct codes).
     """
     if k <= 0:
         raise ValueError("k must be a positive integer.")
 
+    if isinstance(correct_codes, str):
+        correct_codes = [correct_codes]
+
     top_k_retrieved = retrieved_codes[:k]
-    return 1.0 if correct_code in top_k_retrieved else 0.0
+
+    relevant_count = sum(1 for item in top_k_retrieved if item in correct_codes)
+    total_correct = len(correct_codes)
+    return relevant_count / total_correct if total_correct > 0 else 0.0
 
 
-def compute_reciprocal_rank(retrieved_codes: list[str], correct_code: str) -> float:
+def compute_reciprocal_rank(
+    retrieved_codes: list[str], correct_codes: str | list[str]
+) -> float:
     """Compute Reciprocal Rank for a single query.
 
     Args:
         retrieved_codes: List of codes retrieved by the system (ordered by relevance).
-        correct_code: The correct code for the query.
+        correct_codes: A single correct code or list of correct codes to match against.
 
     Returns:
-        float: Reciprocal Rank value.
+        float: Reciprocal Rank value (1/rank of first match, 0 if no match).
     """
+    if isinstance(correct_codes, str):
+        correct_codes = [correct_codes]
+
     for rank, item in enumerate(retrieved_codes, start=1):
-        if item == correct_code:
+        if item in correct_codes:
             return 1 / rank
     return 0.0
 
 
-def get_rank_of_correct_code(
-    retrieved_codes: list[str], correct_code: str
+def get_rank_of_first_matching_code(
+    retrieved_codes: list[str], correct_codes: str | list[str]
 ) -> int | None:
-    """Get the rank of the correct code in the retrieved list for a single query.
+    """Get the rank of the first retrieved code matching correct code(s).
 
     Args:
         retrieved_codes: List of codes retrieved by the system (ordered by relevance).
-        correct_code: The correct code for the query.
+        correct_codes: A single correct code or list of correct codes to match against.
 
     Returns:
-        int: Rank of the correct code, or None if not found.
+        int: Rank of the first matching code, or None if no match found.
     """
+    if isinstance(correct_codes, str):
+        correct_codes = [correct_codes]
+
     for rank, item in enumerate(retrieved_codes, start=1):
-        if item == correct_code:
+        if item in correct_codes:
             return int(rank)
     return None
 
@@ -170,7 +189,7 @@ def get_rank_of_correct_code(
 def add_sayt_metrics_columns(
     df,
     retrieved_codes_col: str,
-    correct_code_col: str,
+    correct_codes_col: str,
     k_values: list[int] | None = None,
     prefix: str | None = None,
 ):
@@ -179,7 +198,7 @@ def add_sayt_metrics_columns(
     Args:
         df: DataFrame containing the retrieved codes and correct codes.
         retrieved_codes_col: Column name containing the list of retrieved codes.
-        correct_code_col: Column name containing the correct code.
+        correct_codes_col: Column name containing correct code(s) (string or list).
         k_values: List of k values for which to compute Precision@K and Recall@K.
         prefix: Optional prefix for the new metric columns. Defaults to None.
 
@@ -195,26 +214,26 @@ def add_sayt_metrics_columns(
         for k in k_values:
             df[f"{prefix}precision_at_{k}"] = df.apply(
                 lambda row, k=k: compute_precision_at_k(
-                    row[retrieved_codes_col], row[correct_code_col], k=k
+                    row[retrieved_codes_col], row[correct_codes_col], k=k
                 ),
                 axis=1,
             )
             df[f"{prefix}recall_at_{k}"] = df.apply(
                 lambda row, k=k: compute_recall_at_k(
-                    row[retrieved_codes_col], row[correct_code_col], k=k
+                    row[retrieved_codes_col], row[correct_codes_col], k=k
                 ),
                 axis=1,
             )
 
     df[f"{prefix}reciprocal_rank"] = df.apply(
         lambda row: compute_reciprocal_rank(
-            row[retrieved_codes_col], row[correct_code_col]
+            row[retrieved_codes_col], row[correct_codes_col]
         ),
         axis=1,
     )
     df[f"{prefix}correct_code_rank"] = df.apply(
-        lambda row: get_rank_of_correct_code(
-            row[retrieved_codes_col], row[correct_code_col]
+        lambda row: get_rank_of_first_matching_code(
+            row[retrieved_codes_col], row[correct_codes_col]
         ),
         axis=1,
     )
@@ -266,7 +285,7 @@ def summarise_performance_metrics(  # noqa: PLR0913 pylint: disable = R0913, R09
 def build_sayt_metrics_comparison_table(
     df,
     suggestions_cols_to_compare: list[str],
-    correct_code_col: str,
+    correct_codes_col: str,
     ave_time_per_query_dict: dict[str, float],
     k_values: list[int] | None = None,
 ):
@@ -276,7 +295,7 @@ def build_sayt_metrics_comparison_table(
         df: DataFrame containing the retrieved suggestions and correct codes.
         suggestions_cols_to_compare: List of column names containing
             the retrieved suggestions to compare.
-        correct_code_col: Column name containing the correct code.
+        correct_codes_col: Column name containing correct code(s) (string or list).
         k_values: List of k values for which to compute Precision@K and Recall@K.
         ave_time_per_query_dict: Average time per query (ms) for each suggestion column,
             keyed by the suggestion column name.
@@ -285,13 +304,13 @@ def build_sayt_metrics_comparison_table(
         pd.DataFrame: One row per suggestion column with all performance metrics.
     """
     performance_metrics = pd.DataFrame()
-    code_length = len(df[correct_code_col].iloc[0])  # inferred from first row
+    code_length = len(df[correct_codes_col].iloc[0])  # inferred from first row
 
     for col in suggestions_cols_to_compare:
         performance_metrics_tmp = {
             **compute_performance_metrics_from_suggestions(
                 df,
-                correct_code_col=correct_code_col,
+                correct_codes_col=correct_codes_col,
                 suggestions_col=col,
                 code_length=code_length,
                 k_values=k_values if k_values is not None else [],
