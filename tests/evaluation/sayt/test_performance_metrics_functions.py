@@ -1575,3 +1575,31 @@ def test_compute_performance_metrics_from_suggestions_applies_code_digit_match_l
     assert (
         with_truncation.code_digit_match_length == 3
     ), "Expected result to report the requested truncated match length."
+
+
+def test_compute_performance_metrics_from_suggestions_truncates_and_dedupes_code_list():
+    """code_digit_match_length should truncate a list of correct codes and dedupe them."""
+    df = pd.DataFrame(
+        {
+            "correct_code": [["1231", "1239"]],
+            "suggestions": [["alpha 1235", "beta 9999"]],
+        }
+    )
+
+    result = compute_performance_metrics_from_suggestions(
+        df,
+        correct_codes_col="correct_code",
+        suggestions_col="suggestions",
+        code_length=4,
+        k_values=[1],
+        ave_time_per_query=0.0,
+        code_digit_match_length=3,
+    )
+
+    assert (
+        result.unmatched_query_count == 0
+    ), "Expected truncated list of correct codes to match the retrieved code."
+    assert result.mrr == pytest.approx(1.0), (
+        "Expected MRR to be 1.0 when truncated codes from the correct code list "
+        "match at rank 1."
+    )

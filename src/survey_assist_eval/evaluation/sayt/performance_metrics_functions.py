@@ -69,7 +69,13 @@ def compute_performance_metrics_from_suggestions(  # noqa: PLR0913 pylint: disab
     )
 
     if code_digit_match_length is not None:
-        df[correct_codes_col] = df[correct_codes_col].str[:code_digit_match_length]
+        df[correct_codes_col] = df[correct_codes_col].apply(
+            lambda codes: (
+                codes[:code_digit_match_length]
+                if isinstance(codes, str)
+                else list({code[:code_digit_match_length] for code in codes})
+            )
+        )
         df["_retrieved_codes"] = df["_retrieved_codes"].apply(
             lambda codes: [code[:code_digit_match_length] for code in codes],
         )
