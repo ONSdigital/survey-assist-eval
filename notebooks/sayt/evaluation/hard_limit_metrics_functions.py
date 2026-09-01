@@ -24,7 +24,7 @@ class SAYTHardLimitMetrics(BaseModel):
     pct_correct_overall: float  # % of correct answers overall
     pct_correct_within_limit: float  # % of correct answers within the limit
     pct_correct_outside_limit: float  # % of correct answers beyond the limit
-    pct_correct_due_to_boundary_tie: (
+    pct_within_limit_at_tie_score: (
         float  # % with correct answer only at boundary by tie
     )
 
@@ -42,8 +42,8 @@ class SAYTHardLimitMetrics(BaseModel):
             f"{self.pct_correct_within_limit:.2%}\n"
             " % of queries with a correct suggestion outside limit: "
             f"{self.pct_correct_outside_limit:.2%}\n"
-            " % of queries with a correct suggestion due to a boundary tie: "
-            f"{self.pct_correct_due_to_boundary_tie:.2%}"
+            "% of queries with a correct in-limit suggestion tied across the limit boundary: "
+            f"{self.pct_within_limit_at_tie_score:.2%}"
         )
         return report
 
@@ -202,7 +202,7 @@ def summarise_hard_limit_metrics(
         "pct_correct_overall": (df[f"{prefix}correct_code_rank"] > 0).mean(),
         "pct_correct_within_limit": df[f"{prefix}correct_code_within_cutoff"].mean(),
         "pct_correct_outside_limit": df[f"{prefix}correct_code_outside_cutoff"].mean(),
-        "pct_correct_due_to_boundary_tie": df[
+        "pct_within_limit_at_tie_score": df[
             f"{prefix}correct_in_cutoff_by_default"
         ].mean(),
     }
