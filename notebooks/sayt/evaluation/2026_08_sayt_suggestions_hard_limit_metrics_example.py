@@ -121,7 +121,7 @@ suggesters = {
 test_df_hard_limit, avg_ms_dict = get_suggestions_by_chars(
     df=test_df,
     suggesters_dict=suggesters,
-    characters=[4, 5, 7, 10],
+    num_chars=[4, 5, 7, 10],
     suggestions_limit=MAX_SUGGESTIONS,
     hard_suggestions_limit=True,
     with_scores=True,
@@ -147,7 +147,7 @@ compare_performance_metrics_hard_limit.head()
 test_df_none_hard_limit, avg_ms_dict = get_suggestions_by_chars(
     df=test_df,
     suggesters_dict=suggesters,
-    characters=[4, 5, 7, 10],
+    num_chars=[4, 5, 7, 10],
     suggestions_limit=MAX_SUGGESTIONS,
     hard_suggestions_limit=False,
     with_scores=True,
