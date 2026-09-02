@@ -30,6 +30,11 @@ NUM_CHARACTERS_LIST = range(4, 10)
 GRID_GRANULARITY = 10
 
 # %%
+if not os.path.exists("notebooks/sayt/weights_sum_10"):
+    os.makedirs("notebooks/sayt/weights_sum_10")
+    print("Created folder: notebooks/sayt/weights_sum_10")
+
+# %%
 load_dotenv()
 bucket_name = os.getenv("EVALUATION_BUCKET_NAME")
 if not bucket_name:
