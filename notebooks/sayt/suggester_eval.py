@@ -65,17 +65,12 @@ def run_eval_for_suggesters(  # noqa: PLR0913 pylint: disable=R0913, R0914
         suggestions_df.columns.str.startswith("suggestions_")
     ].tolist()
 
-    ave_elapsed_per_row_list = [
-        avg_ms_dict.get(col.removeprefix("suggestions_"), 0)
-        for col in suggestions_cols_to_compare
-    ]
-
     compare_performance_metrics = build_sayt_metrics_comparison_table(
         suggestions_df,
         suggestions_cols_to_compare=suggestions_cols_to_compare,
         correct_code_col=correct_code_col,
         k_values=suggestions_list,
-        ave_time_per_query_list=ave_elapsed_per_row_list,
+        ave_time_per_query_dict=avg_ms_dict,
     )
 
     return suggestions_df, fig, compare_performance_metrics
