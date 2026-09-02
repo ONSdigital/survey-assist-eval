@@ -136,6 +136,7 @@ compare_performance_metrics_hard_limit = build_sayt_metrics_comparison_table(
     test_df_hard_limit,
     suggestions_cols_to_compare=suggestions_cols_to_compare,
     correct_codes_col=correct_codes_col,
+    code_length=SIC_CODE_LENGTH,
     k_values=[1, 3, 5, MAX_SUGGESTIONS],
     ave_time_per_query_dict=avg_ms_dict,
 )

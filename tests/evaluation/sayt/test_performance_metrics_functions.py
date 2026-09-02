@@ -17,7 +17,6 @@ from survey_assist_eval.evaluation.sayt.performance_metrics_functions import (
     compute_precision_at_k,
     compute_recall_at_k,
     compute_reciprocal_rank,
-    get_rank_of_first_matching_code,
     summarise_performance_metrics,
 )
 
@@ -270,92 +269,6 @@ def test_compute_reciprocal_rank_with_empty_correct_codes_list():
 
 
 # ============================================================================
-# Test get_rank_of_first_matching_code function
-# ============================================================================
-
-
-def test_get_rank_of_first_matching_code_returns_first_matching_rank():
-    """Rank should report the first position containing the correct code."""
-    rank = get_rank_of_first_matching_code(["1111", "2222", "1111"], "1111")
-
-    assert rank == pytest.approx(1.0), (
-        "Expected rank to report the first matching position when duplicates appear "
-        "later in the list."
-    )
-
-
-def test_get_rank_of_first_matching_code_returns_zero_when_code_not_found():
-    """Rank should be None when the correct code is absent."""
-    rank = get_rank_of_first_matching_code(["1111", "2222", "3333"], "4444")
-
-    assert rank is None, (
-        "Expected rank to be None when the correct code is absent from the retrieved "
-        "list."
-    )
-
-
-def test_get_rank_of_first_matching_code_returns_rank_beyond_first_position():
-    """Rank should reflect the first matching position when it is not first."""
-    rank = get_rank_of_first_matching_code(["1111", "2222", "3333"], "3333")
-
-    assert rank == pytest.approx(3.0), (
-        "Expected rank to equal 3.0 when the correct code is first found in the "
-        "third position."
-    )
-
-
-def test_get_rank_of_first_matching_code_works_with_list_of_correct_codes():
-    """Rank should find first match when given a list of correct codes."""
-    rank = get_rank_of_first_matching_code(["1111", "2222", "3333"], ["3333", "4444"])
-
-    assert rank == 3, (
-        "Expected rank to equal 3 when the first code in the list matches at "
-        "position 3."
-    )
-
-
-def test_get_rank_of_first_matching_code_finds_first_match_in_list():
-    """Rank should return the earliest matching position from a list of codes."""
-    rank = get_rank_of_first_matching_code(
-        ["1111", "2222", "3333", "4444"], ["3333", "2222"]
-    )
-
-    assert rank == 2, (
-        "Expected rank to equal 2 when the earliest match from the list is at "
-        "position 2."
-    )
-
-
-def test_get_rank_of_first_matching_code_returns_none_when_list_has_no_match():
-    """Rank should be None when no codes in the list are found."""
-    rank = get_rank_of_first_matching_code(["1111", "2222", "3333"], ["4444", "5555"])
-
-    assert rank is None, (
-        "Expected rank to be None when none of the codes in the list match the "
-        "retrieved codes."
-    )
-
-
-def test_get_rank_of_first_matching_code_handles_empty_list_of_correct_codes():
-    """Rank should be None when given an empty list of correct codes."""
-    rank = get_rank_of_first_matching_code(["1111", "2222", "3333"], [])
-
-    assert (
-        rank is None
-    ), "Expected rank to be None when the list of correct codes is empty."
-
-
-def test_get_rank_of_first_matching_code_single_code_in_list():
-    """Rank should work with a single-item list equivalently to a string."""
-    rank_from_list = get_rank_of_first_matching_code(["1111", "2222", "3333"], ["2222"])
-    rank_from_string = get_rank_of_first_matching_code(["1111", "2222", "3333"], "2222")
-
-    assert (
-        rank_from_list == rank_from_string == 2
-    ), "Expected single-item list and string to produce the same rank."
-
-
-# ============================================================================
 # Test add_sayt_metrics_columns function
 # ============================================================================
 
@@ -549,6 +462,7 @@ def sayt_metrics_df():
             "precision_at_3": [1 / 3, 1 / 3, 0.0],
             "recall_at_1": [1.0, 0.0, 0.0],
             "recall_at_3": [1.0, 1.0, 0.0],
+            "correct_code": ["1111", "2222", "3333"],
         }
     )
 
@@ -560,6 +474,7 @@ def test_summarise_performance_metrics_returns_sayt_performance_metrics_instance
     result = summarise_performance_metrics(
         sayt_metrics_df,
         suggestions_col="suggestions",
+        correct_codes_col="correct_code",
         code_digit_match_length=5,
         k_values=[1, 3],
         ave_time_per_query=12.5,
@@ -578,6 +493,7 @@ def test_summarise_performance_metrics_total_queries_equals_row_count(
     result = summarise_performance_metrics(
         sayt_metrics_df,
         suggestions_col="suggestions",
+        correct_codes_col="correct_code",
         code_digit_match_length=5,
         k_values=[1],
         ave_time_per_query=10.0,
@@ -595,6 +511,7 @@ def test_summarise_performance_metrics_stores_ave_time_per_query(
     result = summarise_performance_metrics(
         sayt_metrics_df,
         suggestions_col="suggestions",
+        correct_codes_col="correct_code",
         code_digit_match_length=5,
         k_values=[1],
         ave_time_per_query=42.7,
@@ -612,6 +529,7 @@ def test_summarise_performance_metrics_counts_rows_with_zero_correct_code_rank(
     result = summarise_performance_metrics(
         sayt_metrics_df,
         suggestions_col="suggestions",
+        correct_codes_col="correct_code",
         code_digit_match_length=5,
         k_values=[1],
         ave_time_per_query=0.0,
@@ -629,6 +547,7 @@ def test_summarise_performance_metrics_computes_mean_reciprocal_rank(
     result = summarise_performance_metrics(
         sayt_metrics_df,
         suggestions_col="suggestions",
+        correct_codes_col="correct_code",
         code_digit_match_length=5,
         k_values=[1],
         ave_time_per_query=0.0,
@@ -646,6 +565,7 @@ def test_summarise_performance_metrics_computes_mean_rank(sayt_metrics_df):
     result = summarise_performance_metrics(
         sayt_metrics_df,
         suggestions_col="suggestions",
+        correct_codes_col="correct_code",
         code_digit_match_length=5,
         k_values=[1],
         ave_time_per_query=0.0,
@@ -661,6 +581,7 @@ def test_summarise_performance_metrics_builds_precision_at_k_dict(sayt_metrics_d
     result = summarise_performance_metrics(
         sayt_metrics_df,
         suggestions_col="suggestions",
+        correct_codes_col="correct_code",
         code_digit_match_length=5,
         k_values=[1, 3],
         ave_time_per_query=0.0,
@@ -677,6 +598,7 @@ def test_summarise_performance_metrics_builds_recall_at_k_dict(sayt_metrics_df):
     result = summarise_performance_metrics(
         sayt_metrics_df,
         suggestions_col="suggestions",
+        correct_codes_col="correct_code",
         code_digit_match_length=5,
         k_values=[1, 3],
         ave_time_per_query=0.0,
@@ -696,12 +618,14 @@ def test_summarise_performance_metrics_all_matched():
             "correct_code_rank": [1.0, 2.0],
             "precision_at_1": [1.0, 0.0],
             "recall_at_1": [1.0, 1.0],
+            "correct_code": ["1111", "2222"],
         }
     )
 
     result = summarise_performance_metrics(
         df,
         suggestions_col="suggestions",
+        correct_codes_col="correct_code",
         code_digit_match_length=5,
         k_values=[1],
         ave_time_per_query=0.0,
@@ -720,12 +644,14 @@ def test_summarise_performance_metrics_all_unmatched():
             "correct_code_rank": [None, None],
             "precision_at_1": [0.0, 0.0],
             "recall_at_1": [0.0, 0.0],
+            "correct_code": ["1111", "2222"],
         }
     )
 
     result = summarise_performance_metrics(
         df,
         suggestions_col="suggestions",
+        correct_codes_col="correct_code",
         code_digit_match_length=5,
         k_values=[1],
         ave_time_per_query=0.0,
@@ -750,12 +676,14 @@ def test_summarise_performance_metrics_single_row():
             "correct_code_rank": [2.0],
             "precision_at_2": [0.5],
             "recall_at_2": [1.0],
+            "correct_code": ["1111"],
         }
     )
 
     result = summarise_performance_metrics(
         df,
         suggestions_col="suggestions",
+        correct_codes_col="correct_code",
         code_digit_match_length=5,
         k_values=[2],
         ave_time_per_query=5.0,
@@ -780,6 +708,7 @@ def test_summarise_performance_metrics_stores_suggestions_col(sayt_metrics_df):
     result = summarise_performance_metrics(
         sayt_metrics_df,
         suggestions_col="my_col",
+        correct_codes_col="correct_code",
         code_digit_match_length=7,
         k_values=[1],
         ave_time_per_query=0.0,
@@ -793,6 +722,26 @@ def test_summarise_performance_metrics_stores_suggestions_col(sayt_metrics_df):
     ), "Expected code_digit_match_length to be stored as provided."
 
 
+def test_summarise_performance_metrics_defaults_k_values_to_empty_when_none(
+    sayt_metrics_df,
+):
+    """k_values=None should default to an empty list, yielding empty precision/recall dicts."""
+    result = summarise_performance_metrics(
+        sayt_metrics_df,
+        suggestions_col="suggestions",
+        correct_codes_col="correct_code",
+        code_digit_match_length=5,
+        ave_time_per_query=0.0,
+    )
+
+    assert (
+        result.precision_at_k == {}
+    ), "Expected precision_at_k to be an empty dict when k_values is None."
+    assert (
+        result.recall_at_k == {}
+    ), "Expected recall_at_k to be an empty dict when k_values is None."
+
+
 def test_summarise_performance_metrics_with_prefix_reads_prefixed_columns():
     """When prefix is provided, metrics should be read from the prefixed columns."""
     df = pd.DataFrame(
@@ -801,12 +750,14 @@ def test_summarise_performance_metrics_with_prefix_reads_prefixed_columns():
             "pfx_correct_code_rank": [1.0, None],
             "pfx_precision_at_1": [1.0, 0.0],
             "pfx_recall_at_1": [1.0, 0.0],
+            "correct_code": ["1111", "2222"],
         }
     )
 
     result = summarise_performance_metrics(
         df,
         suggestions_col="suggestions",
+        correct_codes_col="correct_code",
         code_digit_match_length=5,
         k_values=[1],
         ave_time_per_query=0.0,
@@ -822,6 +773,120 @@ def test_summarise_performance_metrics_with_prefix_reads_prefixed_columns():
     assert result.mrr == pytest.approx(
         0.5
     ), "Expected MRR computed from the prefixed reciprocal_rank column."
+
+
+def test_summarise_performance_metrics_raises_when_correct_codes_col_missing(
+    sayt_metrics_df,
+):
+    """A ValueError should be raised when correct_codes_col is not in the DataFrame."""
+    with pytest.raises(ValueError, match="not found in DataFrame"):
+        summarise_performance_metrics(
+            sayt_metrics_df,
+            suggestions_col="suggestions",
+            correct_codes_col="missing_col",
+            code_digit_match_length=5,
+            k_values=[1],
+            ave_time_per_query=0.0,
+        )
+
+
+def test_summarise_performance_metrics_splits_queries_missing_ground_truth():
+    """Rows with missing/empty ground truth should be excluded from metric means
+    and counted separately in queries_missing_ground_truth.
+    """
+    df = pd.DataFrame(
+        {
+            "reciprocal_rank": [1.0, 0.0, 0.0],
+            "correct_code_rank": [1.0, None, None],
+            "precision_at_1": [1.0, 0.0, 0.0],
+            "recall_at_1": [1.0, 0.0, 0.0],
+            "correct_code": ["1111", "", None],
+        }
+    )
+
+    result = summarise_performance_metrics(
+        df,
+        suggestions_col="suggestions",
+        correct_codes_col="correct_code",
+        code_digit_match_length=5,
+        k_values=[1],
+        ave_time_per_query=0.0,
+    )
+
+    assert (
+        result.total_queries == 3
+    ), "Expected total_queries to count all rows, including those missing ground truth."
+    assert (
+        result.queries_with_ground_truth == 1
+    ), "Expected queries_with_ground_truth to count only rows with a valid ground truth."
+    assert (
+        result.queries_missing_ground_truth == 2
+    ), "Expected queries_missing_ground_truth to count empty-string and None rows."
+    assert result.mrr == pytest.approx(
+        1.0
+    ), "Expected mrr to be computed only over rows with ground truth present."
+
+
+def test_summarise_performance_metrics_treats_empty_list_as_missing_ground_truth():
+    """An empty list in the correct codes column should count as missing ground truth."""
+    df = pd.DataFrame(
+        {
+            "reciprocal_rank": [1.0, 0.0],
+            "correct_code_rank": [1.0, None],
+            "precision_at_1": [1.0, 0.0],
+            "recall_at_1": [1.0, 0.0],
+            "correct_code": [["1111"], []],
+        }
+    )
+
+    result = summarise_performance_metrics(
+        df,
+        suggestions_col="suggestions",
+        correct_codes_col="correct_code",
+        code_digit_match_length=5,
+        k_values=[1],
+        ave_time_per_query=0.0,
+    )
+
+    assert (
+        result.queries_with_ground_truth == 1
+    ), "Expected only the row with a non-empty list to count as having ground truth."
+    assert (
+        result.queries_missing_ground_truth == 1
+    ), "Expected the row with an empty list to count as missing ground truth."
+
+
+def test_summarise_performance_metrics_treats_nan_mixed_with_lists_as_missing_ground_truth():
+    """A NaN scalar mixed with list values in the same column should be handled safely."""
+    df = pd.DataFrame(
+        {
+            "reciprocal_rank": [1.0, 0.0, 0.0],
+            "correct_code_rank": [1.0, None, None],
+            "precision_at_1": [1.0, 0.0, 0.0],
+            "recall_at_1": [1.0, 0.0, 0.0],
+            "correct_code": [["1111", "2222"], float("nan"), []],
+        }
+    )
+
+    result = summarise_performance_metrics(
+        df,
+        suggestions_col="suggestions",
+        correct_codes_col="correct_code",
+        code_digit_match_length=5,
+        k_values=[1],
+        ave_time_per_query=0.0,
+    )
+
+    assert (
+        result.queries_with_ground_truth == 1
+    ), "Expected only the row with a non-empty list to count as having ground truth."
+    assert (
+        result.queries_missing_ground_truth == 2
+    ), "Expected the NaN row and the empty-list row to both count as missing ground truth."
+    assert result.mrr == pytest.approx(1.0), (
+        "Expected mrr to be computed only over the row with valid ground truth, "
+        "without a NaN-vs-list comparison error."
+    )
 
 
 # ============================================================================
@@ -858,6 +923,7 @@ def test_build_sayt_metrics_comparison_table_returns_dataframe(sayt_comparison_d
         sayt_comparison_df,
         suggestions_cols_to_compare=["suggestions_model_a", "suggestions_model_b"],
         correct_codes_col="correct_code",
+        code_length=4,
         k_values=[1],
         ave_time_per_query_dict={
             "suggestions_model_a": 10.0,
@@ -878,6 +944,7 @@ def test_build_sayt_metrics_comparison_table_has_one_row_per_suggestions_column(
         sayt_comparison_df,
         suggestions_cols_to_compare=["suggestions_model_a", "suggestions_model_b"],
         correct_codes_col="correct_code",
+        code_length=4,
         k_values=[1],
         ave_time_per_query_dict={
             "suggestions_model_a": 10.0,
@@ -898,6 +965,7 @@ def test_build_sayt_metrics_comparison_table_keeps_suggestions_col_name(
         sayt_comparison_df,
         suggestions_cols_to_compare=["suggestions_model_a", "suggestions_model_b"],
         correct_codes_col="correct_code",
+        code_length=4,
         k_values=[1],
         ave_time_per_query_dict={
             "suggestions_model_a": 10.0,
@@ -919,6 +987,7 @@ def test_build_sayt_metrics_comparison_table_assigns_correct_ave_time_per_query(
         sayt_comparison_df,
         suggestions_cols_to_compare=["suggestions_model_a", "suggestions_model_b"],
         correct_codes_col="correct_code",
+        code_length=4,
         k_values=[1],
         ave_time_per_query_dict={
             "suggestions_model_a": 10.0,
@@ -940,6 +1009,7 @@ def test_build_sayt_metrics_comparison_table_computes_metrics_per_column(
         sayt_comparison_df,
         suggestions_cols_to_compare=["suggestions_model_a", "suggestions_model_b"],
         correct_codes_col="correct_code",
+        code_length=4,
         k_values=[1],
         ave_time_per_query_dict={
             "suggestions_model_a": 10.0,
@@ -963,6 +1033,7 @@ def test_build_sayt_metrics_comparison_table_single_column(sayt_comparison_df):
         sayt_comparison_df,
         suggestions_cols_to_compare=["suggestions_model_a"],
         correct_codes_col="correct_code",
+        code_length=4,
         k_values=[1],
         ave_time_per_query_dict={"suggestions_model_a": 15.0},
     )
@@ -983,6 +1054,7 @@ def test_build_sayt_metrics_comparison_table_does_not_mutate_input(sayt_comparis
         sayt_comparison_df,
         suggestions_cols_to_compare=["suggestions_model_a", "suggestions_model_b"],
         correct_codes_col="correct_code",
+        code_length=4,
         k_values=[1],
         ave_time_per_query_dict={
             "suggestions_model_a": 10.0,
@@ -1006,6 +1078,8 @@ def test_sayt_performance_metrics_instantiation_with_valid_data():
         code_digit_match_length=5,
         suggestions_col="suggestions",
         total_queries=100,
+        queries_with_ground_truth=95,
+        queries_missing_ground_truth=5,
         ave_time_per_query_ms=15.5,
         unmatched_query_count=5,
         mrr=0.85,
@@ -1045,6 +1119,8 @@ def test_sayt_performance_metrics_instantiation_with_empty_k_dicts():
         code_digit_match_length=5,
         suggestions_col="suggestions",
         total_queries=50,
+        queries_with_ground_truth=50,
+        queries_missing_ground_truth=0,
         ave_time_per_query_ms=10.0,
         unmatched_query_count=0,
         mrr=1.0,
@@ -1065,6 +1141,8 @@ def test_sayt_performance_metrics_instantiation_with_zero_values():
         code_digit_match_length=5,
         suggestions_col="suggestions",
         total_queries=0,
+        queries_with_ground_truth=0,
+        queries_missing_ground_truth=0,
         ave_time_per_query_ms=0.0,
         unmatched_query_count=0,
         mrr=0.0,
@@ -1085,6 +1163,8 @@ def test_sayt_performance_metrics_report_metrics_includes_all_fields():
         code_digit_match_length=5,
         suggestions_col="test_suggestions",
         total_queries=100,
+        queries_with_ground_truth=95,
+        queries_missing_ground_truth=5,
         ave_time_per_query_ms=15.5,
         unmatched_query_count=5,
         mrr=0.85,
@@ -1107,6 +1187,12 @@ def test_sayt_performance_metrics_report_metrics_includes_all_fields():
     assert "Precision@3" in report, "Expected Precision@3 in report."
     assert "Recall@1" in report, "Expected Recall@1 in report."
     assert "Recall@3" in report, "Expected Recall@3 in report."
+    assert (
+        "Queries with ground truth: 95" in report
+    ), "Expected queries_with_ground_truth in report."
+    assert (
+        "Queries missing ground truth: 5" in report
+    ), "Expected queries_missing_ground_truth in report."
 
 
 def test_sayt_performance_metrics_report_metrics_returns_string():
@@ -1115,6 +1201,8 @@ def test_sayt_performance_metrics_report_metrics_returns_string():
         code_digit_match_length=5,
         suggestions_col="suggestions",
         total_queries=50,
+        queries_with_ground_truth=50,
+        queries_missing_ground_truth=0,
         ave_time_per_query_ms=10.0,
         unmatched_query_count=0,
         mrr=0.5,
@@ -1133,6 +1221,8 @@ def test_sayt_performance_metrics_report_metrics_starts_with_header():
         code_digit_match_length=5,
         suggestions_col="my_col",
         total_queries=10,
+        queries_with_ground_truth=10,
+        queries_missing_ground_truth=0,
         ave_time_per_query_ms=5.0,
         unmatched_query_count=1,
         mrr=0.9,
@@ -1153,6 +1243,8 @@ def test_sayt_performance_metrics_report_metrics_contains_formatted_numbers():
         code_digit_match_length=5,
         suggestions_col="suggestions",
         total_queries=100,
+        queries_with_ground_truth=100,
+        queries_missing_ground_truth=0,
         ave_time_per_query_ms=12.3456,
         unmatched_query_count=8,
         mrr=0.123456,
@@ -1179,6 +1271,8 @@ def test_sayt_performance_metrics_report_metrics_with_multiple_k_values():
         code_digit_match_length=5,
         suggestions_col="suggestions",
         total_queries=100,
+        queries_with_ground_truth=100,
+        queries_missing_ground_truth=0,
         ave_time_per_query_ms=10.0,
         unmatched_query_count=0,
         mrr=0.8,
@@ -1214,6 +1308,8 @@ def test_sayt_performance_metrics_report_metrics_with_empty_k_dicts():
         code_digit_match_length=5,
         suggestions_col="suggestions",
         total_queries=50,
+        queries_with_ground_truth=50,
+        queries_missing_ground_truth=0,
         ave_time_per_query_ms=8.0,
         unmatched_query_count=2,
         mrr=0.6,
@@ -1241,6 +1337,8 @@ def test_sayt_performance_metrics_validates_field_types():
             code_digit_match_length=5,
             suggestions_col="suggestions",
             total_queries="not_an_int",
+            queries_with_ground_truth=100,
+            queries_missing_ground_truth=0,
             ave_time_per_query_ms=10.0,
             unmatched_query_count=0,
             mrr=0.8,
@@ -1257,6 +1355,8 @@ def test_sayt_performance_metrics_validates_required_fields():
             code_digit_match_length=5,
             suggestions_col="suggestions",
             total_queries=100,
+            queries_with_ground_truth=100,
+            queries_missing_ground_truth=0,
             ave_time_per_query_ms=10.0,
             unmatched_query_count=0,
             mrr=0.8,
@@ -1272,6 +1372,8 @@ def test_sayt_performance_metrics_report_metrics_sorts_k_values():
         code_digit_match_length=5,
         suggestions_col="suggestions",
         total_queries=100,
+        queries_with_ground_truth=100,
+        queries_missing_ground_truth=0,
         ave_time_per_query_ms=10.0,
         unmatched_query_count=0,
         mrr=0.8,

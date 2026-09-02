@@ -14,6 +14,9 @@ from survey_assist_embed_core.sayt import (
 from survey_assist_utils.logging import get_logger
 
 from survey_assist_eval.data_cleaning.code_standard import get_clean_n_digit_codes
+from survey_assist_eval.evaluation.sayt.suggestion_ranking_functions import (
+    rank_of_correct_code_in_suggestions,
+)
 
 logger = get_logger(__name__)
 
@@ -225,41 +228,11 @@ def get_suggestions_for_row(  # noqa: PLR0913 pylint: disable=R0917,R0913
     return suggestions
 
 
-def rank_of_correct_code_in_suggestions(
-    row: pd.Series,
-    num_chars: int,
-    suggester_label: str,
-    code_length: int = 5,
-    correct_codes_col: str = "correct_sic_code",
-) -> int | None:
-    """Return the rank of the correct code in generated suggestions.
-
-    Args:
-        row: Input row containing suggestion outputs and the correct code.
-        num_chars: Prefix length used to generate suggestions.
-        suggester_label: Label used in the suggestion column name.
-        code_length: Number of trailing characters to compare as code.
-        correct_codes_col: Column name holding the correct SIC code.
-
-    Returns:
-        int | None: 1-based rank of the correct code, or None if not found.
-    """
-    correct_code = row[correct_codes_col]
-    suggested_codes = get_codes_from_suggestions(
-        row,
-        suggestions_col=f"suggestions_{num_chars}chars_{suggester_label}",
-        code_length=code_length,
-    )
-
-    for rank, suggest in enumerate(suggested_codes):
-        if suggest == correct_code:
-            return rank + 1
-    return None
-
-
-def get_suggestions_by_chars(  # noqa: PLR0913 pylint: disable=R0917,R0913
+def get_suggestions_by_chars(  # noqa: PLR0913 pylint: disable=R0917,R0913,R0914
     df: pd.DataFrame,
     suggesters_dict: dict[str, Any],
+    correct_codes_col: str = "correct_sic_code",
+    code_length: int = 5,
     num_chars: list | None = None,
     suggestions_limit: int = 9,
     hard_suggestions_limit: bool = False,
@@ -269,6 +242,8 @@ def get_suggestions_by_chars(  # noqa: PLR0913 pylint: disable=R0917,R0913
 
     Args:
         df: dataframe containing melted suggestions.
+        correct_codes_col: name of the column containing correct codes.
+        code_length: expected SIC/SOC code length.
         num_chars: number of characters to be tested.
         suggesters_dict: a dictionary with initialised suggester models.
         suggestions_limit: the maximum rank of suggestions considered as valid.
@@ -318,8 +293,9 @@ def get_suggestions_by_chars(  # noqa: PLR0913 pylint: disable=R0917,R0913
             logger.info("  -> suggestions done", elapsed_sec=avg_ms)
             df[f"rank_{prefix_chars}chars_{suggester_name}"] = df.apply(
                 rank_of_correct_code_in_suggestions,
-                correct_codes_col="correct_sic_code",
+                correct_codes_col=correct_codes_col,
                 suggester_label=suggester_name,
+                code_length=code_length,
                 num_chars=prefix_chars,
                 axis=1,
             )
@@ -417,24 +393,6 @@ def create_figure(
     fig.write_html(f"{output_dir}/sayt_eval_100sample_rank_histograms.html")
 
     return fig
-
-
-def get_codes_from_suggestions(
-    row: pd.Series,
-    suggestions_col: str,
-    code_length: int = 5,
-) -> list[str]:
-    """Extract code suffixes from suggestion strings for a single input row.
-
-    Args:
-        row: Input row containing a suggestions column.
-        suggestions_col: Column name containing suggestion strings.
-        code_length: Number of trailing characters to extract as a code.
-
-    Returns:
-        list[str]: Extracted codes in suggestion order.
-    """
-    return [suggestion[-code_length:] for suggestion in row[suggestions_col]]
 
 
 def timed_apply(df: pd.DataFrame, func, **kwargs) -> tuple[pd.Series, float]:

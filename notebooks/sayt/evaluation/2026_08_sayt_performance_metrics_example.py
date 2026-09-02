@@ -6,6 +6,7 @@
 # %%
 import os
 
+import numpy as np
 import pandas as pd
 from dotenv import load_dotenv
 from survey_assist_embed_core.sayt import (
@@ -155,6 +156,56 @@ compare_performance_metrics = build_sayt_metrics_comparison_table(
     test_df,
     suggestions_cols_to_compare=suggestions_cols_to_compare,
     correct_codes_col=correct_codes_col,
+    code_length=SIC_CODE_LENGTH,
+    k_values=[1, 3, 5, MAX_SUGGESTIONS],
+    ave_time_per_query_dict=avg_ms_dict,
+)
+
+compare_performance_metrics.head()
+# %%
+# Example when the correct codes are a list of codes rather than a single code
+
+test_df_list_codes = pd.read_parquet(
+    f"gs://{bucket_name}/evaluation-pipeline/original_datasets/sic_2k/sic_2k_test_data.parquet"
+)
+
+is_self_employed = test_df_list_codes["sic2007_employee"] == "-9"
+
+test_df_list_codes["full_entry"] = np.where(
+    is_self_employed,
+    test_df_list_codes["sic2007_self_employed"],
+    test_df_list_codes["sic2007_employee"],
+)
+test_df_list_codes["employment_status"] = np.where(
+    is_self_employed, "self_employed", "employed"
+)
+
+test_df_list_codes = test_df_list_codes.rename(
+    columns={"clerical_codes": correct_codes_col}
+)
+
+# %%
+
+test_df_list_codes, avg_ms_dict = get_suggestions_by_chars(
+    df=test_df_list_codes,
+    suggesters_dict=suggesters,
+    num_chars=[4, 5, 7, 10],
+    suggestions_limit=MAX_SUGGESTIONS,
+    hard_suggestions_limit=False,
+    with_scores=False,
+)
+
+suggestions_cols_to_compare = test_df_list_codes.columns[
+    test_df_list_codes.columns.str.startswith("suggestions_")
+].tolist()
+
+# %%
+
+compare_performance_metrics = build_sayt_metrics_comparison_table(
+    test_df_list_codes,
+    suggestions_cols_to_compare=suggestions_cols_to_compare,
+    correct_codes_col=correct_codes_col,
+    code_length=SIC_CODE_LENGTH,
     k_values=[1, 3, 5, MAX_SUGGESTIONS],
     ave_time_per_query_dict=avg_ms_dict,
 )

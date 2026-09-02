@@ -21,6 +21,7 @@ def run_eval_for_suggesters(  # noqa: PLR0913 pylint: disable=R0913, R0914
     suggesters_dict: dict,
     num_chars: list[int],
     output_dir: str,
+    code_length: int = 5,
     suggestions_list: list | None = None,
     suggestions_limit: int = 9,
 ):
@@ -34,8 +35,8 @@ def run_eval_for_suggesters(  # noqa: PLR0913 pylint: disable=R0913, R0914
         num_chars (list): number of characters to be tested.
         suggestions_limit: the maximum rank of suggestions considered as valid.
         output_dir (str): path to file location to be saved.
-        suggestions_list (list): optional variable; list of suggestions to be checked.
         code_length (int): expected SIC/SOC code length.
+        suggestions_list (list): optional variable; list of suggestions to be checked.
 
     Return:
         pd.DataFrame: dataframe containing suggestions.
@@ -69,6 +70,7 @@ def run_eval_for_suggesters(  # noqa: PLR0913 pylint: disable=R0913, R0914
         suggestions_df,
         suggestions_cols_to_compare=suggestions_cols_to_compare,
         correct_codes_col=correct_codes_col,
+        code_length=code_length,
         k_values=suggestions_list,
         ave_time_per_query_dict=avg_ms_dict,
     )

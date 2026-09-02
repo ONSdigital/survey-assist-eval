@@ -4,9 +4,10 @@
 import pandas as pd
 from pydantic import BaseModel
 
-from notebooks.sayt.sayt_utils import get_codes_from_suggestions
-from survey_assist_eval.evaluation.sayt.performance_metrics_functions import (
+from survey_assist_eval.evaluation.sayt.suggestion_ranking_functions import (
+    get_codes_from_suggestions,
     get_rank_of_first_matching_code,
+    is_correct_codes_empty,
 )
 
 
@@ -18,6 +19,8 @@ class SAYTHardLimitMetrics(BaseModel):
 
     suggestions_col: str
     num_queries: int  # Total number of queries evaluated
+    num_queries_with_ground_truth: int  # Number of queries with available ground truth
+    num_queries_with_no_ground_truth: int  # Number of queries missing ground truth
     cutoff_k: int  # The hard limit (e.g., 9)
     max_suggestions_returned: int  # Max returned in this dataset
     pct_exceeding_limit: float  # % of queries returning > cutoff_k suggestions
@@ -33,6 +36,8 @@ class SAYTHardLimitMetrics(BaseModel):
         report = (
             f"SAYT Hard Limit Metrics for column '{self.suggestions_col}':\n"
             f" Number of queries: {self.num_queries}\n"
+            f" Number of queries with ground truth: {self.num_queries_with_ground_truth}\n"
+            f" Number of queries with no ground truth: {self.num_queries_with_no_ground_truth}\n"
             f" Suggestions limit (k): {self.cutoff_k}\n"
             f" Maximum suggestions returned: {self.max_suggestions_returned}\n"
             f" % of queries exceeding limit: {self.pct_exceeding_limit:.2%}\n"
@@ -42,7 +47,7 @@ class SAYTHardLimitMetrics(BaseModel):
             f"{self.pct_correct_within_limit:.2%}\n"
             " % of queries with a correct suggestion outside limit: "
             f"{self.pct_correct_outside_limit:.2%}\n"
-            "% of queries with a correct in-limit suggestion tied across the limit boundary: "
+            " % of queries with a correct in-limit suggestion tied across the limit boundary: "
             f"{self.pct_within_limit_at_tie_score:.2%}"
         )
         return report
@@ -96,6 +101,7 @@ def compute_suggestions_hard_limit_metrics(  # noqa: PLR0913 pylint: disable = R
         df=df,
         suggestions_col=suggestions_col,
         cutoff_k=cutoff_k,
+        correct_codes_col=correct_codes_col,
     )
 
 
@@ -179,6 +185,7 @@ def add_sayt_hard_limit_metrics_columns(  # noqa: PLR0913 pylint: disable = R091
 def summarise_hard_limit_metrics(
     df,
     suggestions_col: str,
+    correct_codes_col: str,
     cutoff_k: int,
     prefix: str = "",
 ) -> SAYTHardLimitMetrics:
@@ -187,15 +194,24 @@ def summarise_hard_limit_metrics(
     Args:
         df: DataFrame containing the suggestions and correct codes.
         suggestions_col: The name of the column with the suggestions.
+        correct_codes_col: The name of the column with correct code(s) (string or list).
         cutoff_k: The hard limit on the number of suggestions returned.
         prefix: Optional prefix for the metric columns.
 
     Returns:
         SAYTHardLimitMetrics: The computed hard limit metrics.
     """
+    total_queries = len(df)
+
+    no_ground_truth = df[correct_codes_col].apply(is_correct_codes_empty)
+
+    df = df.loc[~no_ground_truth].copy()
+
     summary = {
         "suggestions_col": suggestions_col,
-        "num_queries": len(df),
+        "num_queries": total_queries,
+        "num_queries_with_ground_truth": len(df),
+        "num_queries_with_no_ground_truth": total_queries - len(df),
         "cutoff_k": cutoff_k,
         "max_suggestions_returned": df[f"{prefix}num_retrieved_codes"].max(),
         "pct_exceeding_limit": df[f"{prefix}num_retrieved_codes"].gt(cutoff_k).mean(),
@@ -214,7 +230,8 @@ def build_sayt_hard_limit_metrics_comparison_table(
     df,
     suggestions_cols_to_compare: list[str],
     correct_codes_col: str,
-    cutoff_k: int,
+    code_length: int = 5,
+    cutoff_k: int = 9,
 ):
     """Build a comparison table of performance metrics across suggestion columns.
 
@@ -223,13 +240,13 @@ def build_sayt_hard_limit_metrics_comparison_table(
         suggestions_cols_to_compare: List of column names containing
             the retrieved suggestions to compare.
         correct_codes_col: Column name containing correct code(s) (string or list).
-        cutoff_k: The hard limit on the number of suggestions returned.
+        code_length: Length of the correct codes (default is 5).
+        cutoff_k: The hard limit on the number of suggestions returned (default is 9).
 
     Returns:
         pd.DataFrame: One row per suggestion column with all hard limit metrics.
     """
     performance_metrics = pd.DataFrame()
-    code_length = len(df[correct_codes_col].iloc[0])  # inferred from first row
 
     for col in suggestions_cols_to_compare:
         score_col = col.replace("suggestions_", "scores_")

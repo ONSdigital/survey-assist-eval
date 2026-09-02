@@ -3,7 +3,11 @@
 import pandas as pd
 from pydantic import BaseModel
 
-from notebooks.sayt.sayt_utils import get_codes_from_suggestions
+from survey_assist_eval.evaluation.sayt.suggestion_ranking_functions import (
+    get_codes_from_suggestions,
+    get_rank_of_first_matching_code,
+    is_correct_codes_empty,
+)
 
 
 class SAYTPerformanceMetrics(BaseModel):
@@ -12,6 +16,8 @@ class SAYTPerformanceMetrics(BaseModel):
     suggestions_col: str
     code_digit_match_length: int
     total_queries: int
+    queries_with_ground_truth: int
+    queries_missing_ground_truth: int
     ave_time_per_query_ms: float
     unmatched_query_count: int
     mrr: float
@@ -25,6 +31,8 @@ class SAYTPerformanceMetrics(BaseModel):
             f"\nSAYT Performance Metrics for column {self.suggestions_col}:",
             f" Code digit match length: {self.code_digit_match_length}",
             f" Total queries: {self.total_queries}",
+            f" Queries with ground truth: {self.queries_with_ground_truth}",
+            f" Queries missing ground truth: {self.queries_missing_ground_truth}",
             f" Average time per query: {self.ave_time_per_query_ms:.2f} ms",
             f" Unmatched query count: {self.unmatched_query_count}",
             f" Mean reciprocal rank: {self.mrr:.4f}",
@@ -90,6 +98,7 @@ def compute_performance_metrics_from_suggestions(  # noqa: PLR0913 pylint: disab
     return summarise_performance_metrics(
         df,
         suggestions_col=suggestions_col,
+        correct_codes_col=correct_codes_col,
         code_digit_match_length=(
             code_digit_match_length
             if code_digit_match_length is not None
@@ -171,27 +180,6 @@ def compute_reciprocal_rank(
     return 0.0
 
 
-def get_rank_of_first_matching_code(
-    retrieved_codes: list[str], correct_codes: str | list[str]
-) -> int | None:
-    """Get the rank of the first retrieved code matching correct code(s).
-
-    Args:
-        retrieved_codes: List of codes retrieved by the system (ordered by relevance).
-        correct_codes: A single correct code or list of correct codes to match against.
-
-    Returns:
-        int: Rank of the first matching code, or None if no match found.
-    """
-    if isinstance(correct_codes, str):
-        correct_codes = [correct_codes]
-
-    for rank, item in enumerate(retrieved_codes, start=1):
-        if item in correct_codes:
-            return int(rank)
-    return None
-
-
 def add_sayt_metrics_columns(
     df,
     retrieved_codes_col: str,
@@ -249,6 +237,7 @@ def add_sayt_metrics_columns(
 def summarise_performance_metrics(  # noqa: PLR0913 pylint: disable = R0913, R0917
     df,
     suggestions_col: str,
+    correct_codes_col: str,
     code_digit_match_length: int,
     ave_time_per_query: float,
     k_values: list[int] | None = None,
@@ -259,6 +248,7 @@ def summarise_performance_metrics(  # noqa: PLR0913 pylint: disable = R0913, R09
     Args:
         df: DataFrame containing the performance metric columns.
         suggestions_col: Column name containing the retrieved suggestions.
+        correct_codes_col: Column name containing correct code(s) (string or list).
         code_digit_match_length: Length of the code to match for evaluation.
         k_values: List of k values for which Precision@K and Recall@K were computed.
         ave_time_per_query: Average time taken per query in milliseconds.
@@ -273,10 +263,21 @@ def summarise_performance_metrics(  # noqa: PLR0913 pylint: disable = R0913, R09
     if k_values is None:
         k_values = []
 
+    if correct_codes_col not in df.columns:
+        raise ValueError(f"Column '{correct_codes_col}' not found in DataFrame.")
+
+    total_queries = len(df)
+
+    no_ground_truth = df[correct_codes_col].apply(is_correct_codes_empty)
+
+    df = df.loc[~no_ground_truth].copy()
+
     summary = {
         "code_digit_match_length": code_digit_match_length,
         "suggestions_col": suggestions_col,
-        "total_queries": len(df),
+        "total_queries": total_queries,
+        "queries_with_ground_truth": len(df),
+        "queries_missing_ground_truth": total_queries - len(df),
         "ave_time_per_query_ms": ave_time_per_query,
         "unmatched_query_count": df[f"{prefix}correct_code_rank"].isna().sum(),
         "mrr": df[f"{prefix}reciprocal_rank"].mean(),
@@ -288,11 +289,12 @@ def summarise_performance_metrics(  # noqa: PLR0913 pylint: disable = R0913, R09
     return SAYTPerformanceMetrics(**summary)
 
 
-def build_sayt_metrics_comparison_table(
+def build_sayt_metrics_comparison_table(  # noqa: PLR0913 pylint: disable = R0913, R0917
     df,
     suggestions_cols_to_compare: list[str],
     correct_codes_col: str,
     ave_time_per_query_dict: dict[str, float],
+    code_length: int = 5,
     k_values: list[int] | None = None,
 ):
     """Build a comparison table of performance metrics across suggestion columns.
@@ -302,15 +304,15 @@ def build_sayt_metrics_comparison_table(
         suggestions_cols_to_compare: List of column names containing
             the retrieved suggestions to compare.
         correct_codes_col: Column name containing correct code(s) (string or list).
-        k_values: List of k values for which to compute Precision@K and Recall@K.
         ave_time_per_query_dict: Average time per query (ms) for each suggestion column,
             keyed by the suggestion column name.
+        code_length: Length of the correct codes (default is 5).
+        k_values: List of k values for which to compute Precision@K and Recall@K.
 
     Returns:
         pd.DataFrame: One row per suggestion column with all performance metrics.
     """
     performance_metrics = pd.DataFrame()
-    code_length = len(df[correct_codes_col].iloc[0])  # inferred from first row
 
     for col in suggestions_cols_to_compare:
         performance_metrics_tmp = {
