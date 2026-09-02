@@ -8,6 +8,8 @@ from survey_assist_eval.evaluation.sayt.suggestion_ranking_functions import (
     get_rank_of_first_matching_code,
     is_correct_codes_empty,
     rank_of_correct_code_in_suggestions,
+    truncate_codes_columns,
+    truncate_correct_codes,
 )
 
 # ============================================================================
@@ -292,3 +294,143 @@ def test_rank_of_correct_code_in_suggestions_uses_custom_correct_codes_col():
         "Expected rank to be 1 when using a custom correct_codes_col that matches "
         "the only suggestion."
     )
+
+
+# ============================================================================
+# Test truncate_correct_codes function
+# ============================================================================
+
+
+def test_truncate_correct_codes_truncates_a_single_string():
+    """A single correct code string should be truncated to the requested length."""
+    result = truncate_correct_codes("12345", code_digit_match_length=3)
+
+    assert result == "123", "Expected the string to be truncated to 3 characters."
+
+
+def test_truncate_correct_codes_truncates_each_code_in_a_list():
+    """Each code in a list should be truncated to the requested length."""
+    result = truncate_correct_codes(["12345", "67890"], code_digit_match_length=3)
+
+    assert set(result) == {
+        "123",
+        "678",
+    }, "Expected each code in the list to be truncated to 3 characters."
+
+
+def test_truncate_correct_codes_dedupes_list_after_truncation():
+    """Truncating a list of codes should remove duplicates created by the truncation."""
+    result = truncate_correct_codes(["1231", "1239"], code_digit_match_length=3)
+
+    assert result == [
+        "123"
+    ], "Expected duplicate truncated codes to be de-duplicated into a single entry."
+
+
+def test_truncate_correct_codes_handles_empty_list():
+    """Truncating an empty list should return an empty list."""
+    result = truncate_correct_codes([], code_digit_match_length=3)
+
+    assert isinstance(result, list), "Expected a list to be returned."
+    assert not result, "Expected an empty list to remain an empty list."
+
+
+# ============================================================================
+# Test truncate_codes_columns function
+# ============================================================================
+
+
+def test_truncate_codes_columns_adds_truncated_correct_codes_column():
+    """A new correct_codes_col_truncated column should hold truncated correct codes."""
+    df = pd.DataFrame({"correct_code": ["12345", "67890"]})
+
+    result = truncate_codes_columns(
+        df, code_digit_match_length=3, correct_codes_col="correct_code"
+    )
+
+    assert result["correct_code_truncated"].tolist() == [
+        "123",
+        "678",
+    ], "Expected correct_code_truncated to hold each code truncated to 3 characters."
+    assert result["correct_code"].tolist() == [
+        "12345",
+        "67890",
+    ], "Expected the original correct_code column to remain unchanged."
+
+
+def test_truncate_codes_columns_adds_truncated_retrieved_codes_column():
+    """A new retrieved_codes_col_truncated column should hold truncated retrieved codes."""
+    df = pd.DataFrame({"retrieved": [["12345", "67890"]]})
+
+    result = truncate_codes_columns(
+        df, code_digit_match_length=3, retrieved_codes_col="retrieved"
+    )
+
+    assert result["retrieved_truncated"].tolist() == [
+        ["123", "678"]
+    ], "Expected retrieved_truncated to hold each code truncated to 3 characters."
+
+
+def test_truncate_codes_columns_keeps_duplicates_in_retrieved_codes():
+    """Truncating retrieved codes should keep duplicates, unlike correct codes."""
+    df = pd.DataFrame({"retrieved": [["1234", "1235"]]})
+
+    result = truncate_codes_columns(
+        df, code_digit_match_length=3, retrieved_codes_col="retrieved"
+    )
+
+    assert result["retrieved_truncated"].tolist() == [["123", "123"]], (
+        "Expected retrieved_truncated to keep duplicate codes produced by "
+        "truncation, preserving retrieval order and rank."
+    )
+
+
+def test_truncate_codes_columns_handles_both_columns_together():
+    """Both correct and retrieved codes columns should be truncated when provided."""
+    df = pd.DataFrame(
+        {
+            "correct_code": ["12345"],
+            "retrieved": [["12345", "99999"]],
+        }
+    )
+
+    result = truncate_codes_columns(
+        df,
+        code_digit_match_length=3,
+        correct_codes_col="correct_code",
+        retrieved_codes_col="retrieved",
+    )
+
+    assert (
+        result["correct_code_truncated"].iloc[0] == "123"
+    ), "Expected correct_code_truncated to be truncated to 3 characters."
+    assert result["retrieved_truncated"].iloc[0] == [
+        "123",
+        "999",
+    ], "Expected retrieved_truncated to be truncated to 3 characters."
+
+
+def test_truncate_codes_columns_skips_columns_not_requested():
+    """Columns should only be added when explicitly requested."""
+    df = pd.DataFrame({"correct_code": ["12345"]})
+
+    result = truncate_codes_columns(df, code_digit_match_length=3)
+
+    assert "correct_code_truncated" not in result.columns, (
+        "Expected no truncated correct-codes column to be added when "
+        "correct_codes_col is not provided."
+    )
+
+
+def test_truncate_codes_columns_does_not_mutate_input():
+    """The function should not modify the input DataFrame."""
+    df = pd.DataFrame({"correct_code": ["12345"]})
+    original_df = df.copy(deep=True)
+
+    truncate_codes_columns(
+        df, code_digit_match_length=3, correct_codes_col="correct_code"
+    )
+
+    assert df.equals(
+        original_df
+    ), "Expected truncate_codes_columns to leave the input DataFrame unchanged."

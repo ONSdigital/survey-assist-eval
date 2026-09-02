@@ -1,4 +1,9 @@
-"""A script showing an example of using SAYT performance metrics."""
+"""A script showing an example of running SAYT evaluation for different suggesters.
+
+Expects following environment variables to be set:
+- EVALUATION_BUCKET_NAME: name of GCS bucket where the data is stored
+The variables are loaded from the ".env" file.
+"""
 
 # pylint: disable=invalid-name
 # pylint: disable=duplicate-code
@@ -19,18 +24,21 @@ from survey_assist_utils.logging import get_logger
 from notebooks.sayt.sayt_utils import (
     build_lookup_suggester,
     build_sayt_corpus_from_df,
-    get_suggestions_by_chars,
     validate_one_code,
 )
-from survey_assist_eval.evaluation.sayt.performance_metrics_functions import (
-    build_sayt_metrics_comparison_table,
-    compute_performance_metrics_from_suggestions,
-)
+from notebooks.sayt.suggester_eval import run_eval_for_suggesters
 
 # %%
 SIC_CODE_LENGTH = 5
-MAX_SUGGESTIONS = 9  # for the evaluation we will look at ranks up to 9 only
-correct_codes_col = "correct_sic_code"
+MAX_SUGGESTIONS = 9
+CORRECT_CODE_COL = "correct_sic_code"
+NUM_CHARACTERS_LIST = range(4, 10)
+OUTPUT_DIR = "data/figures/sayt/min_characters"
+
+# %%
+if not os.path.exists(OUTPUT_DIR):
+    os.makedirs(OUTPUT_DIR)
+correct_codes_col = CORRECT_CODE_COL
 
 load_dotenv()
 bucket_name = os.getenv("EVALUATION_BUCKET_NAME")
@@ -39,7 +47,6 @@ if not bucket_name:
 
 
 logger = get_logger(__name__)
-
 
 # %%
 test_df = pd.read_excel(
@@ -106,65 +113,34 @@ suggesters = {
     ),
 }
 
-
 # %%
-
-test_df, avg_ms_dict = get_suggestions_by_chars(
+suggestions_df, fig, metrics_table = run_eval_for_suggesters(
     df=test_df,
     suggesters_dict=suggesters,
-    num_chars=[4, 5, 7, 10],
+    num_chars=NUM_CHARACTERS_LIST,
     suggestions_limit=MAX_SUGGESTIONS,
-    hard_suggestions_limit=False,
-    with_scores=True,
+    correct_codes_col=correct_codes_col,
+    output_dir=f"{OUTPUT_DIR}_all",
 )
 
-suggestions_cols_to_compare = test_df.columns[
-    test_df.columns.str.startswith("suggestions_")
-].tolist()
+metrics_table.head()
 
 # %%
-# Performance metrics for one suggester and prefix length
-metrics = compute_performance_metrics_from_suggestions(
-    test_df,
+# digit match to 2
+suggestions_df_digit2, fig_digit2, metrics_table_digit2 = run_eval_for_suggesters(
+    df=test_df,
+    suggesters_dict=suggesters,
+    num_chars=NUM_CHARACTERS_LIST,
+    suggestions_limit=MAX_SUGGESTIONS,
     correct_codes_col=correct_codes_col,
-    suggestions_col=suggestions_cols_to_compare[2],
-    code_length=SIC_CODE_LENGTH,
-    k_values=[1, 3, 5, MAX_SUGGESTIONS],
-    ave_time_per_query=avg_ms_dict.get(suggestions_cols_to_compare[2], 0),
-)
-
-print(metrics.report_metrics())
-
-# %%
-# Performance metrics for one suggester and prefix length
-metrics_2_digit_match = compute_performance_metrics_from_suggestions(
-    test_df,
-    correct_codes_col=correct_codes_col,
-    suggestions_col=suggestions_cols_to_compare[2],
-    code_length=SIC_CODE_LENGTH,
-    k_values=[1, 3, 5, MAX_SUGGESTIONS],
-    ave_time_per_query=avg_ms_dict.get(suggestions_cols_to_compare[2], 0),
+    output_dir=f"{OUTPUT_DIR}_digit2",
     code_digit_match_length=2,
 )
 
-print(metrics_2_digit_match.report_metrics())
+metrics_table_digit2.head()
 
-# %%
-# Comparison of performance metrics for the different suggesters and prefix lengths
-
-compare_performance_metrics = build_sayt_metrics_comparison_table(
-    test_df,
-    suggestions_cols_to_compare=suggestions_cols_to_compare,
-    correct_codes_col=correct_codes_col,
-    code_length=SIC_CODE_LENGTH,
-    k_values=[1, 3, 5, MAX_SUGGESTIONS],
-    ave_time_per_query_dict=avg_ms_dict,
-)
-
-compare_performance_metrics.head()
 # %%
 # Example when the correct codes are a list of codes rather than a single code
-
 test_df_list_codes = pd.read_parquet(
     f"gs://{bucket_name}/evaluation-pipeline/original_datasets/sic_2k/sic_2k_test_data.parquet"
 )
@@ -185,44 +161,35 @@ test_df_list_codes = test_df_list_codes.rename(
 )
 
 # %%
+suggestions_df_unambiguous, fig_unambiguous, metrics_table_unambiguous = (
+    run_eval_for_suggesters(
+        df=test_df_list_codes,
+        suggesters_dict=suggesters,
+        num_chars=NUM_CHARACTERS_LIST,
+        suggestions_limit=MAX_SUGGESTIONS,
+        correct_codes_col=correct_codes_col,
+        output_dir=f"{OUTPUT_DIR}_all_list_codes",
+        only_unambiguous_correct_codes=True,
+    )
+)
 
-test_df_list_codes, avg_ms_dict = get_suggestions_by_chars(
+metrics_table_unambiguous.head()
+
+# %%
+# digit match to 2
+(
+    suggestions_df_list_codes_digit2,
+    fig_list_codes_digit2,
+    metrics_table_list_codes_digit2,
+) = run_eval_for_suggesters(
     df=test_df_list_codes,
     suggesters_dict=suggesters,
-    num_chars=[4, 5, 7, 10],
+    num_chars=NUM_CHARACTERS_LIST,
     suggestions_limit=MAX_SUGGESTIONS,
-    hard_suggestions_limit=False,
-    with_scores=False,
-)
-
-suggestions_cols_to_compare = test_df_list_codes.columns[
-    test_df_list_codes.columns.str.startswith("suggestions_")
-].tolist()
-
-# %%
-
-compare_performance_metrics = build_sayt_metrics_comparison_table(
-    test_df_list_codes,
-    suggestions_cols_to_compare=suggestions_cols_to_compare,
     correct_codes_col=correct_codes_col,
-    code_length=SIC_CODE_LENGTH,
-    k_values=[1, 3, 5, MAX_SUGGESTIONS],
-    ave_time_per_query_dict=avg_ms_dict,
-)
-
-compare_performance_metrics.head()
-# %%
-
-compare_performance_metrics = build_sayt_metrics_comparison_table(
-    test_df_list_codes,
-    suggestions_cols_to_compare=suggestions_cols_to_compare,
-    correct_codes_col=correct_codes_col,
-    code_length=SIC_CODE_LENGTH,
+    output_dir=f"{OUTPUT_DIR}_digit2_list_codes",
     code_digit_match_length=2,
-    k_values=[1, 3, 5, MAX_SUGGESTIONS],
-    ave_time_per_query_dict=avg_ms_dict,
 )
 
-compare_performance_metrics.head()
-
+metrics_table_list_codes_digit2.head()
 # %%

@@ -61,6 +61,54 @@ def is_correct_codes_empty(codes: str | list[str] | None) -> bool:
     return len(codes) == 0
 
 
+def truncate_correct_codes(
+    codes: str | list[str], code_digit_match_length: int
+) -> str | list[str]:
+    """Truncate a correct-codes value to a fixed digit length.
+
+    Args:
+        codes: A single correct code or list of correct codes.
+        code_digit_match_length: Number of leading characters to keep.
+
+    Returns:
+        str | list[str]: Truncated code, or de-duplicated list of truncated codes.
+    """
+    if isinstance(codes, str):
+        return codes[:code_digit_match_length]
+    return list({code[:code_digit_match_length] for code in codes})
+
+
+def truncate_codes_columns(
+    df: pd.DataFrame,
+    code_digit_match_length: int,
+    correct_codes_col: str | None = None,
+    retrieved_codes_col: str | None = None,
+) -> pd.DataFrame:
+    """Truncate correct codes, and optionally retrieved codes, to a fixed digit length.
+
+    Args:
+        df: DataFrame containing the correct-codes column and, optionally, the
+            retrieved-codes column.
+        correct_codes_col: Column name containing correct code(s) (string or list).
+        code_digit_match_length: Number of leading characters to keep.
+        retrieved_codes_col: Optional column name containing lists of retrieved
+            codes to truncate as well.
+
+    Returns:
+        pd.DataFrame: Copy of df with the code columns truncated.
+    """
+    df = df.copy()
+    if correct_codes_col is not None:
+        df[f"{correct_codes_col}_truncated"] = df[correct_codes_col].apply(
+            truncate_correct_codes, code_digit_match_length=code_digit_match_length
+        )
+    if retrieved_codes_col is not None:
+        df[f"{retrieved_codes_col}_truncated"] = df[retrieved_codes_col].apply(
+            lambda codes: [code[:code_digit_match_length] for code in codes]
+        )
+    return df
+
+
 def rank_of_correct_code_in_suggestions(
     row: pd.Series,
     num_chars: int,

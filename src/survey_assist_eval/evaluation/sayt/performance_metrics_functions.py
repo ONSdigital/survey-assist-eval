@@ -7,6 +7,7 @@ from survey_assist_eval.evaluation.sayt.suggestion_ranking_functions import (
     get_codes_from_suggestions,
     get_rank_of_first_matching_code,
     is_correct_codes_empty,
+    truncate_codes_columns,
 )
 
 
@@ -69,7 +70,9 @@ def compute_performance_metrics_from_suggestions(  # noqa: PLR0913 pylint: disab
         SAYTPerformanceMetrics: Computed performance metrics.
     """
     df = df.copy()
-    df["_retrieved_codes"] = df.apply(
+
+    retrieved_codes_col = "_retrieved_codes"
+    df[retrieved_codes_col] = df.apply(
         get_codes_from_suggestions,
         suggestions_col=suggestions_col,
         code_length=code_length,
@@ -77,20 +80,18 @@ def compute_performance_metrics_from_suggestions(  # noqa: PLR0913 pylint: disab
     )
 
     if code_digit_match_length is not None:
-        df[correct_codes_col] = df[correct_codes_col].apply(
-            lambda codes: (
-                codes[:code_digit_match_length]
-                if isinstance(codes, str)
-                else list({code[:code_digit_match_length] for code in codes})
-            )
+        df = truncate_codes_columns(
+            df,
+            code_digit_match_length=code_digit_match_length,
+            correct_codes_col=correct_codes_col,
+            retrieved_codes_col=retrieved_codes_col,
         )
-        df["_retrieved_codes"] = df["_retrieved_codes"].apply(
-            lambda codes: [code[:code_digit_match_length] for code in codes],
-        )
+        correct_codes_col = f"{correct_codes_col}_truncated"
+        retrieved_codes_col = f"{retrieved_codes_col}_truncated"
 
     df = add_sayt_metrics_columns(
         df,
-        retrieved_codes_col="_retrieved_codes",
+        retrieved_codes_col=retrieved_codes_col,
         correct_codes_col=correct_codes_col,
         k_values=k_values,
     )
@@ -295,6 +296,7 @@ def build_sayt_metrics_comparison_table(  # noqa: PLR0913 pylint: disable = R091
     correct_codes_col: str,
     ave_time_per_query_dict: dict[str, float],
     code_length: int = 5,
+    code_digit_match_length: int | None = None,
     k_values: list[int] | None = None,
 ):
     """Build a comparison table of performance metrics across suggestion columns.
@@ -307,6 +309,7 @@ def build_sayt_metrics_comparison_table(  # noqa: PLR0913 pylint: disable = R091
         ave_time_per_query_dict: Average time per query (ms) for each suggestion column,
             keyed by the suggestion column name.
         code_length: Length of the correct codes (default is 5).
+        code_digit_match_length: Length of the code digit match to consider (default is None).
         k_values: List of k values for which to compute Precision@K and Recall@K.
 
     Returns:
@@ -323,6 +326,7 @@ def build_sayt_metrics_comparison_table(  # noqa: PLR0913 pylint: disable = R091
                 code_length=code_length,
                 k_values=k_values if k_values is not None else [],
                 ave_time_per_query=ave_time_per_query_dict[col],
+                code_digit_match_length=code_digit_match_length,
             ).__dict__,
         }
 

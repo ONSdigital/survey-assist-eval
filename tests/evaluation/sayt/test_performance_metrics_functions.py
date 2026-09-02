@@ -1067,6 +1067,47 @@ def test_build_sayt_metrics_comparison_table_does_not_mutate_input(sayt_comparis
     ), "Expected build_sayt_metrics_comparison_table to leave the input DataFrame unchanged."
 
 
+def test_build_sayt_metrics_comparison_table_applies_code_digit_match_length():
+    """code_digit_match_length should be passed through and truncate codes before scoring."""
+    df = pd.DataFrame(
+        {
+            "correct_code": ["1234"],
+            "suggestions_model_a": [["alpha 1239", "beta 9999"]],
+        }
+    )
+
+    # Without truncation: no exact match between 1234 and 1239.
+    without_truncation = build_sayt_metrics_comparison_table(
+        df,
+        suggestions_cols_to_compare=["suggestions_model_a"],
+        correct_codes_col="correct_code",
+        code_length=4,
+        k_values=[1],
+        ave_time_per_query_dict={"suggestions_model_a": 0.0},
+    )
+
+    # With truncation to 3 digits: 1234 -> 123 and 1239 -> 123, so rank becomes 1.
+    with_truncation = build_sayt_metrics_comparison_table(
+        df,
+        suggestions_cols_to_compare=["suggestions_model_a"],
+        correct_codes_col="correct_code",
+        code_length=4,
+        code_digit_match_length=3,
+        k_values=[1],
+        ave_time_per_query_dict={"suggestions_model_a": 0.0},
+    )
+
+    assert without_truncation["mrr"].iloc[0] == pytest.approx(
+        0.0
+    ), "Expected MRR to be 0.0 when full 4-digit codes do not match."
+    assert with_truncation["mrr"].iloc[0] == pytest.approx(
+        1.0
+    ), "Expected MRR to be 1.0 when truncated codes match at rank 1."
+    assert (
+        with_truncation["code_digit_match_length"].iloc[0] == 3
+    ), "Expected the result to report the requested truncated match length."
+
+
 # ============================================================================
 # Test SAYTPerformanceMetrics class
 # ============================================================================
