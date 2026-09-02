@@ -200,6 +200,17 @@ def test_compute_recall_at_k_with_no_matches_in_top_k():
     ), "Expected Recall@2 to be 0.0 (0 found / 2 total correct codes)."
 
 
+def test_compute_recall_at_k_does_not_exceed_one_with_duplicate_retrieved_codes():
+    """Duplicated retrieved codes must be counted once, keeping recall <= 1."""
+    recall = compute_recall_at_k(
+        ["1111", "1111", "1111", "1111", "1111"], ["1111", "2222", "3333"], 5
+    )
+
+    assert recall == pytest.approx(
+        1 / 3
+    ), "Expected Recall@5 to be 1/3 (1 distinct correct code found / 3 total), not 5/3."
+
+
 # ============================================================================
 # Test compute_reciprocal_rank function
 # ============================================================================
