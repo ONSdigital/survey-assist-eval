@@ -4,10 +4,6 @@
 
 # %%
 import json
-import os
-
-import gcsfs
-from dotenv import load_dotenv
 
 
 # %%
@@ -56,59 +52,22 @@ def get_ranked_setups(path):
 
 
 # %%
-weights_5 = "notebooks/sayt/weights/weight_5_test_n_p_s.json"
-# weights_6 = "notebooks/sayt/weights/weight_6_test_n_p_s.json"
-# weights_7 = "notebooks/sayt/weights/weight_7_test_n_p_s.json"
-# weights_8 = "notebooks/sayt/weights/weight_8_test_n_p_s.json"
-# weights_9 = "notebooks/sayt/weights/weight_9_test_n_p_s.json"
+for i in range(4, 10):
+    weights_file = f"notebooks/sayt/weights_sum_10/weight_{i}_test_n_p_s.json"
+    mrr_score, best_dict = find_best_performing_setup(weights_file)
+    print(f"Best MRR for {i} characters: {mrr_score}")
+    print(f"Best setup for {i} characters: {best_dict.keys()}\n")
+
 
 # %%
-ms5, bd5 = find_best_performing_setup(weights_5)
-# ms6, bd6 = find_best_performing_setup(weights_6)
-# ms7, bd7 = find_best_performing_setup(weights_7)
-# ms8, bd8 = find_best_performing_setup(weights_8)
-# ms9, bd9 = find_best_performing_setup(weights_9)
+weight = 5
 
-# %%
-# print("5 characters:", ms5, "\n", bd5.keys())
-# print("6 characters:", ms6, "\n", bd6.keys())
-# print("7 characters:", ms7, "\n", bd7.keys())
-# print("8 characters:", ms8, "\n", bd8.keys())
-# print("9 characters:", ms9, "\n", bd9.keys())
-
-# %%
-rankings_by_weight = get_ranked_setups(weights_5)
+rankings_by_weight = get_ranked_setups(
+    f"notebooks/sayt/weights_sum_10/weight_{weight}_test_n_p_s.json"
+)
 
 for rank, (individual_score, setups) in enumerate(rankings_by_weight.items(), start=1):
     print(f"Rank {rank}: MRR={individual_score}")
-    print(f"  {list(setups.keys())}")
+    print(f"  {list(setups.keys())}\n")
     if rank == 5:  # noqa: PLR2004
         break
-
-# %%
-load_dotenv()
-bucket_name = os.getenv("EVALUATION_BUCKET_NAME")
-if not bucket_name:
-    raise ValueError("EVALUATION_BUCKET_NAME environment variable not set")
-
-# %%
-characters = [8, 9]
-
-# %%
-fs = gcsfs.GCSFileSystem()
-
-# %%
-for character in characters:
-    save_path = f"gs://{bucket_name}/evaluation-pipeline/SAYT/weights_by_character/weight_{character}_test_n_p_s.json"  # pylint:disable=C0301 # disable line-too-long
-
-    with open(
-        f"notebooks/sayt/weights/weight_{character}_test_n_p_s.json", encoding="utf-8"
-    ) as weight_to_save:
-        file_to_save = json.load(weight_to_save)
-
-    with fs.open(save_path, "w", encoding="utf-8") as weight_to_save:
-        json.dump(
-            file_to_save, weight_to_save, ensure_ascii=False, indent=4, encoding="utf-8"
-        )
-
-    print(f"Saved dictionary to: {save_path}")
