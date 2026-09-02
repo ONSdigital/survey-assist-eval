@@ -71,8 +71,7 @@ def compute_performance_metrics_from_suggestions(  # noqa: PLR0913 pylint: disab
     """
     df = df.copy()
 
-    retrieved_codes_col = "_retrieved_codes"
-    df[retrieved_codes_col] = df.apply(
+    df["_retrieved_codes"] = df.apply(
         get_codes_from_suggestions,
         suggestions_col=suggestions_col,
         code_length=code_length,
@@ -84,15 +83,21 @@ def compute_performance_metrics_from_suggestions(  # noqa: PLR0913 pylint: disab
             df,
             code_digit_match_length=code_digit_match_length,
             correct_codes_col=correct_codes_col,
-            retrieved_codes_col=retrieved_codes_col,
+            retrieved_codes_col="_retrieved_codes",
         )
-        correct_codes_col = f"{correct_codes_col}_truncated"
-        retrieved_codes_col = f"{retrieved_codes_col}_truncated"
 
     df = add_sayt_metrics_columns(
         df,
-        retrieved_codes_col=retrieved_codes_col,
-        correct_codes_col=correct_codes_col,
+        retrieved_codes_col=(
+            "_retrieved_codes_truncated"
+            if code_digit_match_length is not None
+            else "_retrieved_codes"
+        ),
+        correct_codes_col=(
+            f"{correct_codes_col}_truncated"
+            if code_digit_match_length is not None
+            else correct_codes_col
+        ),
         k_values=k_values,
     )
 
