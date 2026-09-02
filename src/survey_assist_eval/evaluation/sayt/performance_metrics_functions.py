@@ -160,7 +160,7 @@ def compute_recall_at_k(
 
     top_k_retrieved = retrieved_codes[:k]
 
-    relevant_count = sum(1 for item in top_k_retrieved if item in correct_codes)
+    relevant_count = sum(1 for item in correct_codes if item in top_k_retrieved)
     total_correct = len(correct_codes)
     return relevant_count / total_correct if total_correct > 0 else 0.0
 
