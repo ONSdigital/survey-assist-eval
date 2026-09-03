@@ -2,6 +2,11 @@
 
 import pandas as pd
 
+from survey_assist_eval.data_cleaning.code_standard import SIC_EXPECTED_CODE_LENGTH
+from survey_assist_eval.data_cleaning.prep_data import (
+    get_clean_n_digit_codes,
+)
+
 
 def get_codes_from_suggestions(
     row: pd.Series,
@@ -22,19 +27,19 @@ def get_codes_from_suggestions(
 
 
 def get_rank_of_first_matching_code(
-    retrieved_codes: list[str], correct_codes: str | list[str]
+    retrieved_codes: list[str], correct_codes: str | set[str]
 ) -> int | None:
     """Get the rank of the first retrieved code matching correct code(s).
 
     Args:
         retrieved_codes: List of codes retrieved by the system (ordered by relevance).
-        correct_codes: A single correct code or list of correct codes to match against.
+        correct_codes: A single correct code or set of correct codes to match against.
 
     Returns:
         int: Rank of the first matching code, or None if no match found.
     """
     if isinstance(correct_codes, str):
-        correct_codes = [correct_codes]
+        correct_codes = {correct_codes}
 
     for rank, item in enumerate(retrieved_codes, start=1):
         if item in correct_codes:
@@ -61,51 +66,93 @@ def is_correct_codes_empty(codes: str | list[str] | None) -> bool:
     return len(codes) == 0
 
 
-def truncate_correct_codes(
-    codes: str | list[str], code_digit_match_length: int
-) -> str | list[str]:
-    """Truncate a correct-codes value to a fixed digit length.
+def _get_valid_codes(codes: str | list[str] | None, n: int, code_type: str) -> set[str]:
+    """Return the set of valid, cleaned codes for a single codes value.
 
     Args:
-        codes: A single correct code or list of correct codes.
-        code_digit_match_length: Number of leading characters to keep.
+        codes: A single code, list of codes, or a missing value (None or NaN).
+        n: Number of leading characters to keep.
+        code_type: Type of code ('sic' or 'soc').
 
     Returns:
-        str | list[str]: Truncated code, or de-duplicated list of truncated codes.
+        set[str]: Set of valid, cleaned codes, or an empty set if codes is missing.
     """
-    if isinstance(codes, str):
-        return codes[:code_digit_match_length]
-    return list({code[:code_digit_match_length] for code in codes})
+    if codes is None or is_correct_codes_empty(codes):
+        return set()
+    return get_clean_n_digit_codes(
+        codes if isinstance(codes, str) else list(codes), n=n, code_type=code_type
+    )[0]
 
 
-def truncate_codes_columns(
+def clean_codes_columns(
     df: pd.DataFrame,
     code_digit_match_length: int,
+    code_length: int = 5,
     correct_codes_col: str | None = None,
     retrieved_codes_col: str | None = None,
 ) -> pd.DataFrame:
-    """Truncate correct codes, and optionally retrieved codes, to a fixed digit length.
+    """Clean and truncate correct codes, and optionally retrieved codes, to a
+    fixed digit length.
 
     Args:
         df: DataFrame containing the correct-codes column and, optionally, the
             retrieved-codes column.
-        correct_codes_col: Column name containing correct code(s) (string or list).
         code_digit_match_length: Number of leading characters to keep.
+        code_length: Full code length used to infer code_type ('sic' if 5, else 'soc').
+        correct_codes_col: Column name containing correct code(s) (string or list).
         retrieved_codes_col: Optional column name containing lists of retrieved
-            codes to truncate as well.
+            codes to clean and truncate as well.
 
     Returns:
-        pd.DataFrame: Copy of df with the code columns truncated.
+        pd.DataFrame: Copy of df with the following columns added:
+            - "{correct_codes_col}_clean": set of valid, cleaned correct codes
+              (only added if correct_codes_col is given).
+            - "{retrieved_codes_col}_valid": set of valid, cleaned retrieved codes
+              (only added if retrieved_codes_col is given).
+            - "{retrieved_codes_col}_clean": list of retrieved codes truncated to
+              code_digit_match_length, in the original order with duplicates
+              preserved, with any code not in "_valid" replaced by "-9"
+              (only added if retrieved_codes_col is given).
+
+    Raises:
+        ValueError: If correct_codes_col and retrieved_codes_col are the same
+            column.
     """
     df = df.copy()
-    if correct_codes_col is not None:
-        df[f"{correct_codes_col}_truncated"] = df[correct_codes_col].apply(
-            truncate_correct_codes, code_digit_match_length=code_digit_match_length
+
+    code_type = "sic" if code_length == SIC_EXPECTED_CODE_LENGTH else "soc"
+
+    if correct_codes_col is not None and correct_codes_col == retrieved_codes_col:
+        raise ValueError(
+            "correct_codes_col and retrieved_codes_col must not be the same column"
         )
-    if retrieved_codes_col is not None:
-        df[f"{retrieved_codes_col}_truncated"] = df[retrieved_codes_col].apply(
-            lambda codes: [code[:code_digit_match_length] for code in codes]
+
+    for col in [correct_codes_col, retrieved_codes_col]:
+        if col is None:
+            continue
+
+        valid_col = f"{col}_valid"
+        df[valid_col] = df[col].apply(
+            _get_valid_codes, n=code_digit_match_length, code_type=code_type
         )
+
+        if col == correct_codes_col:
+            df[f"{col}_clean"] = df[valid_col]
+        else:
+            df[f"{col}_clean"] = [
+                [
+                    (
+                        truncated
+                        if (truncated := code[:code_digit_match_length]) in valid_set
+                        else "-9"
+                    )
+                    for code in ([] if is_correct_codes_empty(codes) else list(codes))
+                ]
+                for codes, valid_set in zip(df[col], df[valid_col], strict=False)
+            ]
+
+        df = df.drop(columns=[f"{col}_valid"], errors="ignore")
+
     return df
 
 

@@ -15,10 +15,10 @@ from survey_assist_utils.logging import get_logger
 
 from survey_assist_eval.data_cleaning.code_standard import get_clean_n_digit_codes
 from survey_assist_eval.evaluation.sayt.suggestion_ranking_functions import (
+    clean_codes_columns,
     get_codes_from_suggestions,
     get_rank_of_first_matching_code,
     is_correct_codes_empty,
-    truncate_codes_columns,
 )
 
 logger = get_logger(__name__)
@@ -246,21 +246,38 @@ def get_suggestions_by_chars(  # noqa: PLR0913 pylint: disable=R0917,R0913,R0914
 
     Args:
         df: dataframe containing melted suggestions.
+        suggesters_dict: a dictionary with initialised suggester models.
         correct_codes_col: name of the column containing correct codes.
         code_length: expected SIC/SOC code length.
-        code_digit_match_length: Length of the code digit match to consider (default is None).
+        code_digit_match_length: Length of the code digit match to consider. If
+            None, falls back to code_length.
         num_chars: number of characters to be tested.
-        suggesters_dict: a dictionary with initialised suggester models.
         suggestions_limit: the maximum rank of suggestions considered as valid.
         hard_suggestions_limit: if True, limit the number of suggestions to the
             specified suggestions_limit, otherwise allow more suggestions to be returned.
         with_scores: if True, return suggestions with scores instead of just strings.
 
     Returns:
-        tuple[pd.DataFrame, dict]: Suggestions for specified characters typed;
+        tuple[pd.DataFrame, dict]: df with a
+            "rank_{num_chars}chars_{suggester_name}_{digit_match_length}digitmatch"
+            column added per (num_chars, suggester) combination; and a dict of
             average milliseconds per row for each suggester.
     """
     df = df.copy()
+
+    effective_digit_match_length = (
+        code_digit_match_length if code_digit_match_length is not None else code_length
+    )
+
+    logger.info(
+        f"Cleaning correct codes to {effective_digit_match_length}-digit match",
+        code_digit_match_length=effective_digit_match_length,
+    )
+    df = clean_codes_columns(
+        df,
+        effective_digit_match_length,
+        correct_codes_col=correct_codes_col,
+    )
 
     avg_ms_dict = {}
     if num_chars is None:
@@ -268,7 +285,6 @@ def get_suggestions_by_chars(  # noqa: PLR0913 pylint: disable=R0917,R0913,R0914
     for prefix_chars in num_chars:
         for suggester_name, suggester_obj in suggesters_dict.items():
             retrieved_codes_col = "_retrieved_codes"
-            correct_codes_col_ = correct_codes_col
 
             logger.info(
                 "Starting SAYT suggesting - one loop",
@@ -307,34 +323,47 @@ def get_suggestions_by_chars(  # noqa: PLR0913 pylint: disable=R0917,R0913,R0914
                 axis=1,
             )
 
-            rank_col_name = f"rank_{prefix_chars}chars_{suggester_name}"
-
-            if code_digit_match_length is not None:
-                df = truncate_codes_columns(
-                    df,
-                    code_digit_match_length,
-                    correct_codes_col=correct_codes_col,
-                    retrieved_codes_col=retrieved_codes_col,
-                )
-
-                retrieved_codes_col = f"{retrieved_codes_col}_truncated"
-                correct_codes_col_ = f"{correct_codes_col_}_truncated"
-                rank_col_name = f"{rank_col_name}_{code_digit_match_length}digitmatch"
-
-                logger.info(
-                    f"Computing rank for {code_digit_match_length}-digit match",
-                    code_digit_match_length=code_digit_match_length,
-                    rank_col_name=rank_col_name,
-                )
-
-            df[rank_col_name] = df.apply(
-                lambda row, rc=retrieved_codes_col, cc=correct_codes_col_: (
-                    get_rank_of_first_matching_code(row[rc], row[cc])
-                ),
-                axis=1,
+            rank_col_name = (
+                f"rank_{prefix_chars}chars_{suggester_name}"
+                f"_{effective_digit_match_length}digitmatch"
             )
 
+            logger.info(
+                f"Cleaning retrieved codes to {effective_digit_match_length}-digit match",
+                code_digit_match_length=effective_digit_match_length,
+            )
+
+            df = clean_codes_columns(
+                df,
+                effective_digit_match_length,
+                retrieved_codes_col=retrieved_codes_col,
+            )
+
+            logger.info(
+                f"Computing rank for {effective_digit_match_length}-digit match",
+                code_digit_match_length=effective_digit_match_length,
+                rank_col_name=rank_col_name,
+            )
+
+            df[rank_col_name] = [
+                get_rank_of_first_matching_code(retrieved, correct)
+                for retrieved, correct in zip(
+                    df[f"{retrieved_codes_col}_clean"],
+                    df[f"{correct_codes_col}_clean"],
+                    strict=False,
+                )
+            ]
+
             avg_ms_dict.update({suggestions_col: avg_ms})
+
+    df = df.drop(
+        columns=[
+            retrieved_codes_col,
+            f"{retrieved_codes_col}_valid",
+            f"{retrieved_codes_col}_clean",
+        ],
+        errors="ignore",
+    )
 
     return df, avg_ms_dict
 

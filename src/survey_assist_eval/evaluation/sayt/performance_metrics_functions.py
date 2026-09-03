@@ -4,10 +4,10 @@ import pandas as pd
 from pydantic import BaseModel
 
 from survey_assist_eval.evaluation.sayt.suggestion_ranking_functions import (
+    clean_codes_columns,
     get_codes_from_suggestions,
     get_rank_of_first_matching_code,
     is_correct_codes_empty,
-    truncate_codes_columns,
 )
 
 
@@ -59,7 +59,7 @@ def compute_performance_metrics_from_suggestions(  # noqa: PLR0913 pylint: disab
 
     Args:
         df: DataFrame containing the queries and suggestions.
-        correct_codes_col: Column name containing correct code(s) (string or list).
+        correct_codes_col: Column name containing correct code(s).
         suggestions_col: Column name containing the list of suggestion strings.
         code_length: Number of trailing characters to extract as a code.
         k_values: List of k values for which to compute Precision@K and Recall@K.
@@ -78,26 +78,22 @@ def compute_performance_metrics_from_suggestions(  # noqa: PLR0913 pylint: disab
         axis=1,
     )
 
-    if code_digit_match_length is not None:
-        df = truncate_codes_columns(
-            df,
-            code_digit_match_length=code_digit_match_length,
-            correct_codes_col=correct_codes_col,
-            retrieved_codes_col="_retrieved_codes",
-        )
+    df = clean_codes_columns(
+        df,
+        code_digit_match_length=(
+            code_digit_match_length
+            if code_digit_match_length is not None
+            else code_length
+        ),
+        code_length=code_length,
+        correct_codes_col=correct_codes_col,
+        retrieved_codes_col="_retrieved_codes",
+    )
 
     df = add_sayt_metrics_columns(
         df,
-        retrieved_codes_col=(
-            "_retrieved_codes_truncated"
-            if code_digit_match_length is not None
-            else "_retrieved_codes"
-        ),
-        correct_codes_col=(
-            f"{correct_codes_col}_truncated"
-            if code_digit_match_length is not None
-            else correct_codes_col
-        ),
+        retrieved_codes_col="_retrieved_codes_clean",
+        correct_codes_col=f"{correct_codes_col}_clean",
         k_values=k_values,
     )
 
@@ -116,13 +112,13 @@ def compute_performance_metrics_from_suggestions(  # noqa: PLR0913 pylint: disab
 
 
 def compute_precision_at_k(
-    retrieved_codes: list[str], correct_codes: str | list[str], k: int
+    retrieved_codes: list[str], correct_codes: str | set[str], k: int
 ) -> float:
     """Compute Precision@K for a single query.
 
     Args:
         retrieved_codes: List of codes retrieved by the system (ordered by relevance).
-        correct_codes: A single correct code or list of correct codes to match against.
+        correct_codes: A single correct code or set of correct codes to match against.
         k: The cutoff rank at which to compute precision.
 
     Returns:
@@ -132,7 +128,7 @@ def compute_precision_at_k(
         raise ValueError("k must be a positive integer.")
 
     if isinstance(correct_codes, str):
-        correct_codes = [correct_codes]
+        correct_codes = {correct_codes}
 
     top_k_retrieved = retrieved_codes[:k]
     relevant_count = sum(1 for item in top_k_retrieved if item in correct_codes)
@@ -140,13 +136,13 @@ def compute_precision_at_k(
 
 
 def compute_recall_at_k(
-    retrieved_codes: list[str], correct_codes: str | list[str], k: int
+    retrieved_codes: list[str], correct_codes: str | set[str], k: int
 ) -> float:
     """Compute Recall@K for a single query.
 
     Args:
         retrieved_codes: List of codes retrieved by the system (ordered by relevance).
-        correct_codes: A single correct code or list of correct codes to match against.
+        correct_codes: A single correct code or set of correct codes to match against.
         k: The cutoff rank at which to compute recall.
 
     Returns:
@@ -156,7 +152,7 @@ def compute_recall_at_k(
         raise ValueError("k must be a positive integer.")
 
     if isinstance(correct_codes, str):
-        correct_codes = [correct_codes]
+        correct_codes = {correct_codes}
 
     top_k_retrieved = retrieved_codes[:k]
 
@@ -166,19 +162,19 @@ def compute_recall_at_k(
 
 
 def compute_reciprocal_rank(
-    retrieved_codes: list[str], correct_codes: str | list[str]
+    retrieved_codes: list[str], correct_codes: str | set[str]
 ) -> float:
     """Compute Reciprocal Rank for a single query.
 
     Args:
         retrieved_codes: List of codes retrieved by the system (ordered by relevance).
-        correct_codes: A single correct code or list of correct codes to match against.
+        correct_codes: A single correct code or set of correct codes to match against.
 
     Returns:
         float: Reciprocal Rank value (1/rank of first match, 0 if no match).
     """
     if isinstance(correct_codes, str):
-        correct_codes = [correct_codes]
+        correct_codes = {correct_codes}
 
     for rank, item in enumerate(retrieved_codes, start=1):
         if item in correct_codes:
@@ -198,7 +194,7 @@ def add_sayt_metrics_columns(
     Args:
         df: DataFrame containing the retrieved codes and correct codes.
         retrieved_codes_col: Column name containing the list of retrieved codes.
-        correct_codes_col: Column name containing correct code(s) (string or list).
+        correct_codes_col: Column name containing correct code(s).
         k_values: List of k values for which to compute Precision@K and Recall@K.
         prefix: Optional prefix for the new metric columns. Defaults to None.
 
@@ -254,7 +250,7 @@ def summarise_performance_metrics(  # noqa: PLR0913 pylint: disable = R0913, R09
     Args:
         df: DataFrame containing the performance metric columns.
         suggestions_col: Column name containing the retrieved suggestions.
-        correct_codes_col: Column name containing correct code(s) (string or list).
+        correct_codes_col: Column name containing correct code(s).
         code_digit_match_length: Length of the code to match for evaluation.
         k_values: List of k values for which Precision@K and Recall@K were computed.
         ave_time_per_query: Average time taken per query in milliseconds.
@@ -310,7 +306,7 @@ def build_sayt_metrics_comparison_table(  # noqa: PLR0913 pylint: disable = R091
         df: DataFrame containing the retrieved suggestions and correct codes.
         suggestions_cols_to_compare: List of column names containing
             the retrieved suggestions to compare.
-        correct_codes_col: Column name containing correct code(s) (string or list).
+        correct_codes_col: Column name containing correct code(s).
         ave_time_per_query_dict: Average time per query (ms) for each suggestion column,
             keyed by the suggestion column name.
         code_length: Length of the correct codes (default is 5).
