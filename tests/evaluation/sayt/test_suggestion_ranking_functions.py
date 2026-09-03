@@ -154,6 +154,25 @@ def test_get_rank_of_first_matching_code_single_code_in_list():
     ), "Expected single-item list and string to produce the same rank."
 
 
+def test_get_rank_of_first_matching_code_works_with_set_of_correct_codes():
+    """Rank should find first match when given a set of correct codes."""
+    rank = get_rank_of_first_matching_code(["1111", "2222", "3333"], {"3333", "4444"})
+
+    assert rank == 3, (
+        "Expected rank to equal 3 when the first code in the set matches at "
+        "position 3."
+    )
+
+
+def test_get_rank_of_first_matching_code_handles_empty_set_of_correct_codes():
+    """Rank should be None when given an empty set of correct codes."""
+    rank = get_rank_of_first_matching_code(["1111", "2222", "3333"], set())
+
+    assert (
+        rank is None
+    ), "Expected rank to be None when the set of correct codes is empty."
+
+
 # ============================================================================
 # Test get_codes_from_suggestions function
 # ============================================================================

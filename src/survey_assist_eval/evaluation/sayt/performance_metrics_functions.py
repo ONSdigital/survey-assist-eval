@@ -112,7 +112,7 @@ def compute_performance_metrics_from_suggestions(  # noqa: PLR0913 pylint: disab
 
 
 def compute_precision_at_k(
-    retrieved_codes: list[str], correct_codes: str | set[str], k: int
+    retrieved_codes: list[str], correct_codes: str | list[str] | set[str], k: int
 ) -> float:
     """Compute Precision@K for a single query.
 
@@ -136,7 +136,7 @@ def compute_precision_at_k(
 
 
 def compute_recall_at_k(
-    retrieved_codes: list[str], correct_codes: str | set[str], k: int
+    retrieved_codes: list[str], correct_codes: str | list[str] | set[str], k: int
 ) -> float:
     """Compute Recall@K for a single query.
 
@@ -162,13 +162,14 @@ def compute_recall_at_k(
 
 
 def compute_reciprocal_rank(
-    retrieved_codes: list[str], correct_codes: str | set[str]
+    retrieved_codes: list[str], correct_codes: str | list[str] | set[str]
 ) -> float:
     """Compute Reciprocal Rank for a single query.
 
     Args:
         retrieved_codes: List of codes retrieved by the system (ordered by relevance).
-        correct_codes: A single correct code or set of correct codes to match against.
+        correct_codes: A single correct code, list of correct codes, or set of
+            correct codes to match against.
 
     Returns:
         float: Reciprocal Rank value (1/rank of first match, 0 if no match).

@@ -27,7 +27,7 @@ def get_codes_from_suggestions(
 
 
 def get_rank_of_first_matching_code(
-    retrieved_codes: list[str], correct_codes: str | set[str]
+    retrieved_codes: list[str], correct_codes: str | list[str] | set[str]
 ) -> int | None:
     """Get the rank of the first retrieved code matching correct code(s).
 

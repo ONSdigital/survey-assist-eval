@@ -114,6 +114,15 @@ def test_compute_precision_at_k_with_empty_correct_codes_set():
     ), "Expected Precision@3 to be 0.0 when no correct codes to match."
 
 
+def test_compute_precision_at_k_with_list_of_correct_codes():
+    """Precision@k should count matches against any code in the list."""
+    precision = compute_precision_at_k(["1111", "2222", "3333"], ["2222", "4444"], 2)
+
+    assert precision == pytest.approx(
+        0.5
+    ), "Expected Precision@2 to count one match (2222) from the list in top 2."
+
+
 # ============================================================================
 # Test compute_recall_at_k function
 # ============================================================================
@@ -277,6 +286,18 @@ def test_compute_reciprocal_rank_with_empty_correct_codes_set():
     assert reciprocal_rank == pytest.approx(
         0.0
     ), "Expected reciprocal rank to be 0.0 when no correct codes in list."
+
+
+def test_compute_reciprocal_rank_with_list_of_correct_codes():
+    """Reciprocal rank should find first match in list."""
+    reciprocal_rank = compute_reciprocal_rank(
+        ["1111", "2222", "3333"], ["3333", "4444"]
+    )
+
+    assert reciprocal_rank == pytest.approx(1 / 3), (
+        "Expected reciprocal rank to equal 1/3 when first matching code from list "
+        "is at rank 3."
+    )
 
 
 # ============================================================================
