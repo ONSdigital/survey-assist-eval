@@ -24,7 +24,7 @@ def read_json_from_gcs(blob_name_path: str, file_name_weight: str) -> dict:
     """Read JSON data from GCS.
 
     Args:
-        blob_name_path (str): The path to the blob in GCS.
+        blob_name_path (str): The path to the blob in Goggle Cloud Storage.
         file_name_weight (str): The name of the JSON file to read.
 
     Returns:
@@ -54,7 +54,7 @@ def find_best_performing_setup(data: dict):
 
 # %%
 def get_ranked_setups(data: dict):
-    """Get all tests orgered descending by MRR score.
+    """Get all tests ordered descending by MRR score.
 
     Args:
         data (dict): A dictionary containing the test results with MRR scores.
