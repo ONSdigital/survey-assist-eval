@@ -1,7 +1,6 @@
-# %%
-# pylint: disable=R0801, C0103
 """Check the interactions between weights used for different suggesters."""
 
+# pylint: disable=R0801, C0103
 # %%
 import json
 import os

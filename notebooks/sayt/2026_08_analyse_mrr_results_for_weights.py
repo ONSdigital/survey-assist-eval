@@ -1,5 +1,5 @@
-# %%
 """Find best performing MRR and corresponding test."""
+
 # pylint: disable=C0103
 
 # %%
