@@ -1,3 +1,4 @@
+# %%
 """Find best performing MRR and corresponding test."""
 
 # pylint: disable=C0103
@@ -7,32 +8,15 @@ import json
 import os
 
 from dotenv import load_dotenv
-from google.cloud import storage as gcs
+
+from src.survey_assist_eval.pipeline.shared_components import _read_json
 
 # %%
 load_dotenv()
 bucket_name = os.getenv("EVALUATION_BUCKET_NAME")
 if not bucket_name:
     raise ValueError("EVALUATION_BUCKET_NAME environment variable not set")
-client = gcs.Client()
 blob_name = "evaluation-pipeline/SAYT/weights_by_character/"
-bucket = client.bucket(bucket_name)
-
-
-# %%
-def read_json_from_gcs(blob_name_path: str, file_name_weight: str) -> dict:
-    """Read JSON data from GCS.
-
-    Args:
-        blob_name_path (str): The path to the blob in Goggle Cloud Storage.
-        file_name_weight (str): The name of the JSON file to read.
-
-    Returns:
-        dict: The JSON data as a dictionary.
-    """
-    blob = bucket.blob(blob_name_path + file_name_weight)
-    json_data = blob.download_as_text()
-    return json.loads(json_data)
 
 
 # %%
@@ -54,7 +38,7 @@ def find_best_performing_setup(data: dict):
 
 # %%
 def get_ranked_setups(data: dict):
-    """Get all tests ordered descending by MRR score.
+    """Get all tests orgered descending by MRR score.
 
     Args:
         data (dict): A dictionary containing the test results with MRR scores.
@@ -79,7 +63,10 @@ for i in range(4, 10):
     file_name = f"weight_{i}_test_n_p_s.json"
 
     if bucket_name:
-        data_file = read_json_from_gcs(blob_name, file_name)
+        # data_file = read_json_from_gcs(blob_name, file_name)
+        print("read from storage")
+        path = f"gs://{bucket_name}/{blob_name}{file_name}"
+        data_file = _read_json(path)
 
     else:
         weights_file = f"notebooks/sayt/weights_sum_10/{file_name}"
@@ -96,7 +83,8 @@ weight = 5
 
 file_name = f"weight_{weight}_test_n_p_s.json"
 if bucket_name:
-    data_file = read_json_from_gcs(blob_name, file_name)
+    path = f"gs://{bucket_name}/{blob_name}{file_name}"
+    data_file = _read_json(path)
 
 else:
     weights_file = f"notebooks/sayt/weights_sum_10/{file_name}"
