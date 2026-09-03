@@ -1,4 +1,3 @@
-# %%
 """Check the interactions between weights used for different suggesters."""
 
 # pylint: disable=R0801, C0103
@@ -192,8 +191,3 @@ for character_file in NUM_CHARACTERS_LIST:
         print("Source files removed.")
     else:
         print("Source files not removed.")
-
-# %%
-
-
-
