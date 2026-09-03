@@ -18,6 +18,7 @@ from survey_assist_utils.logging import get_logger
 
 from notebooks.sayt.sayt_utils import (
     build_lookup_suggester,
+    build_sayt_corpus_from_df,
 )
 from notebooks.sayt.suggester_eval import run_eval_for_suggesters
 
@@ -84,9 +85,9 @@ sayt_df["code"] = sayt_df["SIC07"].apply(
 )
 sayt_df["display_text_with_code"] = sayt_df["SIC_lookup"] + ": " + sayt_df["code"]
 
-sayt_corpus = list(
-    zip(sayt_df["SIC_lookup"], sayt_df["display_text_with_code"], strict=False)
-)
+sayt_corpus = build_sayt_corpus_from_df(
+    sayt_df, "SIC_lookup", "display_text_with_code", "code"
+)[1]
 
 # %%
 folder = "notebooks/sayt/weights_sum_10"
@@ -153,7 +154,7 @@ remove_files = False
 for character_file in NUM_CHARACTERS_LIST:
     master_dict = {}
     files_to_delete = []
-    final_file_name = f"weight_test_{characters}chars_n_p_s.json"
+    final_file_name = f"weight_test_{character_file}chars_n_p_s.json"
     main_file_name = f"{folder}/{final_file_name}"
 
     if os.path.exists(main_file_name):
