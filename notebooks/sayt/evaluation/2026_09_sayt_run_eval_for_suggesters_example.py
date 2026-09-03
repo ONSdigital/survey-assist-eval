@@ -32,7 +32,7 @@ from notebooks.sayt.suggester_eval import run_eval_for_suggesters
 SIC_CODE_LENGTH = 5
 MAX_SUGGESTIONS = 9
 CORRECT_CODE_COL = "correct_sic_code"
-NUM_CHARACTERS_LIST = range(4, 10)
+NUM_CHARACTERS_LIST = list(range(4, 10))
 OUTPUT_DIR = "data/figures/sayt/min_characters"
 
 # %%
