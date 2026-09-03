@@ -87,27 +87,27 @@ def test_compute_precision_at_k_uses_requested_k_when_fewer_results_returned():
     )
 
 
-def test_compute_precision_at_k_with_list_of_correct_codes():
-    """Precision@k should count matches against any code in the list."""
-    precision = compute_precision_at_k(["1111", "2222", "3333"], ["2222", "4444"], 2)
+def test_compute_precision_at_k_with_set_of_correct_codes():
+    """Precision@k should count matches against any code in the set."""
+    precision = compute_precision_at_k(["1111", "2222", "3333"], {"2222", "4444"}, 2)
 
     assert precision == pytest.approx(
         0.5
-    ), "Expected Precision@2 to count one match (2222) from the list in top 2."
+    ), "Expected Precision@2 to count one match (2222) from the set in top 2."
 
 
-def test_compute_precision_at_k_with_multiple_matches_in_list():
-    """Precision@k should count all matches when list codes appear in top-k."""
-    precision = compute_precision_at_k(["1111", "2222", "3333"], ["1111", "2222"], 2)
+def test_compute_precision_at_k_with_multiple_matches_in_set():
+    """Precision@k should count all matches when set codes appear in top-k."""
+    precision = compute_precision_at_k(["1111", "2222", "3333"], {"1111", "2222"}, 2)
 
     assert precision == pytest.approx(
         1.0
-    ), "Expected Precision@2 to count two matches from the list in top 2."
+    ), "Expected Precision@2 to count two matches from the set in top 2."
 
 
-def test_compute_precision_at_k_with_empty_correct_codes_list():
-    """Precision@k should return 0 when correct_codes list is empty."""
-    precision = compute_precision_at_k(["1111", "2222", "3333"], [], 3)
+def test_compute_precision_at_k_with_empty_correct_codes_set():
+    """Precision@k should return 0 when correct_codes set is empty."""
+    precision = compute_precision_at_k(["1111", "2222", "3333"], set(), 3)
 
     assert precision == pytest.approx(
         0.0
@@ -164,27 +164,27 @@ def test_compute_recall_at_k_handles_k_larger_than_retrieved_results():
     )
 
 
-def test_compute_recall_at_k_with_list_of_correct_codes():
-    """Recall@k should be relevant_found / total_correct using a list."""
-    recall = compute_recall_at_k(["1111", "2222", "3333"], ["2222", "4444", "5555"], 2)
+def test_compute_recall_at_k_with_set_of_correct_codes():
+    """Recall@k should be relevant_found / total_correct using a set."""
+    recall = compute_recall_at_k(["1111", "2222", "3333"], {"2222", "4444", "5555"}, 2)
 
     assert recall == pytest.approx(
         1 / 3
     ), "Expected Recall@2 to be 1/3 (1 found: 2222 / 3 total correct codes)."
 
 
-def test_compute_recall_at_k_with_multiple_matches_in_list():
-    """Recall@k should count all matching codes from the list in top-k."""
-    recall = compute_recall_at_k(["1111", "2222", "3333"], ["1111", "2222", "4444"], 3)
+def test_compute_recall_at_k_with_multiple_matches_in_set():
+    """Recall@k should count all matching codes from the set in top-k."""
+    recall = compute_recall_at_k(["1111", "2222", "3333"], {"1111", "2222", "4444"}, 3)
 
     assert recall == pytest.approx(
         2 / 3
     ), "Expected Recall@3 to be 2/3 (2 found: 1111, 2222 / 3 total correct codes)."
 
 
-def test_compute_recall_at_k_with_empty_correct_codes_list():
-    """Recall@k should return 0 when correct_codes list is empty."""
-    recall = compute_recall_at_k(["1111", "2222", "3333"], [], 3)
+def test_compute_recall_at_k_with_empty_correct_codes_set():
+    """Recall@k should return 0 when correct_codes set is empty."""
+    recall = compute_recall_at_k(["1111", "2222", "3333"], set(), 3)
 
     assert recall == pytest.approx(
         0.0
@@ -246,33 +246,33 @@ def test_compute_reciprocal_rank_returns_inverse_for_match_beyond_first_position
     )
 
 
-def test_compute_reciprocal_rank_with_list_of_correct_codes():
-    """Reciprocal rank should find first match in list."""
+def test_compute_reciprocal_rank_with_set_of_correct_codes():
+    """Reciprocal rank should find first match in set."""
     reciprocal_rank = compute_reciprocal_rank(
-        ["1111", "2222", "3333"], ["3333", "4444"]
+        ["1111", "2222", "3333"], {"3333", "4444"}
     )
 
     assert reciprocal_rank == pytest.approx(1 / 3), (
-        "Expected reciprocal rank to equal 1/3 when first matching code from list "
+        "Expected reciprocal rank to equal 1/3 when first matching code from set "
         "is at rank 3."
     )
 
 
-def test_compute_reciprocal_rank_finds_earliest_in_list():
-    """Reciprocal rank should return earliest matching position from list."""
+def test_compute_reciprocal_rank_finds_earliest_in_set():
+    """Reciprocal rank should return earliest matching position from set."""
     reciprocal_rank = compute_reciprocal_rank(
-        ["1111", "2222", "3333", "4444"], ["3333", "2222"]
+        ["1111", "2222", "3333", "4444"], {"3333", "2222"}
     )
 
     assert reciprocal_rank == pytest.approx(1 / 2), (
-        "Expected reciprocal rank to equal 1/2 when earliest match from list "
+        "Expected reciprocal rank to equal 1/2 when earliest match from set "
         "is 2222 at rank 2."
     )
 
 
-def test_compute_reciprocal_rank_with_empty_correct_codes_list():
-    """Reciprocal rank should return 0 when correct_codes list is empty."""
-    reciprocal_rank = compute_reciprocal_rank(["1111", "2222", "3333"], [])
+def test_compute_reciprocal_rank_with_empty_correct_codes_set():
+    """Reciprocal rank should return 0 when correct_codes set is empty."""
+    reciprocal_rank = compute_reciprocal_rank(["1111", "2222", "3333"], set())
 
     assert reciprocal_rank == pytest.approx(
         0.0
