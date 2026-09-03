@@ -1,6 +1,8 @@
+# %%
 """Check the interactions between weights used for different suggesters."""
 
 # pylint: disable=R0801, C0103
+
 # %%
 import json
 import os
@@ -92,7 +94,7 @@ folder = "notebooks/sayt/weights_sum_10"
 
 for characters in NUM_CHARACTERS_LIST:
 
-    main_file_name = f"{folder}/weight_{characters}_test_n_p_s.json"
+    main_file_name = f"{folder}/weight_test_{characters}chars_n_p_s.json"
 
     if os.path.exists(main_file_name):
         print(f"File {main_file_name} already exists.")
@@ -152,7 +154,7 @@ remove_files = False
 for character_file in NUM_CHARACTERS_LIST:
     master_dict = {}
     files_to_delete = []
-    final_file_name = f"weight_{character_file}_test_n_p_s.json"
+    final_file_name = f"weight_test_{characters}chars_n_p_s.json"
     main_file_name = f"{folder}/{final_file_name}"
 
     if os.path.exists(main_file_name):
@@ -192,3 +194,6 @@ for character_file in NUM_CHARACTERS_LIST:
         print("Source files not removed.")
 
 # %%
+
+
+

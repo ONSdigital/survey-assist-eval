@@ -60,7 +60,7 @@ def get_ranked_setups(data: dict):
 
 # %%
 for i in range(4, 10):
-    file_name = f"weight_{i}_test_n_p_s.json"
+    file_name = f"weight_test_{i}chars_n_p_s.json"
 
     if bucket_name:
         # data_file = read_json_from_gcs(blob_name, file_name)
@@ -79,9 +79,9 @@ for i in range(4, 10):
     print(f"Best setup for {i} characters: {best_dict.keys()}\n")
 
 # %%
-weight = 5
+character = 5
 
-file_name = f"weight_{weight}_test_n_p_s.json"
+file_name = f"weight_test_{character}chars_n_p_s.json"
 if bucket_name:
     path = f"gs://{bucket_name}/{blob_name}{file_name}"
     data_file = _read_json(path)
