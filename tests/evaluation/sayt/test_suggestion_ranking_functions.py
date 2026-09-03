@@ -363,15 +363,15 @@ def test_clean_codes_columns_keeps_duplicates_and_order_in_retrieved_clean():
 
 
 def test_clean_codes_columns_replaces_invalid_retrieved_codes_with_sentinel():
-    """Retrieved codes not present in the valid set should be replaced with '-9'."""
+    """Retrieved codes not present in the valid set should be replaced with None."""
     df = pd.DataFrame({"retrieved": [["1111", "9999"]]})
 
     result = clean_codes_columns(
         df, code_digit_match_length=3, code_length=4, retrieved_codes_col="retrieved"
     )
 
-    assert result["retrieved_clean"].tolist() == [["111", "-9"]], (
-        "Expected invalid retrieved codes to be replaced with the '-9' sentinel "
+    assert result["retrieved_clean"].tolist() == [["111", None]], (
+        "Expected invalid retrieved codes to be replaced with the None sentinel "
         "while valid codes are truncated normally."
     )
 
@@ -411,8 +411,37 @@ def test_clean_codes_columns_handles_both_columns_together():
     }, "Expected correct_code_clean to hold the cleaned correct code as a set."
     assert result["retrieved_clean"].iloc[0] == [
         "123",
-        "-9",
+        None,
     ], "Expected retrieved_clean to hold each retrieved code truncated to 3 characters."
+
+
+def test_clean_codes_columns_handles_both_columns_together_with_block_section_retrieved():
+    """Both columns should be cleaned together using SIC block-section logic and sentinels."""
+    df = pd.DataFrame(
+        {
+            "correct_code": ["10310"],
+            "retrieved": [["10310", "01110", "01110", "00000"]],
+        }
+    )
+
+    result = clean_codes_columns(
+        df,
+        code_digit_match_length=0,
+        code_length=5,
+        code_type="sic",
+        correct_codes_col="correct_code",
+        retrieved_codes_col="retrieved",
+    )
+
+    assert result["correct_code_clean"].iloc[0] == {
+        "C"
+    }, "Expected correct_code_clean to hold the cleaned SIC block section as a set."
+    assert result["retrieved_clean"].iloc[0] == [
+        "C",
+        "A",
+        "A",
+        None,
+    ], "Expected retrieved_clean to preserve order and replace invalid SIC codes with None."
 
 
 def test_clean_codes_columns_skips_columns_not_requested():

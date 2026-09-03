@@ -66,7 +66,9 @@ def is_correct_codes_empty(codes: str | list[str] | None) -> bool:
     return len(codes) == 0
 
 
-def _get_valid_codes(codes: str | list[str] | None, n: int, code_type: str) -> set[str]:
+def _get_valid_codes(
+    codes: str | list[str] | None, n: int, code_type: str = "sic"
+) -> set[str]:
     """Return the set of valid, cleaned codes for a single codes value.
 
     Args:
@@ -84,10 +86,33 @@ def _get_valid_codes(codes: str | list[str] | None, n: int, code_type: str) -> s
     )[0]
 
 
-def clean_codes_columns(
+def _get_valid_codes_list(
+    codes: str | list[str] | None, n: int, code_type: str = "sic"
+) -> list[str | None]:
+    """Return the ordered list of valid, cleaned codes for a single candidate list of codes value.
+
+    Args:
+        codes: A single code, list of codes, or a missing value (None or NaN).
+        n: Number of leading characters to keep.
+        code_type: Type of code ('sic' or 'soc').
+
+    Returns:
+        List of valid, cleaned codes, or Nones for missing/invalid entries.
+    """
+    if codes is None or is_correct_codes_empty(codes):
+        return []
+    if isinstance(codes, str):
+        codes = [codes]
+    out = [_get_valid_codes(x, n=n, code_type=code_type) for x in codes]
+    # Flatten the list of sets into a single list while preserving order
+    return [next(iter(x)) if len(x) == 1 else None for x in out]
+
+
+def clean_codes_columns(  # noqa: PLR0913 pylint: disable=R0913, R0914, R0917
     df: pd.DataFrame,
     code_digit_match_length: int,
-    code_length: int = 5,
+    code_length: int | None = None,
+    code_type: str | None = None,
     correct_codes_col: str | None = None,
     retrieved_codes_col: str | None = None,
 ) -> pd.DataFrame:
@@ -99,6 +124,7 @@ def clean_codes_columns(
             retrieved-codes column.
         code_digit_match_length: Number of leading characters to keep.
         code_length: Full code length used to infer code_type ('sic' if 5, else 'soc').
+        code_type: Type of code ('sic' or 'soc'). If None, it will be inferred from code_length.
         correct_codes_col: Column name containing correct code(s) (string or list).
         retrieved_codes_col: Optional column name containing lists of retrieved
             codes to clean and truncate as well.
@@ -127,31 +153,29 @@ def clean_codes_columns(
             "correct_codes_col and retrieved_codes_col must not be the same column"
         )
 
+    if code_type is None and code_length is None:
+        raise ValueError("Either code_type or code_length must be provided.")
+
+    if code_type is None:
+        code_type = "sic" if code_length == SIC_EXPECTED_CODE_LENGTH else "soc"
+
     for col in [correct_codes_col, retrieved_codes_col]:
         if col is None:
             continue
 
-        valid_col = f"{col}_valid"
-        df[valid_col] = df[col].apply(
-            _get_valid_codes, n=code_digit_match_length, code_type=code_type
-        )
+        if correct_codes_col is not None:
+            df[f"{correct_codes_col}_clean"] = df[correct_codes_col].apply(
+                _get_valid_codes,
+                n=code_digit_match_length,
+                code_type=code_type,
+            )
 
-        if col == correct_codes_col:
-            df[f"{col}_clean"] = df[valid_col]
-        else:
-            df[f"{col}_clean"] = [
-                [
-                    (
-                        truncated
-                        if (truncated := code[:code_digit_match_length]) in valid_set
-                        else "-9"
-                    )
-                    for code in ([] if is_correct_codes_empty(codes) else list(codes))
-                ]
-                for codes, valid_set in zip(df[col], df[valid_col], strict=False)
-            ]
-
-        df = df.drop(columns=[f"{col}_valid"], errors="ignore")
+        if retrieved_codes_col is not None:
+            df[f"{retrieved_codes_col}_clean"] = df[retrieved_codes_col].apply(
+                _get_valid_codes_list,
+                n=code_digit_match_length,
+                code_type=code_type,
+            )
 
     return df
 
