@@ -1,6 +1,6 @@
 """Check the interactions between weights used for different suggesters."""
 
-# pylint: disable=R0801, C0103
+# pylint: disable=R0801, C0103, C0301
 
 # %%
 import json
@@ -19,8 +19,12 @@ from survey_assist_utils.logging import get_logger
 from notebooks.sayt.sayt_utils import (
     build_lookup_suggester,
     build_sayt_corpus_from_df,
+    get_suggestions_by_chars,
 )
 from notebooks.sayt.suggester_eval import run_eval_for_suggesters
+from survey_assist_eval.evaluation.sayt.performance_metrics_functions import (
+    build_sayt_metrics_comparison_table,
+)
 
 # %%
 SIC_CODE_LENGTH = 5
@@ -29,7 +33,8 @@ CORRECT_CODE_COL = "correct_sic_code"
 NUM_CHARACTERS_LIST = list(range(4, 10))
 
 GRID_GRANULARITY = 10
-FOLDER = f"data/sayt/weights_grid_{GRID_GRANULARITY}"
+FOLDER_SUFFIX = f"weights_grid_{GRID_GRANULARITY}"
+OUTPUT_DIR = "data/sayt/"
 
 # %%
 load_dotenv()
@@ -37,15 +42,12 @@ bucket_name = os.getenv("EVALUATION_BUCKET_NAME")
 if not bucket_name:
     raise ValueError("EVALUATION_BUCKET_NAME environment variable not set")
 
-OUTPUT_DIR = "data/figures/sayt/character_weights"
-if not os.path.exists(OUTPUT_DIR):
-    os.makedirs(OUTPUT_DIR)
 
 logger = get_logger(__name__)
 logger.info("Location specs", bucket_name=bucket_name, output_dir=OUTPUT_DIR)
 
 client = gcs.Client()
-blob_name = "evaluation-pipeline/SAYT/weights_by_character/"
+blob_name = f"evaluation-pipeline/SAYT/weights_by_character/{FOLDER_SUFFIX}/"
 
 # %%
 test_df = pd.read_excel(
@@ -79,10 +81,10 @@ LOOKUP_FILE_NAME = f"gs://{bucket_name}/evaluation-pipeline/SAYT/Lookup_IT3_Fina
 
 sayt_df = pd.read_csv(LOOKUP_FILE_NAME, dtype=str)
 if LOOKUP_FILE_NAME.endswith("sic_kb_for_sayt.csv"):
-    FOLDER = FOLDER + "_sic_kb"
+    FOLDER_SUFFIX = FOLDER_SUFFIX + "_sic_kb"
     sayt_df["display_text_with_code"] = sayt_df["search_text"] + ": " + sayt_df["code"]
 elif LOOKUP_FILE_NAME.endswith("Lookup_IT3_Final.csv"):
-    FOLDER = FOLDER + "_lookup_it3"
+    FOLDER_SUFFIX = FOLDER_SUFFIX + "_lookup_it3"
     sayt_df["code"] = sayt_df["SIC07"].apply(
         lambda x: x if len(x) == SIC_CODE_LENGTH else f"0{x}"
     )
@@ -94,15 +96,17 @@ sayt_corpus = build_sayt_corpus_from_df(
 )[1]
 
 # %%
-if not os.path.exists(FOLDER):
-    os.makedirs(FOLDER)
-    print(f"Created folder: {FOLDER}")
+if not os.path.exists(OUTPUT_DIR + FOLDER_SUFFIX):
+    os.makedirs(OUTPUT_DIR + FOLDER_SUFFIX)
+    print(f"Created folder: {OUTPUT_DIR + FOLDER_SUFFIX}")
 # %%
 
 characters_to_run = NUM_CHARACTERS_LIST.copy()
 for characters in NUM_CHARACTERS_LIST.copy():
 
-    main_file_name = f"{FOLDER}/weight_test_{characters}chars_n_p_s.json"
+    main_file_name = (
+        f"{OUTPUT_DIR}{FOLDER_SUFFIX}/weight_test_{characters}chars_n_p_s.json"
+    )
 
     if os.path.exists(main_file_name):
         print(
@@ -117,9 +121,7 @@ for ngram in range(0, GRID_GRANULARITY + 1):
         characters_to_run2 = characters_to_run.copy()
         for characters in characters_to_run2.copy():
 
-            sub_file_name = (
-                f"{FOLDER}/w_{characters}_n{ngram}_p{prefix}_s{semantic}.json"
-            )
+            sub_file_name = f"{OUTPUT_DIR}{FOLDER_SUFFIX}/w_{characters}_n{ngram}_p{prefix}_s{semantic}.json"
             if os.path.exists(sub_file_name):
                 print(
                     f"File already exists, no need to run for {characters} characters."
@@ -152,9 +154,7 @@ for ngram in range(0, GRID_GRANULARITY + 1):
                 f"""Running evaluation for {characters} characters,
 with ngram={ngram}, prefix={prefix}, semantic={semantic}."""
             )
-            sub_file_name = (
-                f"{FOLDER}/w_{characters}_n{ngram}_p{prefix}_s{semantic}.json"
-            )
+            sub_file_name = f"{OUTPUT_DIR}{FOLDER_SUFFIX}/w_{characters}_n{ngram}_p{prefix}_s{semantic}.json"
 
             suggestions_df, fig, metrics_table = run_eval_for_suggesters(
                 df=test_df,
@@ -163,6 +163,25 @@ with ngram={ngram}, prefix={prefix}, semantic={semantic}."""
                 suggestions_limit=MAX_SUGGESTIONS,
                 correct_code_col=CORRECT_CODE_COL,
                 output_dir=f"{OUTPUT_DIR}_all",
+            )
+
+            suggestions_df, avg_ms_dict = get_suggestions_by_chars(
+                test_df,
+                suggesters_dict=suggesters_three,
+                num_chars=[characters],
+                suggestions_limit=MAX_SUGGESTIONS,
+            )
+
+            suggestions_cols_to_compare = suggestions_df.columns[
+                suggestions_df.columns.str.startswith("suggestions_")
+            ].tolist()
+
+            compare_performance_metrics = build_sayt_metrics_comparison_table(
+                suggestions_df,
+                suggestions_cols_to_compare=suggestions_cols_to_compare,
+                correct_code_col=CORRECT_CODE_COL,
+                k_values=[characters],
+                ave_time_per_query_dict=avg_ms_dict,
             )
 
             data = {
@@ -181,46 +200,50 @@ with ngram={ngram}, prefix={prefix}, semantic={semantic}."""
 # %%
 # combine separate test results into one file
 
-remove_files = False
+remove_files = False  # set to True to remove the individual test files after combining
+save_to_bucket = False  # set to True to save the combined file to the GCS bucket
 
-for character_file in NUM_CHARACTERS_LIST:
-    master_dict = {}
-    files_to_delete = []
-    final_file_name = f"weight_test_{character_file}chars_n_p_s.json"
-    main_file_name = f"{FOLDER}/{final_file_name}"
+if save_to_bucket:
+    for character_file in NUM_CHARACTERS_LIST:
+        master_dict = {}
+        files_to_delete = []
+        final_file_name = f"weight_test_{character_file}chars_n_p_s.json"
+        main_file_name = f"{OUTPUT_DIR}{FOLDER_SUFFIX}/{final_file_name}"
 
-    if os.path.exists(main_file_name):
-        print("Final file already exists.")
-    else:
-        for filename in sorted(os.listdir(FOLDER)):
-            if filename.startswith(f"w_{character_file}_n") and filename.endswith(
-                ".json"
-            ):
-                full_path = os.path.join(FOLDER, filename)
-                key_name = filename[:-5]  # remove .json from the file name
-                test_name = f"test{key_name[3:]}"
-                with open(full_path, encoding="utf-8") as f:
-                    master_dict[test_name] = json.load(f)
-                files_to_delete.append(full_path)
-        # Save locally
-        with open(
-            os.path.join(FOLDER, final_file_name),
-            "w",
-            encoding="utf-8",
-        ) as f:
-            json.dump(master_dict, f, indent=4)
+        if os.path.exists(main_file_name):
+            print("Final file already exists.")
+        else:
+            for filename in sorted(os.listdir(OUTPUT_DIR + FOLDER_SUFFIX)):
+                if filename.startswith(f"w_{character_file}_n") and filename.endswith(
+                    ".json"
+                ):
+                    full_path = os.path.join(OUTPUT_DIR + FOLDER_SUFFIX, filename)
+                    key_name = filename[:-5]  # remove .json from the file name
+                    test_name = f"test{key_name[3:]}"
+                    with open(full_path, encoding="utf-8") as f:
+                        master_dict[test_name] = json.load(f)
+                    files_to_delete.append(full_path)
+            # Save locally
+            with open(
+                os.path.join(OUTPUT_DIR + FOLDER_SUFFIX, final_file_name),
+                "w",
+                encoding="utf-8",
+            ) as f:
+                json.dump(master_dict, f, indent=4)
 
-        print(f"File {final_file_name} saved.")
-        # Save to the bucket
-        blob = client.bucket(bucket_name).blob(blob_name + final_file_name)
-        blob.upload_from_string(
-            json.dumps(master_dict, indent=4), content_type="application/json"
-        )
+            print(f"File {final_file_name} saved.")
+            # Save to the bucket
+            blob = client.bucket(bucket_name).blob(blob_name + final_file_name)
+            blob.upload_from_string(
+                json.dumps(master_dict, indent=4), content_type="application/json"
+            )
 
-    # remove files
-    if remove_files:
-        for file_path in files_to_delete:
-            os.remove(file_path)
-        print("Source files removed.")
-    else:
-        print("Source files not removed.")
+        # remove files
+        if remove_files:
+            for file_path in files_to_delete:
+                os.remove(file_path)
+            print("Source files removed.")
+        else:
+            print("Source files not removed.")
+
+# %%
