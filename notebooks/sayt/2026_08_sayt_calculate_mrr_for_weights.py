@@ -81,19 +81,24 @@ for col in [
 # %%
 # LOOKUP_FILE_NAME = f"gs://{bucket_name}/evaluation-pipeline/SAYT/Lookup_IT3_Final.csv"
 LOOKUP_FILE_NAME = f"gs://{bucket_name}/sic_knowledgebase/sic_kb_for_sayt.csv"
+
 sayt_df = pd.read_csv(LOOKUP_FILE_NAME, dtype=str)
+if LOOKUP_FILE_NAME.endswith("sic_kb_for_sayt.csv"):
+    sayt_df["display_text_with_code"] = sayt_df["search_text"] + ": " + sayt_df["code"]
+elif LOOKUP_FILE_NAME.endswith("Lookup_IT3_Final.csv"):
+    sayt_df["code"] = sayt_df["SIC07"].apply(
+        lambda x: x if len(x) == SIC_CODE_LENGTH else f"0{x}"
+    )
+    sayt_df["display_text_with_code"] = sayt_df["SIC_lookup"] + ": " + sayt_df["code"]
 
-# sayt_df["code"] = sayt_df["SIC07"].apply(
-#     lambda x: x if len(x) == SIC_CODE_LENGTH else f"0{x}"
-# )
-sayt_df["display_text"] = sayt_df["search_text"] + ": " + sayt_df["code"]
-
-sayt_corpus = build_sayt_corpus_from_df(sayt_df, "search_text", "display_text", "code")[
-    1
-]
+sayt_corpus = build_sayt_corpus_from_df(
+    sayt_df, "search_text", "display_text_with_code", "code"
+)[1]
 
 
 # %%
+
+
 for characters in NUM_CHARACTERS_LIST:
 
     main_file_name = f"{FOLDER}/weight_test_{characters}chars_n_p_s.json"
