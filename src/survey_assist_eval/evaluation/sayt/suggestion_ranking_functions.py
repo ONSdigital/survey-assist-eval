@@ -148,9 +148,10 @@ def clean_codes_columns(  # noqa: PLR0913 pylint: disable=R0913, R0914, R0917
 
     code_type = "sic" if code_length == SIC_EXPECTED_CODE_LENGTH else "soc"
 
-    if correct_codes_col is not None and correct_codes_col == retrieved_codes_col:
+    if correct_codes_col == retrieved_codes_col:
         raise ValueError(
-            "correct_codes_col and retrieved_codes_col must not be the same column"
+            "correct_codes_col and retrieved_codes_col must be different "
+            "(both cannot be the same value or both None)."
         )
 
     if code_type is None and code_length is None:
@@ -159,23 +160,19 @@ def clean_codes_columns(  # noqa: PLR0913 pylint: disable=R0913, R0914, R0917
     if code_type is None:
         code_type = "sic" if code_length == SIC_EXPECTED_CODE_LENGTH else "soc"
 
-    for col in [correct_codes_col, retrieved_codes_col]:
-        if col is None:
-            continue
+    if correct_codes_col is not None:
+        df[f"{correct_codes_col}_clean"] = df[correct_codes_col].apply(
+            _get_valid_codes,
+            n=code_digit_match_length,
+            code_type=code_type,
+        )
 
-        if correct_codes_col is not None:
-            df[f"{correct_codes_col}_clean"] = df[correct_codes_col].apply(
-                _get_valid_codes,
-                n=code_digit_match_length,
-                code_type=code_type,
-            )
-
-        if retrieved_codes_col is not None:
-            df[f"{retrieved_codes_col}_clean"] = df[retrieved_codes_col].apply(
-                _get_valid_codes_list,
-                n=code_digit_match_length,
-                code_type=code_type,
-            )
+    if retrieved_codes_col is not None:
+        df[f"{retrieved_codes_col}_clean"] = df[retrieved_codes_col].apply(
+            _get_valid_codes_list,
+            n=code_digit_match_length,
+            code_type=code_type,
+        )
 
     return df
 
