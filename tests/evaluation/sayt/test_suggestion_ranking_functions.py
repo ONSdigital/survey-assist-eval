@@ -465,9 +465,11 @@ def test_clean_codes_columns_handles_both_columns_together_with_block_section_re
 
 def test_clean_codes_columns_skips_columns_not_requested():
     """Columns should only be added when explicitly requested."""
-    df = pd.DataFrame({"correct_code": ["1111"]})
+    df = pd.DataFrame({"retrieved": [["1111"]]})
 
-    result = clean_codes_columns(df, code_digit_match_length=3, code_length=4)
+    result = clean_codes_columns(
+        df, code_digit_match_length=3, code_length=4, retrieved_codes_col="retrieved"
+    )
 
     assert "correct_code_clean" not in result.columns, (
         "Expected no cleaned correct-codes column to be added when "
@@ -493,7 +495,7 @@ def test_clean_codes_columns_raises_when_columns_are_the_same():
     """A ValueError should be raised when correct_codes_col equals retrieved_codes_col."""
     df = pd.DataFrame({"code": ["1111"]})
 
-    with pytest.raises(ValueError, match="must not be the same column"):
+    with pytest.raises(ValueError, match="both cannot be the same value"):
         clean_codes_columns(
             df,
             code_digit_match_length=3,
@@ -501,6 +503,16 @@ def test_clean_codes_columns_raises_when_columns_are_the_same():
             correct_codes_col="code",
             retrieved_codes_col="code",
         )
+
+
+def test_clean_codes_columns_raises_when_both_columns_are_none():
+    """A ValueError should be raised when both correct_codes_col and
+    retrieved_codes_col are None.
+    """
+    df = pd.DataFrame({"correct_code": ["1111"], "retrieved": [["2222"]]})
+
+    with pytest.raises(ValueError, match="or both None"):
+        clean_codes_columns(df, code_digit_match_length=3, code_length=4)
 
 
 def test_clean_codes_columns_is_safe_to_call_again_on_its_own_output():
