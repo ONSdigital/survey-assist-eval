@@ -79,16 +79,19 @@ for col in [
     )
 
 # %%
-LOOKUP_FILE_NAME = f"gs://{bucket_name}/evaluation-pipeline/SAYT/Lookup_IT3_Final.csv"
+# LOOKUP_FILE_NAME = f"gs://{bucket_name}/evaluation-pipeline/SAYT/Lookup_IT3_Final.csv"
+LOOKUP_FILE_NAME = f"gs://{bucket_name}/sic_knowledgebase/sic_kb_for_sayt.csv"
 sayt_df = pd.read_csv(LOOKUP_FILE_NAME, dtype=str)
-sayt_df["code"] = sayt_df["SIC07"].apply(
-    lambda x: x if len(x) == SIC_CODE_LENGTH else f"0{x}"
-)
-sayt_df["display_text_with_code"] = sayt_df["SIC_lookup"] + ": " + sayt_df["code"]
 
-sayt_corpus = build_sayt_corpus_from_df(
-    sayt_df, "SIC_lookup", "display_text_with_code", "code"
-)[1]
+# sayt_df["code"] = sayt_df["SIC07"].apply(
+#     lambda x: x if len(x) == SIC_CODE_LENGTH else f"0{x}"
+# )
+sayt_df["display_text"] = sayt_df["search_text"] + ": " + sayt_df["code"]
+
+sayt_corpus = build_sayt_corpus_from_df(sayt_df, "search_text", "display_text", "code")[
+    1
+]
+
 
 # %%
 for characters in NUM_CHARACTERS_LIST:
@@ -181,7 +184,7 @@ for character_file in NUM_CHARACTERS_LIST:
         # Save to the bucket
         blob = client.bucket(bucket_name).blob(blob_name + final_file_name)
         blob.upload_from_string(
-            json.dumps(final_file_name, indent=4), content_type="application/json"
+            json.dumps(master_dict, indent=4), content_type="application/json"
         )
 
     # remove files
