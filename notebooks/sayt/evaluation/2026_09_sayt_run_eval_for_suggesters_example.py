@@ -1,4 +1,9 @@
-"""A script showing an example of using SAYT suggestions hard limit metrics."""
+"""A script showing an example of running SAYT evaluation for different suggesters.
+
+Expects following environment variables to be set:
+- EVALUATION_BUCKET_NAME: name of GCS bucket where the data is stored
+The variables are loaded from the ".env" file.
+"""
 
 # pylint: disable=invalid-name
 # pylint: disable=duplicate-code
@@ -6,6 +11,7 @@
 # %%
 import os
 
+import numpy as np
 import pandas as pd
 from dotenv import load_dotenv
 from survey_assist_embed_core.sayt import (
@@ -15,24 +21,24 @@ from survey_assist_embed_core.sayt import (
 )
 from survey_assist_utils.logging import get_logger
 
-from notebooks.sayt.evaluation.hard_limit_metrics_functions import (
-    build_sayt_hard_limit_metrics_comparison_table,
-    compute_suggestions_hard_limit_metrics,
-)
 from notebooks.sayt.sayt_utils import (
     build_lookup_suggester,
     build_sayt_corpus_from_df,
-    get_suggestions_by_chars,
     validate_one_code,
 )
-from survey_assist_eval.evaluation.sayt.performance_metrics_functions import (
-    build_sayt_metrics_comparison_table,
-)
+from notebooks.sayt.suggester_eval import run_eval_for_suggesters
 
 # %%
 SIC_CODE_LENGTH = 5
-MAX_SUGGESTIONS = 9  # for the evaluation we will look at ranks up to 9 only
-correct_codes_col = "correct_sic_code"
+MAX_SUGGESTIONS = 9
+CORRECT_CODE_COL = "correct_sic_code"
+NUM_CHARACTERS_LIST = list(range(4, 10))
+OUTPUT_DIR = "data/figures/sayt/min_characters"
+
+# %%
+if not os.path.exists(OUTPUT_DIR):
+    os.makedirs(OUTPUT_DIR)
+correct_codes_col = CORRECT_CODE_COL
 
 load_dotenv()
 bucket_name = os.getenv("EVALUATION_BUCKET_NAME")
@@ -41,7 +47,6 @@ if not bucket_name:
 
 
 logger = get_logger(__name__)
-
 
 # %%
 test_df = pd.read_excel(
@@ -106,75 +111,85 @@ suggesters = {
     "Semantic only": build_lookup_suggester(
         sayt2_corpus, retrievers=[SemanticRetrieverSpec()]
     ),
-    "All Suggesters": build_lookup_suggester(
-        sayt2_corpus,
-        retrievers=[
-            NgramRetrieverSpec(),
-            PrefixRetrieverSpec(),
-            SemanticRetrieverSpec(),
-        ],
-    ),
 }
 
 # %%
-# get suggestions for the test queries with a hard limit on the number of suggestions returned
-test_df_hard_limit, avg_ms_dict = get_suggestions_by_chars(
+suggestions_df, fig, metrics_table = run_eval_for_suggesters(
     df=test_df,
     suggesters_dict=suggesters,
-    num_chars=[4, 5, 7, 10],
+    num_chars=NUM_CHARACTERS_LIST,
     suggestions_limit=MAX_SUGGESTIONS,
-    hard_suggestions_limit=True,
-    with_scores=True,
-)
-
-suggestions_cols_to_compare = test_df_hard_limit.columns[
-    test_df_hard_limit.columns.str.startswith("suggestions_")
-].tolist()
-
-
-compare_performance_metrics_hard_limit = build_sayt_metrics_comparison_table(
-    test_df_hard_limit,
-    suggestions_cols_to_compare=suggestions_cols_to_compare,
     correct_codes_col=correct_codes_col,
-    code_length=SIC_CODE_LENGTH,
-    k_values=[1, 3, 5, MAX_SUGGESTIONS],
-    ave_time_per_query_dict=avg_ms_dict,
+    output_dir=f"{OUTPUT_DIR}_all",
 )
 
-compare_performance_metrics_hard_limit.head()
+metrics_table.head()
 
 # %%
-# compute hard limit metrics for suggestions when no hard limit applied
-test_df_none_hard_limit, avg_ms_dict = get_suggestions_by_chars(
+# digit match to 2
+suggestions_df_digit2, fig_digit2, metrics_table_digit2 = run_eval_for_suggesters(
     df=test_df,
     suggesters_dict=suggesters,
-    num_chars=[4, 5, 7, 10],
+    num_chars=NUM_CHARACTERS_LIST,
     suggestions_limit=MAX_SUGGESTIONS,
-    hard_suggestions_limit=False,
-    with_scores=True,
-)
-
-print(
-    compute_suggestions_hard_limit_metrics(
-        test_df_none_hard_limit,
-        correct_codes_col=correct_codes_col,
-        suggestions_col=suggestions_cols_to_compare[0],
-        cutoff_k=MAX_SUGGESTIONS,
-        code_length=SIC_CODE_LENGTH,
-        score_col=suggestions_cols_to_compare[0].replace("suggestions_", "scores_"),
-    ).report_metrics()
-)
-
-suggestions_cols_to_compare = test_df_none_hard_limit.columns[
-    test_df_none_hard_limit.columns.str.startswith("suggestions_")
-].tolist()
-
-compare_hard_limit_metrics = build_sayt_hard_limit_metrics_comparison_table(
-    test_df_none_hard_limit,
-    suggestions_cols_to_compare=suggestions_cols_to_compare,
     correct_codes_col=correct_codes_col,
-    cutoff_k=MAX_SUGGESTIONS,
+    output_dir=f"{OUTPUT_DIR}_digit2",
+    code_digit_match_length=2,
 )
 
-compare_hard_limit_metrics.head()
+metrics_table_digit2.head()
+
+# %%
+# Example when the correct codes are a list of codes rather than a single code
+test_df_list_codes = pd.read_parquet(
+    f"gs://{bucket_name}/evaluation-pipeline/original_datasets/sic_2k/sic_2k_test_data.parquet"
+)
+
+is_self_employed = test_df_list_codes["sic2007_employee"] == "-9"
+
+test_df_list_codes["full_entry"] = np.where(
+    is_self_employed,
+    test_df_list_codes["sic2007_self_employed"],
+    test_df_list_codes["sic2007_employee"],
+)
+test_df_list_codes["employment_status"] = np.where(
+    is_self_employed, "self_employed", "employed"
+)
+
+test_df_list_codes = test_df_list_codes.rename(
+    columns={"clerical_codes": correct_codes_col}
+)
+
+# %%
+suggestions_df_unambiguous, fig_unambiguous, metrics_table_unambiguous = (
+    run_eval_for_suggesters(
+        df=test_df_list_codes,
+        suggesters_dict=suggesters,
+        num_chars=NUM_CHARACTERS_LIST,
+        suggestions_limit=MAX_SUGGESTIONS,
+        correct_codes_col=correct_codes_col,
+        output_dir=f"{OUTPUT_DIR}_all_list_codes",
+        only_unambiguous_correct_codes=True,
+    )
+)
+
+metrics_table_unambiguous.head()
+
+# %%
+# digit match to 2
+(
+    suggestions_df_list_codes_digit2,
+    fig_list_codes_digit2,
+    metrics_table_list_codes_digit2,
+) = run_eval_for_suggesters(
+    df=test_df_list_codes,
+    suggesters_dict=suggesters,
+    num_chars=NUM_CHARACTERS_LIST,
+    suggestions_limit=MAX_SUGGESTIONS,
+    correct_codes_col=correct_codes_col,
+    output_dir=f"{OUTPUT_DIR}_digit2_list_codes",
+    code_digit_match_length=2,
+)
+
+metrics_table_list_codes_digit2.head()
 # %%

@@ -192,7 +192,7 @@ suggestions_df_one, fig_one, metrics_table_one = run_eval_for_suggesters(
     suggesters_dict=suggesters_one,
     num_chars=NUM_CHARACTERS_LIST,
     suggestions_limit=MAX_SUGGESTIONS,
-    correct_code_col=CORRECT_CODE_COL,
+    correct_codes_col=CORRECT_CODE_COL,
     output_dir=f"{OUTPUT_DIR}_one",
 )
 
@@ -202,7 +202,7 @@ suggestions_df_two, fig_two, metrics_table_two = run_eval_for_suggesters(
     suggesters_dict=suggesters_two,
     num_chars=NUM_CHARACTERS_LIST,
     suggestions_limit=MAX_SUGGESTIONS,
-    correct_code_col=CORRECT_CODE_COL,
+    correct_codes_col=CORRECT_CODE_COL,
     output_dir=f"{OUTPUT_DIR}_two",
 )
 
@@ -212,7 +212,7 @@ suggestions_df_three, fig_three, metrics_table_three = run_eval_for_suggesters(
     suggesters_dict=suggesters_three,
     num_chars=NUM_CHARACTERS_LIST,
     suggestions_limit=MAX_SUGGESTIONS,
-    correct_code_col=CORRECT_CODE_COL,
+    correct_codes_col=CORRECT_CODE_COL,
     output_dir=f"{OUTPUT_DIR}_three",
 )
 
@@ -225,7 +225,7 @@ suggestions_df_all, fig_all, metrics_table_all = run_eval_for_suggesters(
     suggesters_dict=suggesters_all,
     num_chars=NUM_CHARACTERS_LIST,
     suggestions_limit=MAX_SUGGESTIONS,
-    correct_code_col=CORRECT_CODE_COL,
+    correct_codes_col=CORRECT_CODE_COL,
     output_dir=f"{OUTPUT_DIR}_all",
 )
 
