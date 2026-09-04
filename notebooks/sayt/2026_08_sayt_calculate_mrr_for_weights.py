@@ -29,11 +29,12 @@ CORRECT_CODE_COL = "correct_sic_code"
 NUM_CHARACTERS_LIST = list(range(4, 10))
 
 GRID_GRANULARITY = 10
+FOLDER = "notebooks/sayt/weights_sum_10"
 
 # %%
-if not os.path.exists("notebooks/sayt/weights_sum_10"):
-    os.makedirs("notebooks/sayt/weights_sum_10")
-    print("Created folder: notebooks/sayt/weights_sum_10")
+if not os.path.exists(FOLDER):
+    os.makedirs(FOLDER)
+    print(f"Created folder: {FOLDER}")
 
 # %%
 load_dotenv()
@@ -90,11 +91,9 @@ sayt_corpus = build_sayt_corpus_from_df(
 )[1]
 
 # %%
-folder = "notebooks/sayt/weights_sum_10"
-
 for characters in NUM_CHARACTERS_LIST:
 
-    main_file_name = f"{folder}/weight_test_{characters}chars_n_p_s.json"
+    main_file_name = f"{FOLDER}/weight_test_{characters}chars_n_p_s.json"
 
     if os.path.exists(main_file_name):
         print(f"File {main_file_name} already exists.")
@@ -104,7 +103,7 @@ for characters in NUM_CHARACTERS_LIST:
             semantic = GRID_GRANULARITY - ngram - prefix
 
             sub_file_name = (
-                f"{folder}/w_{characters}_n{ngram}_p{prefix}_s{semantic}.json"
+                f"{FOLDER}/w_{characters}_n{ngram}_p{prefix}_s{semantic}.json"
             )
 
             if os.path.exists(sub_file_name):
@@ -155,16 +154,16 @@ for character_file in NUM_CHARACTERS_LIST:
     master_dict = {}
     files_to_delete = []
     final_file_name = f"weight_test_{character_file}chars_n_p_s.json"
-    main_file_name = f"{folder}/{final_file_name}"
+    main_file_name = f"{FOLDER}/{final_file_name}"
 
     if os.path.exists(main_file_name):
         print("Final file already exists.")
     else:
-        for filename in sorted(os.listdir(folder)):
+        for filename in sorted(os.listdir(FOLDER)):
             if filename.startswith(f"w_{character_file}_n") and filename.endswith(
                 ".json"
             ):
-                full_path = os.path.join(folder, filename)
+                full_path = os.path.join(FOLDER, filename)
                 key_name = filename[:-5]  # remove .json from the file name
                 test_name = f"test{key_name[3:]}"
                 with open(full_path, encoding="utf-8") as f:
@@ -172,7 +171,7 @@ for character_file in NUM_CHARACTERS_LIST:
                 files_to_delete.append(full_path)
         # Save locally
         with open(
-            os.path.join(folder, final_file_name),
+            os.path.join(FOLDER, final_file_name),
             "w",
             encoding="utf-8",
         ) as f:
