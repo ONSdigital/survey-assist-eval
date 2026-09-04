@@ -32,11 +32,6 @@ GRID_GRANULARITY = 10
 FOLDER = f"data/sayt/weights_grid_{GRID_GRANULARITY}"
 
 # %%
-if not os.path.exists(FOLDER):
-    os.makedirs(FOLDER)
-    print(f"Created folder: {FOLDER}")
-
-# %%
 load_dotenv()
 bucket_name = os.getenv("EVALUATION_BUCKET_NAME")
 if not bucket_name:
@@ -79,58 +74,87 @@ for col in [
     )
 
 # %%
-# LOOKUP_FILE_NAME = f"gs://{bucket_name}/evaluation-pipeline/SAYT/Lookup_IT3_Final.csv"
-LOOKUP_FILE_NAME = f"gs://{bucket_name}/sic_knowledgebase/sic_kb_for_sayt.csv"
+LOOKUP_FILE_NAME = f"gs://{bucket_name}/evaluation-pipeline/SAYT/Lookup_IT3_Final.csv"
+# LOOKUP_FILE_NAME = f"gs://{bucket_name}/sic_knowledgebase/sic_kb_for_sayt.csv"
 
 sayt_df = pd.read_csv(LOOKUP_FILE_NAME, dtype=str)
 if LOOKUP_FILE_NAME.endswith("sic_kb_for_sayt.csv"):
+    FOLDER = FOLDER + "_sic_kb"
     sayt_df["display_text_with_code"] = sayt_df["search_text"] + ": " + sayt_df["code"]
 elif LOOKUP_FILE_NAME.endswith("Lookup_IT3_Final.csv"):
+    FOLDER = FOLDER + "_lookup_it3"
     sayt_df["code"] = sayt_df["SIC07"].apply(
         lambda x: x if len(x) == SIC_CODE_LENGTH else f"0{x}"
     )
     sayt_df["display_text_with_code"] = sayt_df["SIC_lookup"] + ": " + sayt_df["code"]
+    sayt_df = sayt_df.rename(columns={"SIC_lookup": "search_text"})
 
 sayt_corpus = build_sayt_corpus_from_df(
     sayt_df, "search_text", "display_text_with_code", "code"
 )[1]
 
-
+# %%
+if not os.path.exists(FOLDER):
+    os.makedirs(FOLDER)
+    print(f"Created folder: {FOLDER}")
 # %%
 
-
-for characters in NUM_CHARACTERS_LIST:
+characters_to_run = NUM_CHARACTERS_LIST.copy()
+for characters in NUM_CHARACTERS_LIST.copy():
 
     main_file_name = f"{FOLDER}/weight_test_{characters}chars_n_p_s.json"
 
     if os.path.exists(main_file_name):
-        print(f"File {main_file_name} already exists.")
-        continue
-    for ngram in range(0, GRID_GRANULARITY + 1):
-        for prefix in range(0, GRID_GRANULARITY + 1 - ngram):
-            semantic = GRID_GRANULARITY - ngram - prefix
+        print(
+            f"File {main_file_name} already exists, no need to run for {characters} characters."
+        )
+        characters_to_run.remove(characters)
+
+for ngram in range(0, GRID_GRANULARITY + 1):
+    for prefix in range(0, GRID_GRANULARITY + 1 - ngram):
+        semantic = GRID_GRANULARITY - ngram - prefix
+
+        characters_to_run2 = characters_to_run.copy()
+        for characters in characters_to_run2.copy():
 
             sub_file_name = (
                 f"{FOLDER}/w_{characters}_n{ngram}_p{prefix}_s{semantic}.json"
             )
-
             if os.path.exists(sub_file_name):
-                continue
+                print(
+                    f"File already exists, no need to run for {characters} characters."
+                )
+                characters_to_run2.remove(characters)
 
-            retrievers_list = []
-            if ngram > 0:
-                retrievers_list.append(NgramRetrieverSpec(weight=ngram))
-            if prefix > 0:
-                retrievers_list.append(PrefixRetrieverSpec(weight=prefix))
-            if semantic > 0:
-                retrievers_list.append(SemanticRetrieverSpec(weight=semantic))
+        if characters_to_run2 == []:
+            print(
+                f"File for ngram={ngram}, prefix={prefix}, semantic={semantic} already exists."
+            )
+            continue
 
-            suggesters_three = {
-                "ngram, prefix and semantic": build_lookup_suggester(
-                    sayt_corpus,
-                    retrievers=retrievers_list,
-                ),
-            }
+        retrievers_list = []
+        if ngram > 0:
+            retrievers_list.append(NgramRetrieverSpec(weight=ngram))
+        if prefix > 0:
+            retrievers_list.append(PrefixRetrieverSpec(weight=prefix))
+        if semantic > 0:
+            retrievers_list.append(SemanticRetrieverSpec(weight=semantic))
+
+        suggesters_three = {
+            "ngram, prefix and semantic": build_lookup_suggester(
+                sayt_corpus,
+                retrievers=retrievers_list,
+            ),
+        }
+
+        for characters in characters_to_run2:
+            print(
+                f"""Running evaluation for {characters} characters,
+with ngram={ngram}, prefix={prefix}, semantic={semantic}."""
+            )
+            sub_file_name = (
+                f"{FOLDER}/w_{characters}_n{ngram}_p{prefix}_s{semantic}.json"
+            )
 
             suggestions_df, fig, metrics_table = run_eval_for_suggesters(
                 df=test_df,
@@ -151,6 +175,7 @@ for characters in NUM_CHARACTERS_LIST:
             print(data)
 
             with open(sub_file_name, "w", encoding="utf-8") as f:
+
                 json.dump(data, f, indent=4)
 
 # %%
