@@ -29,7 +29,7 @@ CORRECT_CODE_COL = "correct_sic_code"
 NUM_CHARACTERS_LIST = list(range(4, 10))
 
 GRID_GRANULARITY = 10
-FOLDER = "notebooks/sayt/weights_sum_10"
+FOLDER = "data/sayt/weights_sum_10"
 
 # %%
 if not os.path.exists(FOLDER):
