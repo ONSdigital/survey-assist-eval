@@ -80,14 +80,18 @@ LOOKUP_FILE_NAME = f"gs://{bucket_name}/sic_knowledgebase/sic_kb_for_sayt.csv"
 
 sayt_df = pd.read_csv(LOOKUP_FILE_NAME, dtype=str)
 if LOOKUP_FILE_NAME.endswith("sic_kb_for_sayt.csv"):
-    FOLDER_PREFIX = FOLDER_PREFIX + "_sic_kb"
+    SAVE_FOLDER = FOLDER_PREFIX + "_sic_kb"
 
 elif LOOKUP_FILE_NAME.endswith("Lookup_IT3_Final.csv"):
-    FOLDER_PREFIX = FOLDER_PREFIX + "_lookup_it3"
+    SAVE_FOLDER = FOLDER_PREFIX + "_lookup_it3"
     sayt_df["code"] = sayt_df["SIC07"].apply(
         lambda x: x if len(x) == SIC_CODE_LENGTH else f"0{x}"
     )
     sayt_df = sayt_df.rename(columns={"SIC_lookup": "search_text"})
+else:
+    raise ValueError(
+        f"LOOKUP_FILE_NAME {LOOKUP_FILE_NAME} does not match expected file names."
+    )
 
 sayt_corpus = build_sayt_corpus_from_df(sayt_df, "search_text", "search_text", "code")[
     1
@@ -95,16 +99,16 @@ sayt_corpus = build_sayt_corpus_from_df(sayt_df, "search_text", "search_text", "
 
 
 # %%
-if not os.path.exists(OUTPUT_DIR + FOLDER_PREFIX):
-    os.makedirs(OUTPUT_DIR + FOLDER_PREFIX)
-    print(f"Created folder: {OUTPUT_DIR + FOLDER_PREFIX}")
+if not os.path.exists(OUTPUT_DIR + SAVE_FOLDER):
+    os.makedirs(OUTPUT_DIR + SAVE_FOLDER)
+    print(f"Created folder: {OUTPUT_DIR + SAVE_FOLDER}")
 # %%
 
 characters_to_run = NUM_CHARACTERS_LIST.copy()
 for characters in NUM_CHARACTERS_LIST.copy():
 
     main_file_name = (
-        f"{OUTPUT_DIR}{FOLDER_PREFIX}/weight_test_{characters}chars_n_p_s.json"
+        f"{OUTPUT_DIR}{SAVE_FOLDER}/weight_test_{characters}chars_n_p_s.json"
     )
 
     if os.path.exists(main_file_name):
@@ -120,7 +124,7 @@ for ngram in range(0, GRID_GRANULARITY + 1):
         characters_to_run2 = characters_to_run.copy()
         for characters in characters_to_run2.copy():
 
-            sub_file_name = f"{OUTPUT_DIR}{FOLDER_PREFIX}/w_{characters}_n{ngram}_p{prefix}_s{semantic}.json"
+            sub_file_name = f"{OUTPUT_DIR}{SAVE_FOLDER}/w_{characters}_n{ngram}_p{prefix}_s{semantic}.json"
             if os.path.exists(sub_file_name):
                 print(
                     f"File already exists, no need to run for {characters} characters."
@@ -153,7 +157,7 @@ for ngram in range(0, GRID_GRANULARITY + 1):
                 f"""Running evaluation for {characters} characters,
 with ngram={ngram}, prefix={prefix}, semantic={semantic}."""
             )
-            sub_file_name = f"{OUTPUT_DIR}{FOLDER_PREFIX}/w_{characters}_n{ngram}_p{prefix}_s{semantic}.json"
+            sub_file_name = f"{OUTPUT_DIR}{SAVE_FOLDER}/w_{characters}_n{ngram}_p{prefix}_s{semantic}.json"
 
             suggestions_df, avg_ms_dict = get_suggestions_by_chars(
                 test_df,
@@ -197,16 +201,16 @@ for character_file in NUM_CHARACTERS_LIST:
     master_dict = {}
     files_to_delete = []
     final_file_name = f"weight_test_{character_file}chars_n_p_s.json"
-    main_file_name = f"{OUTPUT_DIR}{FOLDER_PREFIX}/{final_file_name}"
+    main_file_name = f"{OUTPUT_DIR}{SAVE_FOLDER}/{final_file_name}"
 
     if os.path.exists(main_file_name):
         print("Final file already exists.")
     else:
-        for filename in sorted(os.listdir(OUTPUT_DIR + FOLDER_PREFIX)):
+        for filename in sorted(os.listdir(OUTPUT_DIR + SAVE_FOLDER)):
             if filename.startswith(f"w_{character_file}_n") and filename.endswith(
                 ".json"
             ):
-                full_path = os.path.join(OUTPUT_DIR + FOLDER_PREFIX, filename)
+                full_path = os.path.join(OUTPUT_DIR + SAVE_FOLDER, filename)
                 key_name = filename[:-5]  # remove .json from the file name
                 test_name = key_name.lstrip(f"w_{character_file}")
                 with open(full_path, encoding="utf-8") as f:
@@ -214,7 +218,7 @@ for character_file in NUM_CHARACTERS_LIST:
                 files_to_delete.append(full_path)
         # Save locally
         with open(
-            os.path.join(OUTPUT_DIR + FOLDER_PREFIX, final_file_name),
+            os.path.join(OUTPUT_DIR + SAVE_FOLDER, final_file_name),
             "w",
             encoding="utf-8",
         ) as f:
