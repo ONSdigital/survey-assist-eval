@@ -221,15 +221,6 @@ def test_get_rank_of_first_matching_code_returns_none_when_list_has_no_match():
     )
 
 
-def test_get_rank_of_first_matching_code_handles_empty_list_of_correct_codes():
-    """Rank should be None when given an empty list of correct codes."""
-    rank = get_rank_of_first_matching_code(["1111", "2222", "3333"], [])
-
-    assert (
-        rank is None
-    ), "Expected rank to be None when the list of correct codes is empty."
-
-
 def test_get_rank_of_first_matching_code_single_code_in_list():
     """Rank should work with a single-item list equivalently to a string."""
     rank_from_list = get_rank_of_first_matching_code(["1111", "2222", "3333"], ["2222"])
@@ -250,13 +241,106 @@ def test_get_rank_of_first_matching_code_works_with_set_of_correct_codes():
     )
 
 
-def test_get_rank_of_first_matching_code_handles_empty_set_of_correct_codes():
-    """Rank should be None when given an empty set of correct codes."""
-    rank = get_rank_of_first_matching_code(["1111", "2222", "3333"], set())
+@pytest.mark.parametrize(
+    "retrieved_codes,correct_codes,expected_rank",
+    [
+        ([None, "1111", "2222"], "1111", 2),
+        (["1111", None, "2222"], "2222", 3),
+        ([None, None, "3333"], "3333", 3),
+    ],
+    ids=[
+        "none_at_start",
+        "none_in_middle",
+        "all_none_except_correct_code",
+    ],
+)
+def test_get_rank_of_first_matching_code_with_none_in_retrieved(
+    retrieved_codes, correct_codes, expected_rank
+):
+    """None values in retrieved codes list should be handled correctly."""
+    rank = get_rank_of_first_matching_code(retrieved_codes, correct_codes)
 
-    assert (
-        rank is None
-    ), "Expected rank to be None when the set of correct codes is empty."
+    assert rank == expected_rank, (
+        f"Expected rank {expected_rank} for retrieved_codes={retrieved_codes} "
+        f"and correct_codes={correct_codes}, but got {rank}."
+    )
+
+
+@pytest.mark.parametrize(
+    "retrieved_codes,correct_codes,expected_rank",
+    [
+        ([], "1111", None),
+        ([], ["1111", "2222"], None),
+        ([], set(), None),
+    ],
+    ids=[
+        "empty_with_string",
+        "empty_with_list",
+        "empty_with_set",
+    ],
+)
+def test_get_rank_of_first_matching_code_with_empty_retrieved(
+    retrieved_codes, correct_codes, expected_rank
+):
+    """Empty retrieved codes list should return None regardless of correct_codes type."""
+    rank = get_rank_of_first_matching_code(retrieved_codes, correct_codes)
+
+    assert rank == expected_rank, (
+        f"Expected rank {expected_rank} for retrieved_codes={retrieved_codes} "
+        f"and correct_codes={correct_codes}, but got {rank}."
+    )
+
+
+@pytest.mark.parametrize(
+    "retrieved_codes,correct_codes,expected_rank",
+    [
+        (["1111"], "1111", 1),
+        (["2222"], "1111", None),
+        ([None], "1111", None),
+    ],
+    ids=[
+        "single_match",
+        "single_no_match",
+        "single_none",
+    ],
+)
+def test_get_rank_of_first_matching_code_with_single_element(
+    retrieved_codes, correct_codes, expected_rank
+):
+    """Single element in retrieved codes should be handled correctly."""
+    rank = get_rank_of_first_matching_code(retrieved_codes, correct_codes)
+
+    assert rank == expected_rank, (
+        f"Expected rank {expected_rank} for retrieved_codes={retrieved_codes} "
+        f"and correct_codes={correct_codes}, but got {rank}."
+    )
+
+
+@pytest.mark.parametrize(
+    "retrieved_codes,correct_codes,expected_rank",
+    [
+        (["1111", "2222"], None, None),
+        (["1111", "2222", "3333"], [], None),
+        (["1111", "2222", "3333"], set(), None),
+        (["1111", "2222", "3333"], "", None),
+    ],
+    ids=[
+        "none_as_correct_codes",
+        "empty_list_as_correct_codes",
+        "empty_set_as_correct_codes",
+        "empty_string_as_correct_codes",
+    ],
+)
+def test_get_rank_of_first_matching_code_with_none_or_empty_correct_codes(
+    retrieved_codes, correct_codes, expected_rank
+):
+    """None or empty correct_codes should result in rank of None."""
+    rank = get_rank_of_first_matching_code(retrieved_codes, correct_codes)
+
+    assert rank == expected_rank, (
+        f"Expected rank {expected_rank} for retrieved_codes={retrieved_codes} "
+        f"and correct_codes={correct_codes}, but got {rank}."
+    )
 
 
 # ============================================================================

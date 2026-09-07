@@ -60,7 +60,7 @@ def get_codes_from_suggestions(
 
 
 def get_rank_of_first_matching_code(
-    retrieved_codes: list[str], correct_codes: str | list[str] | set[str]
+    retrieved_codes: list[str], correct_codes: str | list[str] | set[str] | None
 ) -> int | None:
     """Get the rank of the first retrieved code matching correct code(s).
 
@@ -71,6 +71,9 @@ def get_rank_of_first_matching_code(
     Returns:
         int: Rank of the first matching code, or None if no match found.
     """
+    if correct_codes is None or is_correct_codes_empty(correct_codes):
+        return None
+
     if isinstance(correct_codes, str):
         correct_codes = {correct_codes}
 
@@ -80,15 +83,15 @@ def get_rank_of_first_matching_code(
     return None
 
 
-def is_correct_codes_empty(codes: str | list[str] | None) -> bool:
+def is_correct_codes_empty(codes: str | list[str] | set[str] | None) -> bool:
     """Check whether a correct-codes value represents missing ground truth.
 
     Args:
-        codes: A single correct code, list of correct codes, or a missing value
-            (None or NaN).
+        codes: A single correct code, list of correct codes, set of correct codes,
+            or a missing value (None or NaN).
 
     Returns:
-        bool: True if codes is None, NaN, an empty string, or an empty list.
+        bool: True if codes is None, NaN, an empty string, an empty list, or an empty set.
     """
     if isinstance(codes, str):
         return pd.isna(codes) or codes == ""
