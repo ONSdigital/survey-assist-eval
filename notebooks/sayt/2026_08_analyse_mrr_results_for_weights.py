@@ -7,6 +7,7 @@
 import json
 import os
 
+import plotly.graph_objects as go
 from dotenv import load_dotenv
 
 from src.survey_assist_eval.pipeline.shared_components import _read_json
@@ -59,17 +60,85 @@ def get_ranked_setups(data: dict):
 
 
 # %%
-for i in range(4, 10):
-    file_name = f"weight_test_{i}chars_n_p_s.json"
+def generate_ternary_plot(data: dict):
+    """Generate a ternary plot of the n/p/s weight combinations.
 
+    Args:
+        data (dict): A dictionary containing the test results with MRR scores.
+
+    Returns:
+        fig: A Plotly figure object representing the ternary plot.
+    """
+    # Plot n/p/s weight combinations in a ternary diagram.
+    points = []
+
+    for setup_name, results in data.items():
+        # get points
+        points.append(
+            {
+                "setup": setup_name,
+                "n": results["Ngram_weight"],
+                "p": results["Prefix_weight"],
+                "s": results["Semantic_weight"],
+                "mrr": results["MRR"],
+            }
+        )
+
+    if not points:
+        raise ValueError("No records containing 'n', 'p', and 's' weights were found.")
+
+    # ternary plot
+    fig = go.Figure(
+        go.Scatterternary(
+            a=[point["n"] for point in points],
+            b=[point["p"] for point in points],
+            c=[point["s"] for point in points],
+            mode="markers",
+            text=[point["setup"] for point in points],
+            customdata=[[point["mrr"]] for point in points],
+            hovertemplate=(
+                "Setup: %{text}<br>"
+                "n: %{a}<br>"
+                "p: %{b}<br>"
+                "s: %{c}<br>"
+                "MRR: %{customdata[0]}<extra></extra>"
+            ),
+            marker={
+                "size": 10,
+                "color": [point["mrr"] for point in points],
+                "colorscale": "Viridis",
+                "showscale": True,
+                "colorbar": {"title": "MRR score"},
+            },
+        )
+    )
+
+    fig.update_layout(
+        title="Weight Configurations",
+        ternary={
+            "sum": 1,
+            "aaxis": {"title": "ngram"},
+            "baxis": {"title": "prefix"},
+            "caxis": {"title": "semantic"},
+        },
+    )
+
+    # fig.show()
+    return fig
+
+
+# %%
+for i in range(4, 10):
+
+    file_name = f"weight_test_{i}chars_n_p_s.json"
     if bucket_name:
-        # data_file = read_json_from_gcs(blob_name, file_name)
         print("read from storage")
         path = f"gs://{bucket_name}/{blob_name}{file_name}"
         data_file = _read_json(path)
 
     else:
-        weights_file = f"notebooks/sayt/weights_sum_10/{file_name}"
+        print("read from local file")
+        weights_file = f"data/sayt/weights_grid_10_lookup_it3/{file_name}"
 
         with open(weights_file, encoding="utf-8") as f:
             data_file = json.load(f)
@@ -83,11 +152,13 @@ character = 5
 
 file_name = f"weight_test_{character}chars_n_p_s.json"
 if bucket_name:
+    print("read from storage")
     path = f"gs://{bucket_name}/{blob_name}{file_name}"
     data_file = _read_json(path)
 
 else:
-    weights_file = f"notebooks/sayt/weights_sum_10/{file_name}"
+    print("read from local file")
+    weights_file = f"data/sayt/weights_grid_10_lookup_it3/{file_name}"
 
     with open(weights_file, encoding="utf-8") as f:
         data_file = json.load(f)
@@ -99,3 +170,25 @@ for rank, (individual_score, setups) in enumerate(rankings_by_weight.items(), st
     print(f"  {list(setups.keys())}\n")
     if rank == 5:  # noqa: PLR2004
         break
+
+# %%
+# Access data for visualisation
+character = 7
+
+file_name = f"weight_test_{character}chars_n_p_s.json"
+if bucket_name:
+    print("read from storage")
+    path = f"gs://{bucket_name}/{blob_name}{file_name}"
+    data_file = _read_json(path)
+
+else:
+    print("read from local file")
+    weights_file = f"data/sayt/weights_grid_10_lookup_it3/{file_name}"
+
+    with open(weights_file, encoding="utf-8") as f:
+        data_file = json.load(f)
+
+# %%
+generate_ternary_plot(data_file)
+
+# %%
