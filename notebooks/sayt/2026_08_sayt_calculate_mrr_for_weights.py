@@ -21,7 +21,6 @@ from notebooks.sayt.sayt_utils import (
     build_sayt_corpus_from_df,
     get_suggestions_by_chars,
 )
-from notebooks.sayt.suggester_eval import run_eval_for_suggesters
 from survey_assist_eval.evaluation.sayt.performance_metrics_functions import (
     build_sayt_metrics_comparison_table,
 )
@@ -156,15 +155,6 @@ with ngram={ngram}, prefix={prefix}, semantic={semantic}."""
             )
             sub_file_name = f"{OUTPUT_DIR}{FOLDER_SUFFIX}/w_{characters}_n{ngram}_p{prefix}_s{semantic}.json"
 
-            suggestions_df, fig, metrics_table = run_eval_for_suggesters(
-                df=test_df,
-                suggesters_dict=suggesters_three,
-                num_chars=[characters],
-                suggestions_limit=MAX_SUGGESTIONS,
-                correct_code_col=CORRECT_CODE_COL,
-                output_dir=f"{OUTPUT_DIR}_all",
-            )
-
             suggestions_df, avg_ms_dict = get_suggestions_by_chars(
                 test_df,
                 suggesters_dict=suggesters_three,
@@ -188,8 +178,8 @@ with ngram={ngram}, prefix={prefix}, semantic={semantic}."""
                 "Ngram_weight": ngram,
                 "Prefix_weight": prefix,
                 "Semantic_weight": semantic,
-                "MRR": metrics_table["mrr"][0],
-                "avg_time": metrics_table["ave_time_per_query_ms"][0],
+                "MRR": compare_performance_metrics["mrr"][0],
+                "avg_time": compare_performance_metrics["ave_time_per_query_ms"][0],
             }
             print(data)
 
@@ -201,7 +191,7 @@ with ngram={ngram}, prefix={prefix}, semantic={semantic}."""
 # combine separate test results into one file
 
 remove_files = False  # set to True to remove the individual test files after combining
-save_to_bucket = False  # set to True to save the combined file to the GCS bucket
+save_to_bucket = True  # set to True to save the combined file to the GCS bucket
 
 if save_to_bucket:
     for character_file in NUM_CHARACTERS_LIST:
