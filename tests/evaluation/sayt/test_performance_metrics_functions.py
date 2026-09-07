@@ -48,79 +48,134 @@ def test_compute_precision_at_k_raises_for_non_positive_k(k):
         compute_precision_at_k(["1111", "5678"], "1111", k)
 
 
-def test_compute_precision_at_k_returns_fraction_of_top_k_matches():
-    """Precision@k should count relevant results within the cutoff."""
-    precision = compute_precision_at_k(["1111", "1112", "1111"], "1111", 2)
+@pytest.mark.parametrize(
+    "retrieved_codes,correct_codes,k,expected_precision",
+    [
+        (["1111", "1112", "1111"], "1111", 2, 0.5),
+        (["1111", "1111", "1112"], "1111", 2, 1.0),
+        (["1111"], "1111", 3, 1 / 3),
+        (["1111", "1112", "1121"], {"1112", "1122"}, 2, 0.5),
+        (["1111", "1112", "1121"], {"1111", "1112"}, 2, 1.0),
+        (["1111", "1112", "1121"], ["1112", "1122"], 2, 0.5),
+        (["1111", "1111", "1111"], "1111", 3, 1.0),
+        (["1111", "1112", "1113"], {"1111", "1112", "1113"}, 3, 1.0),
+        (["1111"], "1111", 1, 1.0),
+        (["1111"], "2222", 1, 0.0),
+        (["1111"], ["1111"], 1, 1.0),
+    ],
+    ids=[
+        "fraction_of_top_k_matches",
+        "counts_duplicate_codes_in_top_k",
+        "uses_requested_k_with_fewer_results",
+        "with_set_single_match",
+        "with_set_multiple_matches",
+        "with_list_correct_codes",
+        "all_duplicates_match",
+        "all_unique_match_with_set",
+        "single_code_match",
+        "single_code_no_match",
+        "single_code_list_match",
+    ],
+)
+def test_compute_precision_at_k_normal_scenarios(
+    retrieved_codes, correct_codes, k, expected_precision
+):
+    """Precision@k should handle normal scenarios correctly."""
+    precision = compute_precision_at_k(retrieved_codes, correct_codes, k)
 
-    assert precision == pytest.approx(0.5), (
-        "Expected Precision@2 to be 0.5 when one of two top-ranked results matches "
-        "the correct code."
+    assert precision == pytest.approx(expected_precision)
+
+
+@pytest.mark.parametrize(
+    "retrieved_codes,correct_codes,k,expected_precision",
+    [
+        (["1111"], "1111", 100, 0.01),
+        (["1111", "2222"], "1111", 10, 0.1),
+        (["1111", "1112", "1113"], "1111", 10, 0.1),
+        (["1111", "1112", "1113", "1114", "1115"], "2222", 2, 0.0),
+        (["1111", "1111", "1112", "1112"], "1111", 4, 0.5),
+        (["1111", "1112", "1113", "2222"], "2222", 4, 0.25),
+    ],
+    ids=[
+        "very_large_k_single_match",
+        "large_k_two_results",
+        "large_k_multiple_results",
+        "no_matches_with_small_k",
+        "duplicate_matches_in_top_k",
+        "match_at_end_of_top_k",
+    ],
+)
+def test_compute_precision_at_k_extreme_scenarios(
+    retrieved_codes, correct_codes, k, expected_precision
+):
+    """Precision@k should handle extreme k values and duplicate positioning."""
+    precision = compute_precision_at_k(retrieved_codes, correct_codes, k)
+
+    assert precision == pytest.approx(expected_precision)
+
+
+@pytest.mark.parametrize(
+    "retrieved_codes,correct_codes,k,expected_precision",
+    [
+        # Empty retrieved codes
+        ([], "1111", 3, 0.0),
+        ([], set(), 3, 0.0),
+        ([], ["1111"], 3, 0.0),
+        # Empty correct codes
+        (["1111", "1112", "1121"], set(), 3, 0.0),
+        (["1111", "1112", "1121"], [], 3, 0.0),
+    ],
+    ids=[
+        "empty_retrieved_with_string",
+        "empty_retrieved_with_set",
+        "empty_retrieved_with_list",
+        "empty_correct_codes_set",
+        "empty_correct_codes_list",
+    ],
+)
+def test_compute_precision_at_k_with_empty_inputs(
+    retrieved_codes, correct_codes, k, expected_precision
+):
+    """Edge cases with empty inputs should return zero precision."""
+    precision = compute_precision_at_k(retrieved_codes, correct_codes, k)
+
+    assert precision == pytest.approx(expected_precision), (
+        f"Expected Precision@{k} to be {expected_precision} for "
+        f"retrieved_codes={retrieved_codes} and correct_codes={correct_codes}."
     )
 
 
-def test_compute_precision_at_k_counts_duplicate_correct_codes_in_top_k():
-    """Precision@k counts all matching entries present in the top-k list."""
-    precision = compute_precision_at_k(["1111", "1111", "1112"], "1111", 2)
+@pytest.mark.parametrize(
+    "retrieved_codes,correct_codes,k,expected_precision",
+    [
+        ([None, None, None], "1111", 3, 0.0),
+        ([None, "1111", None], "1111", 3, 1 / 3),
+        (["1111", None, "1112"], "1111", 3, 1 / 3),
+        ([None, None], {"1111"}, 2, 0.0),
+        (["1111", "1112", "1121"], None, 3, 0.0),
+        ([], None, 3, 0.0),
+        ([None], None, 1, 0.0),
+    ],
+    ids=[
+        "list_of_all_none_values",
+        "none_value_with_single_match",
+        "leading_match_with_trailing_none",
+        "list_of_none_with_set_correct",
+        "none_correct_codes_with_list",
+        "empty_retrieved_with_none_correct",
+        "single_none_with_none_correct",
+    ],
+)
+def test_compute_precision_at_k_with_none_values(
+    retrieved_codes, correct_codes, k, expected_precision
+):
+    """Precision@k should handle None values within lists and None correct_codes gracefully."""
+    precision = compute_precision_at_k(retrieved_codes, correct_codes, k)
 
-    assert precision == pytest.approx(1.0), (
-        "Expected Precision@2 to be 1.0 when both top-ranked results match the "
-        "correct code."
+    assert precision == pytest.approx(expected_precision), (
+        f"Expected Precision@{k} to be {expected_precision} for "
+        f"retrieved_codes={retrieved_codes} and correct_codes={correct_codes}."
     )
-
-
-def test_compute_precision_at_k_returns_zero_for_empty_retrieved_codes():
-    """Precision@k should be zero when no results are retrieved."""
-    precision = compute_precision_at_k([], "1111", 3)
-
-    assert precision == pytest.approx(
-        0.0
-    ), "Expected Precision@3 to be 0.0 when the retrieved code list is empty."
-
-
-def test_compute_precision_at_k_uses_requested_k_when_fewer_results_returned():
-    """Precision@k keeps k as the denominator even for short result lists."""
-    precision = compute_precision_at_k(["1111"], "1111", 3)
-
-    assert precision == pytest.approx(1 / 3), (
-        "Expected Precision@3 to divide by k even when fewer than k results are "
-        "returned."
-    )
-
-
-def test_compute_precision_at_k_with_set_of_correct_codes():
-    """Precision@k should count matches against any code in the set."""
-    precision = compute_precision_at_k(["1111", "1112", "1121"], {"1112", "1122"}, 2)
-
-    assert precision == pytest.approx(
-        0.5
-    ), "Expected Precision@2 to count one match (2222) from the set in top 2."
-
-
-def test_compute_precision_at_k_with_multiple_matches_in_set():
-    """Precision@k should count all matches when set codes appear in top-k."""
-    precision = compute_precision_at_k(["1111", "1112", "1121"], {"1111", "1112"}, 2)
-
-    assert precision == pytest.approx(
-        1.0
-    ), "Expected Precision@2 to count two matches from the set in top 2."
-
-
-def test_compute_precision_at_k_with_empty_correct_codes_set():
-    """Precision@k should return 0 when correct_codes set is empty."""
-    precision = compute_precision_at_k(["1111", "1112", "1121"], set(), 3)
-
-    assert precision == pytest.approx(
-        0.0
-    ), "Expected Precision@3 to be 0.0 when no correct codes to match."
-
-
-def test_compute_precision_at_k_with_list_of_correct_codes():
-    """Precision@k should count matches against any code in the list."""
-    precision = compute_precision_at_k(["1111", "1112", "1121"], ["1112", "1122"], 2)
-
-    assert precision == pytest.approx(
-        0.5
-    ), "Expected Precision@2 to count one match (2222) from the list in top 2."
 
 
 # ============================================================================
@@ -135,78 +190,63 @@ def test_compute_recall_at_k_raises_for_non_positive_k(k):
         compute_recall_at_k(["1111", "5678"], "1111", k)
 
 
-def test_compute_recall_at_k_returns_one_when_correct_code_in_top_k():
-    """Recall@k should be 1 when the correct code is retrieved within k."""
-    recall = compute_recall_at_k(["1111", "1112", "1121"], "1112", 2)
+@pytest.mark.parametrize(
+    "retrieved_codes,correct_codes,k,expected_recall",
+    [
+        (["1111", "1112", "1121"], "1112", 2, 1.0),
+        (["1111", "1112", "1121"], "1121", 2, 0.0),
+        (["1111"], "1111", 3, 1.0),
+        (["1111", "1112", "1121"], {"1112", "1122", "1123"}, 2, 1 / 3),
+        (["1111", "1112", "1121"], {"1111", "1112", "1122"}, 3, 2 / 3),
+        (["1111", "1112"], ["1121", "1122"], 2, 0.0),
+    ],
+    ids=[
+        "code_in_top_k",
+        "code_outside_cutoff",
+        "code_found_with_k_larger_than_results",
+        "with_set_single_match",
+        "with_set_multiple_matches",
+        "with_list_no_matches",
+    ],
+)
+def test_compute_recall_at_k_normal_scenarios(
+    retrieved_codes, correct_codes, k, expected_recall
+):
+    """Recall@k should handle normal scenarios correctly."""
+    recall = compute_recall_at_k(retrieved_codes, correct_codes, k)
 
-    assert recall == pytest.approx(1.0), (
-        "Expected Recall@2 to be 1.0 when the correct code appears within the top "
-        "two results."
+    assert recall == pytest.approx(expected_recall)
+
+
+@pytest.mark.parametrize(
+    "retrieved_codes,correct_codes,k,expected_recall",
+    [
+        # Empty retrieved codes
+        ([], "1111", 3, 0.0),
+        ([], set(), 3, 0.0),
+        ([], ["1111"], 3, 0.0),
+        # Empty correct codes
+        (["1111", "1112", "1121"], set(), 3, 0.0),
+        (["1111", "1112", "1121"], [], 3, 0.0),
+    ],
+    ids=[
+        "empty_retrieved_with_string",
+        "empty_retrieved_with_set",
+        "empty_retrieved_with_list",
+        "empty_correct_codes_set",
+        "empty_correct_codes_list",
+    ],
+)
+def test_compute_recall_at_k_with_empty_or_none_inputs(
+    retrieved_codes, correct_codes, k, expected_recall
+):
+    """Edge cases with empty inputs should return zero recall."""
+    recall = compute_recall_at_k(retrieved_codes, correct_codes, k)
+
+    assert recall == pytest.approx(expected_recall), (
+        f"Expected Recall@{k} to be {expected_recall} for "
+        f"retrieved_codes={retrieved_codes} and correct_codes={correct_codes}."
     )
-
-
-def test_compute_recall_at_k_returns_zero_when_correct_code_not_in_top_k():
-    """Recall@k should be 0 when the correct code falls outside the cutoff."""
-    recall = compute_recall_at_k(["1111", "1112", "1121"], "1121", 2)
-
-    assert recall == pytest.approx(
-        0.0
-    ), "Expected Recall@2 to be 0.0 when the correct code falls outside the cutoff."
-
-
-def test_compute_recall_at_k_returns_zero_for_empty_retrieved_codes():
-    """Recall@k should be zero when no results are retrieved."""
-    recall = compute_recall_at_k([], "1111", 3)
-
-    assert recall == pytest.approx(
-        0.0
-    ), "Expected Recall@3 to be 0.0 when the retrieved code list is empty."
-
-
-def test_compute_recall_at_k_handles_k_larger_than_retrieved_results():
-    """Recall@k should still find a match when k exceeds the result count."""
-    recall = compute_recall_at_k(["1111"], "1111", 3)
-
-    assert recall == pytest.approx(1.0), (
-        "Expected Recall@3 to be 1.0 (1 found / 1 total correct) when the correct "
-        "code is present even if fewer than k results are returned."
-    )
-
-
-def test_compute_recall_at_k_with_set_of_correct_codes():
-    """Recall@k should be relevant_found / total_correct using a set."""
-    recall = compute_recall_at_k(["1111", "1112", "1121"], {"1112", "1122", "1123"}, 2)
-
-    assert recall == pytest.approx(
-        1 / 3
-    ), "Expected Recall@2 to be 1/3 (1 found: 2222 / 3 total correct codes)."
-
-
-def test_compute_recall_at_k_with_multiple_matches_in_set():
-    """Recall@k should count all matching codes from the set in top-k."""
-    recall = compute_recall_at_k(["1111", "1112", "1121"], {"1111", "1112", "1122"}, 3)
-
-    assert recall == pytest.approx(
-        2 / 3
-    ), "Expected Recall@3 to be 2/3 (2 found: 1111, 2222 / 3 total correct codes)."
-
-
-def test_compute_recall_at_k_with_empty_correct_codes_set():
-    """Recall@k should return 0 when correct_codes set is empty."""
-    recall = compute_recall_at_k(["1111", "1112", "1121"], set(), 3)
-
-    assert recall == pytest.approx(
-        0.0
-    ), "Expected Recall@3 to be 0.0 when no correct codes to recall."
-
-
-def test_compute_recall_at_k_with_no_matches_in_top_k():
-    """Recall@k should be 0 when none of the correct codes appear in top-k."""
-    recall = compute_recall_at_k(["1111", "1112"], ["1121", "1122"], 2)
-
-    assert recall == pytest.approx(
-        0.0
-    ), "Expected Recall@2 to be 0.0 (0 found / 2 total correct codes)."
 
 
 def test_compute_recall_at_k_does_not_exceed_one_with_duplicate_retrieved_codes():
@@ -220,83 +260,133 @@ def test_compute_recall_at_k_does_not_exceed_one_with_duplicate_retrieved_codes(
     ), "Expected Recall@5 to be 1/3 (1 distinct correct code found / 3 total), not 5/3."
 
 
+@pytest.mark.parametrize(
+    "retrieved_codes,correct_codes,k,expected_recall",
+    [
+        ([None, None, None], "1111", 3, 0.0),
+        ([None, "1111", None], "1111", 3, 1.0),
+        (["1111", None, "1112"], "1111", 3, 1.0),
+        ([None, None], {"1111"}, 2, 0.0),
+        (["1111", "1112", "1121"], None, 3, 0.0),
+        ([], None, 3, 0.0),
+        ([None], None, 1, 0.0),
+    ],
+    ids=[
+        "list_of_all_none_values",
+        "none_value_with_single_match",
+        "leading_match_with_trailing_none",
+        "list_of_none_with_set_correct",
+        "none_correct_codes_with_list",
+        "empty_retrieved_with_none_correct",
+        "single_none_with_none_correct",
+    ],
+)
+def test_compute_recall_at_k_with_none_values(
+    retrieved_codes, correct_codes, k, expected_recall
+):
+    """Recall@k should handle None values within lists and None correct_codes gracefully."""
+    recall = compute_recall_at_k(retrieved_codes, correct_codes, k)
+
+    assert recall == pytest.approx(expected_recall), (
+        f"Expected Recall@{k} to be {expected_recall} for "
+        f"retrieved_codes={retrieved_codes} and correct_codes={correct_codes}."
+    )
+
+
 # ============================================================================
 # Test compute_reciprocal_rank function
 # ============================================================================
 
 
-def test_compute_reciprocal_rank_returns_inverse_of_first_matching_rank():
-    """Reciprocal rank should use the first matching position."""
-    reciprocal_rank = compute_reciprocal_rank(["1111", "1112", "1111"], "1111")
+@pytest.mark.parametrize(
+    "retrieved_codes,correct_codes,expected_reciprocal_rank",
+    [
+        (["1111", "1112", "1111"], "1111", 1.0),
+        (["1111", "1112", "1121"], "1122", 0.0),
+        (["1111", "1112", "1121"], "1121", 1 / 3),
+        (["1111", "1112", "1121"], {"1121", "1122"}, 1 / 3),
+        (["1111", "1112", "1121", "1122"], {"1121", "1112"}, 1 / 2),
+        (["1111", "1112", "1121"], ["1121", "1122"], 1 / 3),
+    ],
+    ids=[
+        "first_position_with_duplicates",
+        "code_not_found",
+        "match_at_later_position",
+        "with_set_find_first_match",
+        "with_set_find_earliest_match",
+        "with_list_find_first_match",
+    ],
+)
+def test_compute_reciprocal_rank_normal_scenarios(
+    retrieved_codes, correct_codes, expected_reciprocal_rank
+):
+    """Reciprocal rank should find first matching position correctly."""
+    reciprocal_rank = compute_reciprocal_rank(retrieved_codes, correct_codes)
 
-    assert reciprocal_rank == pytest.approx(1.0), (
-        "Expected reciprocal rank to use the first matching result when duplicates "
-        "exist later in the list."
+    assert reciprocal_rank == pytest.approx(expected_reciprocal_rank)
+
+
+@pytest.mark.parametrize(
+    "retrieved_codes,correct_codes,expected_reciprocal_rank",
+    [
+        # Empty retrieved codes
+        ([], "1111", 0.0),
+        ([], set(), 0.0),
+        ([], ["1111"], 0.0),
+        # Empty correct codes
+        (["1111", "1112", "1121"], set(), 0.0),
+        (["1111", "1112", "1121"], [], 0.0),
+    ],
+    ids=[
+        "empty_retrieved_with_string",
+        "empty_retrieved_with_set",
+        "empty_retrieved_with_list",
+        "empty_correct_codes_set",
+        "empty_correct_codes_list",
+    ],
+)
+def test_compute_reciprocal_rank_with_empty_or_none_inputs(
+    retrieved_codes, correct_codes, expected_reciprocal_rank
+):
+    """Edge cases with empty inputs should return zero reciprocal rank."""
+    reciprocal_rank = compute_reciprocal_rank(retrieved_codes, correct_codes)
+
+    assert reciprocal_rank == pytest.approx(expected_reciprocal_rank), (
+        f"Expected reciprocal rank to be {expected_reciprocal_rank} for "
+        f"retrieved_codes={retrieved_codes} and correct_codes={correct_codes}."
     )
 
 
-def test_compute_reciprocal_rank_returns_zero_when_code_not_found():
-    """Reciprocal rank should be zero when there is no match."""
-    reciprocal_rank = compute_reciprocal_rank(["1111", "1112", "1121"], "1122")
+@pytest.mark.parametrize(
+    "retrieved_codes,correct_codes,expected_reciprocal_rank",
+    [
+        ([None, None, None], "1111", 0.0),
+        ([None, "1111", None], "1111", 1 / 2),
+        (["1111", None, "1112"], "1111", 1.0),
+        ([None, None], {"1111"}, 0.0),
+        (["1111", "1112", "1121"], None, 0.0),
+        ([], None, 0.0),
+        ([None], None, 0.0),
+    ],
+    ids=[
+        "list_of_all_none_values",
+        "none_value_with_single_match",
+        "leading_match_with_trailing_none",
+        "list_of_none_with_set_correct",
+        "none_correct_codes_with_list",
+        "empty_retrieved_with_none_correct",
+        "single_none_with_none_correct",
+    ],
+)
+def test_compute_reciprocal_rank_with_none_values(
+    retrieved_codes, correct_codes, expected_reciprocal_rank
+):
+    """Reciprocal rank should handle None values within lists and None correct_codes gracefully."""
+    reciprocal_rank = compute_reciprocal_rank(retrieved_codes, correct_codes)
 
-    assert reciprocal_rank == pytest.approx(0.0), (
-        "Expected reciprocal rank to be 0.0 when the correct code is absent from "
-        "the retrieved list."
-    )
-
-
-def test_compute_reciprocal_rank_returns_inverse_for_match_beyond_first_position():
-    """Reciprocal rank should use the first matching position even when later."""
-    reciprocal_rank = compute_reciprocal_rank(["1111", "1112", "1121"], "1121")
-
-    assert reciprocal_rank == pytest.approx(1 / 3), (
-        "Expected reciprocal rank to equal 1/3 when the correct code is first found "
-        "at rank 3."
-    )
-
-
-def test_compute_reciprocal_rank_with_set_of_correct_codes():
-    """Reciprocal rank should find first match in set."""
-    reciprocal_rank = compute_reciprocal_rank(
-        ["1111", "1112", "1121"], {"1121", "1122"}
-    )
-
-    assert reciprocal_rank == pytest.approx(1 / 3), (
-        "Expected reciprocal rank to equal 1/3 when first matching code from set "
-        "is at rank 3."
-    )
-
-
-def test_compute_reciprocal_rank_finds_earliest_in_set():
-    """Reciprocal rank should return earliest matching position from set."""
-    reciprocal_rank = compute_reciprocal_rank(
-        ["1111", "1112", "1121", "1122"], {"1121", "1112"}
-    )
-
-    assert reciprocal_rank == pytest.approx(1 / 2), (
-        "Expected reciprocal rank to equal 1/2 when earliest match from set "
-        "is 2222 at rank 2."
-    )
-
-
-def test_compute_reciprocal_rank_with_empty_correct_codes_set():
-    """Reciprocal rank should return 0 when correct_codes set is empty."""
-    reciprocal_rank = compute_reciprocal_rank(["1111", "1112", "1121"], set())
-
-    assert reciprocal_rank == pytest.approx(
-        0.0
-    ), "Expected reciprocal rank to be 0.0 when no correct codes in list."
-
-
-def test_compute_reciprocal_rank_with_list_of_correct_codes():
-    """Reciprocal rank should find first match in list."""
-    reciprocal_rank = compute_reciprocal_rank(
-        ["1111", "1112", "1121"], ["1121", "1122"]
-    )
-
-    assert reciprocal_rank == pytest.approx(1 / 3), (
-        "Expected reciprocal rank to equal 1/3 when first matching code from list "
-        "is at rank 3."
+    assert reciprocal_rank == pytest.approx(expected_reciprocal_rank), (
+        f"Expected reciprocal rank to be {expected_reciprocal_rank} for "
+        f"retrieved_codes={retrieved_codes} and correct_codes={correct_codes}."
     )
 
 
