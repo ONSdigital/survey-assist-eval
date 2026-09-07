@@ -17,16 +17,10 @@ from survey_assist_eval.evaluation.sayt.suggestion_ranking_functions import (
 # ============================================================================
 
 
-def test_get_code_length_from_type_returns_sic_length_by_default():
-    """The default code_type of 'sic' should return the SIC code length (5)."""
-    length = get_code_length_from_type()
-
-    assert length == 5, "Expected default code_type 'sic' to return length 5."
-
-
 @pytest.mark.parametrize(
     "code_type,expected_length",
     [
+        (None, 5),
         ("sic", 5),
         ("SIC", 5),
         ("Sic", 5),
@@ -35,6 +29,7 @@ def test_get_code_length_from_type_returns_sic_length_by_default():
         ("Soc", 4),
     ],
     ids=[
+        "default_sic",
         "lowercase_sic",
         "uppercase_sic",
         "mixedcase_sic",
@@ -45,7 +40,11 @@ def test_get_code_length_from_type_returns_sic_length_by_default():
 )
 def test_get_code_length_from_type_returns_correct_length(code_type, expected_length):
     """The function should return the correct code length for all code type variations."""
-    length = get_code_length_from_type(code_type=code_type)
+    length = (
+        get_code_length_from_type()
+        if code_type is None
+        else get_code_length_from_type(code_type=code_type)
+    )
 
     assert (
         length == expected_length
@@ -102,44 +101,48 @@ def test_get_code_length_from_type_error_message_shows_valid_types():
 # ============================================================================
 
 
-def test_is_correct_codes_empty_returns_false_for_non_empty_string():
-    """A non-empty string should not be considered empty."""
+@pytest.mark.parametrize(
+    "input_value,expected_empty",
+    [
+        ("1234", False),
+        (["1234", "5678"], False),
+    ],
+    ids=[
+        "non_empty_string",
+        "non_empty_list",
+    ],
+)
+def test_is_correct_codes_empty_with_non_empty_inputs(input_value, expected_empty):
+    """Non-empty strings and lists should not be considered empty."""
+    result = is_correct_codes_empty(input_value)
+
     assert (
-        is_correct_codes_empty("1234") is False
-    ), "Expected a non-empty string to not be considered empty."
+        result is expected_empty
+    ), f"Expected is_correct_codes_empty({input_value!r}) to be {expected_empty}."
 
 
-def test_is_correct_codes_empty_returns_true_for_empty_string():
-    """An empty string should be considered empty."""
+@pytest.mark.parametrize(
+    "input_value,expected_empty",
+    [
+        ("", True),
+        (None, True),
+        (float("nan"), True),
+        ([], True),
+    ],
+    ids=[
+        "empty_string",
+        "none",
+        "nan_float",
+        "empty_list",
+    ],
+)
+def test_is_correct_codes_empty_with_empty_or_none_inputs(input_value, expected_empty):
+    """Empty strings, None, NaN, and empty lists should be considered empty."""
+    result = is_correct_codes_empty(input_value)
+
     assert (
-        is_correct_codes_empty("") is True
-    ), "Expected an empty string to be considered empty."
-
-
-def test_is_correct_codes_empty_returns_true_for_none():
-    """None should be considered empty."""
-    assert is_correct_codes_empty(None) is True, "Expected None to be considered empty."
-
-
-def test_is_correct_codes_empty_returns_true_for_nan_float():
-    """A NaN float scalar should be considered empty."""
-    assert (
-        is_correct_codes_empty(float("nan")) is True
-    ), "Expected a NaN float scalar to be considered empty."
-
-
-def test_is_correct_codes_empty_returns_false_for_non_empty_list():
-    """A non-empty list of codes should not be considered empty."""
-    assert (
-        is_correct_codes_empty(["1234", "5678"]) is False
-    ), "Expected a non-empty list to not be considered empty."
-
-
-def test_is_correct_codes_empty_returns_true_for_empty_list():
-    """An empty list should be considered empty."""
-    assert (
-        is_correct_codes_empty([]) is True
-    ), "Expected an empty list to be considered empty."
+        result is expected_empty
+    ), f"Expected is_correct_codes_empty({input_value!r}) to be {expected_empty}."
 
 
 def test_is_correct_codes_empty_does_not_error_on_nan_mixed_with_lists():
@@ -159,55 +162,45 @@ def test_is_correct_codes_empty_does_not_error_on_nan_mixed_with_lists():
 # ============================================================================
 
 
-def test_get_rank_of_first_matching_code_returns_first_matching_rank():
-    """Rank should report the first position containing the correct code."""
-    rank = get_rank_of_first_matching_code(["1111", "2222", "1111"], "1111")
+@pytest.mark.parametrize(
+    "retrieved_codes,correct_codes,expected_rank",
+    [
+        (["1111", "2222", "1111"], "1111", 1.0),
+        (["1111", "2222", "3333"], "3333", 3.0),
+        (["1111", "2222", "3333"], ["3333", "4444"], 3),
+        (["1111", "2222", "3333", "4444"], ["3333", "2222"], 2),
+        (["1111", "2222", "3333"], {"3333", "4444"}, 3),
+        (["1111", "2222", "3333"], ["2222"], 2),
+    ],
+    ids=[
+        "first_position_with_duplicates",
+        "rank_beyond_first_position",
+        "list_of_correct_codes_first_match",
+        "list_of_correct_codes_earliest_match",
+        "set_of_correct_codes",
+        "single_item_list_equivalence",
+    ],
+)
+def test_get_rank_of_first_matching_code_normal_scenarios(
+    retrieved_codes, correct_codes, expected_rank
+):
+    """Rank should find first matching position for various correct_codes types."""
+    rank = get_rank_of_first_matching_code(retrieved_codes, correct_codes)
 
-    assert rank == pytest.approx(1.0), (
-        "Expected rank to report the first matching position when duplicates appear "
-        "later in the list."
-    )
+    assert (
+        rank == pytest.approx(expected_rank)
+        if isinstance(expected_rank, float)
+        else rank == expected_rank
+    ), f"Expected rank {expected_rank} but got {rank}."
 
 
-def test_get_rank_of_first_matching_code_returns_zero_when_code_not_found():
+def test_get_rank_of_first_matching_code_returns_none_when_code_not_found():
     """Rank should be None when the correct code is absent."""
     rank = get_rank_of_first_matching_code(["1111", "2222", "3333"], "4444")
 
     assert rank is None, (
         "Expected rank to be None when the correct code is absent from the retrieved "
         "list."
-    )
-
-
-def test_get_rank_of_first_matching_code_returns_rank_beyond_first_position():
-    """Rank should reflect the first matching position when it is not first."""
-    rank = get_rank_of_first_matching_code(["1111", "2222", "3333"], "3333")
-
-    assert rank == pytest.approx(3.0), (
-        "Expected rank to equal 3.0 when the correct code is first found in the "
-        "third position."
-    )
-
-
-def test_get_rank_of_first_matching_code_works_with_list_of_correct_codes():
-    """Rank should find first match when given a list of correct codes."""
-    rank = get_rank_of_first_matching_code(["1111", "2222", "3333"], ["3333", "4444"])
-
-    assert rank == 3, (
-        "Expected rank to equal 3 when the first code in the list matches at "
-        "position 3."
-    )
-
-
-def test_get_rank_of_first_matching_code_finds_first_match_in_list():
-    """Rank should return the earliest matching position from a list of codes."""
-    rank = get_rank_of_first_matching_code(
-        ["1111", "2222", "3333", "4444"], ["3333", "2222"]
-    )
-
-    assert rank == 2, (
-        "Expected rank to equal 2 when the earliest match from the list is at "
-        "position 2."
     )
 
 
@@ -218,26 +211,6 @@ def test_get_rank_of_first_matching_code_returns_none_when_list_has_no_match():
     assert rank is None, (
         "Expected rank to be None when none of the codes in the list match the "
         "retrieved codes."
-    )
-
-
-def test_get_rank_of_first_matching_code_single_code_in_list():
-    """Rank should work with a single-item list equivalently to a string."""
-    rank_from_list = get_rank_of_first_matching_code(["1111", "2222", "3333"], ["2222"])
-    rank_from_string = get_rank_of_first_matching_code(["1111", "2222", "3333"], "2222")
-
-    assert (
-        rank_from_list == rank_from_string == 2
-    ), "Expected single-item list and string to produce the same rank."
-
-
-def test_get_rank_of_first_matching_code_works_with_set_of_correct_codes():
-    """Rank should find first match when given a set of correct codes."""
-    rank = get_rank_of_first_matching_code(["1111", "2222", "3333"], {"3333", "4444"})
-
-    assert rank == 3, (
-        "Expected rank to equal 3 when the first code in the set matches at "
-        "position 3."
     )
 
 
@@ -272,42 +245,23 @@ def test_get_rank_of_first_matching_code_with_none_in_retrieved(
         ([], "1111", None),
         ([], ["1111", "2222"], None),
         ([], set(), None),
-    ],
-    ids=[
-        "empty_with_string",
-        "empty_with_list",
-        "empty_with_set",
-    ],
-)
-def test_get_rank_of_first_matching_code_with_empty_retrieved(
-    retrieved_codes, correct_codes, expected_rank
-):
-    """Empty retrieved codes list should return None regardless of correct_codes type."""
-    rank = get_rank_of_first_matching_code(retrieved_codes, correct_codes)
-
-    assert rank == expected_rank, (
-        f"Expected rank {expected_rank} for retrieved_codes={retrieved_codes} "
-        f"and correct_codes={correct_codes}, but got {rank}."
-    )
-
-
-@pytest.mark.parametrize(
-    "retrieved_codes,correct_codes,expected_rank",
-    [
         (["1111"], "1111", 1),
         (["2222"], "1111", None),
         ([None], "1111", None),
     ],
     ids=[
+        "empty_with_string",
+        "empty_with_list",
+        "empty_with_set",
         "single_match",
         "single_no_match",
         "single_none",
     ],
 )
-def test_get_rank_of_first_matching_code_with_single_element(
+def test_get_rank_of_first_matching_code_with_empty_or_single_element(
     retrieved_codes, correct_codes, expected_rank
 ):
-    """Single element in retrieved codes should be handled correctly."""
+    """Empty or single element retrieved codes should be handled correctly."""
     rank = get_rank_of_first_matching_code(retrieved_codes, correct_codes)
 
     assert rank == expected_rank, (
@@ -348,33 +302,35 @@ def test_get_rank_of_first_matching_code_with_none_or_empty_correct_codes(
 # ============================================================================
 
 
-def test_get_codes_from_suggestions_extracts_trailing_code_from_each_suggestion():
-    """Codes should be the trailing code_length characters of each suggestion."""
-    row = pd.Series({"suggestions": ["alpha 1234", "beta 5678"]})
+@pytest.mark.parametrize(
+    "suggestions,code_type,expected_codes",
+    [
+        (["alpha 1234", "beta 5678"], "soc", ["1234", "5678"]),
+        (["third 3333", "first 1111", "second 2222"], "soc", ["3333", "1111", "2222"]),
+        (["some entry 12345"], None, ["12345"]),
+    ],
+    ids=[
+        "extract_trailing_codes",
+        "preserve_suggestion_order",
+        "uses_default_code_type",
+    ],
+)
+def test_get_codes_from_suggestions_normal_scenarios(
+    suggestions, code_type, expected_codes
+):
+    """Codes should be extracted and order preserved from suggestion strings."""
+    row = pd.Series({"suggestions": suggestions})
 
-    codes = get_codes_from_suggestions(
-        row, suggestions_col="suggestions", code_type="soc"
-    )
+    if code_type is None:
+        codes = get_codes_from_suggestions(row, suggestions_col="suggestions")
+    else:
+        codes = get_codes_from_suggestions(
+            row, suggestions_col="suggestions", code_type=code_type
+        )
 
-    assert codes == ["1234", "5678"], (
-        "Expected the trailing 4 characters of each suggestion string to be "
-        "extracted as the code."
-    )
-
-
-def test_get_codes_from_suggestions_preserves_suggestion_order():
-    """Extracted codes should be returned in the same order as the suggestions."""
-    row = pd.Series({"suggestions": ["third 3333", "first 1111", "second 2222"]})
-
-    codes = get_codes_from_suggestions(
-        row, suggestions_col="suggestions", code_type="soc"
-    )
-
-    assert codes == [
-        "3333",
-        "1111",
-        "2222",
-    ], "Expected extracted codes to preserve the original suggestion order."
+    assert (
+        codes == expected_codes
+    ), f"Expected {expected_codes} but got {codes} for suggestions={suggestions}."
 
 
 def test_get_codes_from_suggestions_returns_empty_list_for_no_suggestions():
@@ -390,28 +346,30 @@ def test_get_codes_from_suggestions_returns_empty_list_for_no_suggestions():
     ), "Expected no codes to be extracted from an empty suggestions list."
 
 
-def test_get_codes_from_suggestions_uses_default_code_type():
-    """The default code_type of 'sic' (5 digits) should be used when not specified."""
-    row = pd.Series({"suggestions": ["some entry 12345"]})
-
-    codes = get_codes_from_suggestions(row, suggestions_col="suggestions")
-
-    assert codes == [
-        "12345"
-    ], "Expected the default code_type of 'sic' to extract the trailing 5 characters."
-
-
 # ============================================================================
 # Test rank_of_correct_code_in_suggestions function
 # ============================================================================
 
 
-def test_rank_of_correct_code_in_suggestions_returns_rank_for_single_correct_code():
-    """Rank should reflect the position of the correct code in the suggestion column."""
+@pytest.mark.parametrize(
+    "suggestions,correct_code,expected_rank",
+    [
+        (["alpha 1111", "beta 2222", "gamma 3333"], "2222", 2),
+        (["alpha 1111", "beta 2222", "gamma 3333"], ["3333", "4444"], 3),
+    ],
+    ids=[
+        "single_correct_code_found",
+        "list_of_correct_codes_first_match",
+    ],
+)
+def test_rank_of_correct_code_in_suggestions_normal_scenarios(
+    suggestions, correct_code, expected_rank
+):
+    """Rank should find the correct code position in suggestions."""
     row = pd.Series(
         {
-            "suggestions_4chars_prefix": ["alpha 1111", "beta 2222", "gamma 3333"],
-            "correct_sic_code": "2222",
+            "suggestions_4chars_prefix": suggestions,
+            "correct_sic_code": correct_code,
         }
     )
 
@@ -420,8 +378,8 @@ def test_rank_of_correct_code_in_suggestions_returns_rank_for_single_correct_cod
     )
 
     assert (
-        rank == 2
-    ), "Expected rank to be 2 when the correct code matches the second suggestion."
+        rank == expected_rank
+    ), f"Expected rank {expected_rank} but got {rank} for correct_code={correct_code}."
 
 
 def test_rank_of_correct_code_in_suggestions_returns_none_when_not_found():
@@ -440,25 +398,6 @@ def test_rank_of_correct_code_in_suggestions_returns_none_when_not_found():
     assert (
         rank is None
     ), "Expected rank to be None when the correct code is absent from the suggestions."
-
-
-def test_rank_of_correct_code_in_suggestions_works_with_list_of_correct_codes():
-    """Rank should match against any code in a list of correct codes."""
-    row = pd.Series(
-        {
-            "suggestions_4chars_prefix": ["alpha 1111", "beta 2222", "gamma 3333"],
-            "correct_sic_code": ["3333", "4444"],
-        }
-    )
-
-    rank = rank_of_correct_code_in_suggestions(
-        row, num_chars=4, suggester_label="prefix", code_type="soc"
-    )
-
-    assert rank == 3, (
-        "Expected rank to be 3 when the first matching code from the list of "
-        "correct codes appears at the third suggestion."
-    )
 
 
 def test_rank_of_correct_code_in_suggestions_uses_custom_correct_codes_col():
@@ -489,36 +428,34 @@ def test_rank_of_correct_code_in_suggestions_uses_custom_correct_codes_col():
 # ============================================================================
 
 
-def test_clean_codes_columns_adds_clean_correct_codes_column():
+@pytest.mark.parametrize(
+    "correct_code_values,expected_clean",
+    [
+        (["1111", "1231"], [{"111"}, {"123"}]),
+        ([None, None], [set(), set()]),
+    ],
+    ids=[
+        "truncate_to_match_length",
+        "none_values_return_empty_set",
+    ],
+)
+def test_clean_codes_columns_adds_clean_correct_codes_column(
+    correct_code_values, expected_clean
+):
     """A new correct_code_clean column should hold the set of cleaned correct codes."""
-    df = pd.DataFrame({"correct_code": ["1111", "1231"]})
+    df = pd.DataFrame({"correct_code": correct_code_values})
 
     result = clean_codes_columns(
         df, code_digit_match_length=3, code_type="soc", correct_codes_col="correct_code"
     )
 
-    assert result["correct_code_clean"].tolist() == [
-        {"111"},
-        {"123"},
-    ], "Expected correct_code_clean to hold each code truncated to 3 characters as a set."
-    assert result["correct_code"].tolist() == [
-        "1111",
-        "1231",
-    ], "Expected the original correct_code column to remain unchanged."
-
-
-def test_clean_codes_columns_correct_codes_empty_returns_empty_set():
-    """Missing correct-codes values should produce an empty clean set."""
-    df = pd.DataFrame({"correct_code": [None, None]})
-
-    result = clean_codes_columns(
-        df, code_digit_match_length=3, code_type="soc", correct_codes_col="correct_code"
-    )
-
-    assert result["correct_code_clean"].tolist() == [
-        set(),
-        set(),
-    ], "Expected missing correct codes to produce an empty clean set."
+    assert (
+        result["correct_code_clean"].tolist() == expected_clean
+    ), f"Expected correct_code_clean to be {expected_clean}."
+    if correct_code_values != [None, None]:
+        assert (
+            result["correct_code"].tolist() == correct_code_values
+        ), "Expected the original correct_code column to remain unchanged."
 
 
 def test_clean_codes_columns_adds_clean_retrieved_codes_column():
