@@ -5,11 +5,97 @@ import pytest
 
 from survey_assist_eval.evaluation.sayt.suggestion_ranking_functions import (
     clean_codes_columns,
+    get_code_length_from_type,
     get_codes_from_suggestions,
     get_rank_of_first_matching_code,
     is_correct_codes_empty,
     rank_of_correct_code_in_suggestions,
 )
+
+# ============================================================================
+# Test get_code_length_from_type function
+# ============================================================================
+
+
+def test_get_code_length_from_type_returns_sic_length_by_default():
+    """The default code_type of 'sic' should return the SIC code length (5)."""
+    length = get_code_length_from_type()
+
+    assert length == 5, "Expected default code_type 'sic' to return length 5."
+
+
+@pytest.mark.parametrize(
+    "code_type,expected_length",
+    [
+        ("sic", 5),
+        ("SIC", 5),
+        ("Sic", 5),
+        ("soc", 4),
+        ("SOC", 4),
+        ("Soc", 4),
+    ],
+    ids=[
+        "lowercase_sic",
+        "uppercase_sic",
+        "mixedcase_sic",
+        "lowercase_soc",
+        "uppercase_soc",
+        "mixedcase_soc",
+    ],
+)
+def test_get_code_length_from_type_returns_correct_length(code_type, expected_length):
+    """The function should return the correct code length for all code type variations."""
+    length = get_code_length_from_type(code_type=code_type)
+
+    assert (
+        length == expected_length
+    ), f"Expected code_type '{code_type}' to return length {expected_length}."
+
+
+@pytest.mark.parametrize(
+    "invalid_code_type",
+    [
+        "invalid",
+        "xyz",
+        "",
+        "soc_code",
+        "sic_code",
+        "SIC_CODE",
+    ],
+)
+def test_get_code_length_from_type_raises_for_invalid_string_types(invalid_code_type):
+    """Unsupported string code_type values should raise a ValueError."""
+    with pytest.raises(ValueError, match="Unsupported code_type"):
+        get_code_length_from_type(code_type=invalid_code_type)
+
+
+@pytest.mark.parametrize(
+    "non_string_code_type",
+    [
+        None,
+        123,
+        45.67,
+        [],
+        {},
+        object(),
+    ],
+)
+def test_get_code_length_from_type_raises_for_non_string_types(non_string_code_type):
+    """Non-string code_type inputs should raise an error (AttributeError or TypeError)."""
+    with pytest.raises((AttributeError, TypeError)):
+        get_code_length_from_type(code_type=non_string_code_type)
+
+
+def test_get_code_length_from_type_error_message_shows_valid_types():
+    """The error message should list the valid code types."""
+    with pytest.raises(ValueError) as exc_info:
+        get_code_length_from_type(code_type="xyz")
+
+    error_msg = str(exc_info.value)
+    assert (
+        "sic" in error_msg and "soc" in error_msg
+    ), "Expected error message to include the list of valid code types."
+
 
 # ============================================================================
 # Test is_correct_codes_empty function
