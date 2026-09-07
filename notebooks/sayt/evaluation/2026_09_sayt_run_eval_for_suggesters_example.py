@@ -24,12 +24,11 @@ from survey_assist_utils.logging import get_logger
 from notebooks.sayt.sayt_utils import (
     build_lookup_suggester,
     build_sayt_corpus_from_df,
-    validate_one_code,
 )
 from notebooks.sayt.suggester_eval import run_eval_for_suggesters
 
 # %%
-SIC_CODE_LENGTH = 5
+CODE_TYPE = "sic"
 MAX_SUGGESTIONS = 9
 CORRECT_CODE_COL = "correct_sic_code"
 NUM_CHARACTERS_LIST = list(range(4, 10))
@@ -75,17 +74,6 @@ for col in [
     )
 
 # %%
-# check the codes are well formed
-print(
-    f"Clerical codes validated: {
-        test_df[correct_codes_col]
-        .apply(validate_one_code,
-               code_length=SIC_CODE_LENGTH)
-               .all()
-               }"
-)
-
-# %%
 sic_kb_for_classifai = pd.read_csv(
     f"gs://{bucket_name}/sic_knowledgebase/sic_kb_for_sayt.csv", dtype=str
 )
@@ -95,7 +83,7 @@ _, sayt2_corpus = build_sayt_corpus_from_df(
     search_text_col="search_text",
     display_text_col="display_text",
     code_col="code",
-    expected_code_length=SIC_CODE_LENGTH,
+    code_type=CODE_TYPE,
     incl_code_in_display=True,
 )
 
@@ -121,6 +109,7 @@ suggestions_df, fig, metrics_table = run_eval_for_suggesters(
     suggestions_limit=MAX_SUGGESTIONS,
     correct_codes_col=correct_codes_col,
     output_dir=f"{OUTPUT_DIR}_all",
+    code_type=CODE_TYPE,
 )
 
 metrics_table.head()
@@ -134,6 +123,7 @@ suggestions_df_digit2, fig_digit2, metrics_table_digit2 = run_eval_for_suggester
     suggestions_limit=MAX_SUGGESTIONS,
     correct_codes_col=correct_codes_col,
     output_dir=f"{OUTPUT_DIR}_digit2",
+    code_type=CODE_TYPE,
     code_digit_match_length=2,
 )
 
@@ -169,6 +159,7 @@ suggestions_df_unambiguous, fig_unambiguous, metrics_table_unambiguous = (
         suggestions_limit=MAX_SUGGESTIONS,
         correct_codes_col=correct_codes_col,
         output_dir=f"{OUTPUT_DIR}_all_list_codes",
+        code_type=CODE_TYPE,
         only_unambiguous_correct_codes=True,
     )
 )
@@ -188,6 +179,7 @@ metrics_table_unambiguous.head()
     suggestions_limit=MAX_SUGGESTIONS,
     correct_codes_col=correct_codes_col,
     output_dir=f"{OUTPUT_DIR}_digit2_list_codes",
+    code_type=CODE_TYPE,
     code_digit_match_length=2,
 )
 

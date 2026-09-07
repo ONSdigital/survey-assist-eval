@@ -5,6 +5,7 @@ import pandas as pd
 from pydantic import BaseModel
 
 from survey_assist_eval.evaluation.sayt.suggestion_ranking_functions import (
+    clean_codes_columns,
     get_codes_from_suggestions,
     get_rank_of_first_matching_code,
     is_correct_codes_empty,
@@ -58,7 +59,7 @@ def compute_suggestions_hard_limit_metrics(  # noqa: PLR0913 pylint: disable = R
     correct_codes_col: str,
     suggestions_col: str,
     cutoff_k: int,
-    code_length: int,
+    code_type: str = "sic",
     score_col: str = "score",
 ) -> SAYTHardLimitMetrics:
     """Compute the hard limit metrics for a given suggester and prefix length.
@@ -68,7 +69,7 @@ def compute_suggestions_hard_limit_metrics(  # noqa: PLR0913 pylint: disable = R
         correct_codes_col: The name of the column with correct code(s) (string or list).
         suggestions_col: The name of the column with the suggestions.
         cutoff_k: The hard limit on the number of suggestions returned.
-        code_length: The length of the code prefix used for suggestions.
+        code_type: The type of the code ('sic' or 'soc'). Defaults to 'sic'.
         score_col: The name of the column with the suggestion scores.
 
     Returns:
@@ -85,8 +86,15 @@ def compute_suggestions_hard_limit_metrics(  # noqa: PLR0913 pylint: disable = R
     df["_retrieved_codes"] = df.apply(
         get_codes_from_suggestions,
         suggestions_col=suggestions_col,
-        code_length=code_length,
+        code_type=code_type,
         axis=1,
+    )
+
+    df = clean_codes_columns(
+        df,
+        code_type=code_type,
+        correct_codes_col=correct_codes_col,
+        retrieved_codes_col="_retrieved_codes",
     )
 
     df = add_sayt_hard_limit_metrics_columns(
@@ -230,7 +238,7 @@ def build_sayt_hard_limit_metrics_comparison_table(
     df,
     suggestions_cols_to_compare: list[str],
     correct_codes_col: str,
-    code_length: int = 5,
+    code_type: str = "sic",
     cutoff_k: int = 9,
 ):
     """Build a comparison table of performance metrics across suggestion columns.
@@ -240,7 +248,7 @@ def build_sayt_hard_limit_metrics_comparison_table(
         suggestions_cols_to_compare: List of column names containing
             the retrieved suggestions to compare.
         correct_codes_col: Column name containing correct code(s) (string or list).
-        code_length: Length of the correct codes (default is 5).
+        code_type: The type of the code ('sic' or 'soc'). Defaults to 'sic'.
         cutoff_k: The hard limit on the number of suggestions returned (default is 9).
 
     Returns:
@@ -256,7 +264,7 @@ def build_sayt_hard_limit_metrics_comparison_table(
                 correct_codes_col=correct_codes_col,
                 suggestions_col=col,
                 cutoff_k=cutoff_k,
-                code_length=code_length,
+                code_type=code_type,
                 score_col=score_col,
             ).__dict__,
         }

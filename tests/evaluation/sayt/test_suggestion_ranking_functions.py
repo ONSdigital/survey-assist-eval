@@ -183,7 +183,7 @@ def test_get_codes_from_suggestions_extracts_trailing_code_from_each_suggestion(
     row = pd.Series({"suggestions": ["alpha 1234", "beta 5678"]})
 
     codes = get_codes_from_suggestions(
-        row, suggestions_col="suggestions", code_length=4
+        row, suggestions_col="suggestions", code_type="soc"
     )
 
     assert codes == ["1234", "5678"], (
@@ -197,7 +197,7 @@ def test_get_codes_from_suggestions_preserves_suggestion_order():
     row = pd.Series({"suggestions": ["third 3333", "first 1111", "second 2222"]})
 
     codes = get_codes_from_suggestions(
-        row, suggestions_col="suggestions", code_length=4
+        row, suggestions_col="suggestions", code_type="soc"
     )
 
     assert codes == [
@@ -212,7 +212,7 @@ def test_get_codes_from_suggestions_returns_empty_list_for_no_suggestions():
     row = pd.Series({"suggestions": []})
 
     codes = get_codes_from_suggestions(
-        row, suggestions_col="suggestions", code_length=5
+        row, suggestions_col="suggestions", code_type="sic"
     )
 
     assert (
@@ -220,15 +220,15 @@ def test_get_codes_from_suggestions_returns_empty_list_for_no_suggestions():
     ), "Expected no codes to be extracted from an empty suggestions list."
 
 
-def test_get_codes_from_suggestions_uses_default_code_length():
-    """The default code_length of 5 should be used when not specified."""
+def test_get_codes_from_suggestions_uses_default_code_type():
+    """The default code_type of 'sic' (5 digits) should be used when not specified."""
     row = pd.Series({"suggestions": ["some entry 12345"]})
 
     codes = get_codes_from_suggestions(row, suggestions_col="suggestions")
 
     assert codes == [
         "12345"
-    ], "Expected the default code_length of 5 to extract the trailing 5 characters."
+    ], "Expected the default code_type of 'sic' to extract the trailing 5 characters."
 
 
 # ============================================================================
@@ -246,7 +246,7 @@ def test_rank_of_correct_code_in_suggestions_returns_rank_for_single_correct_cod
     )
 
     rank = rank_of_correct_code_in_suggestions(
-        row, num_chars=4, suggester_label="prefix", code_length=4
+        row, num_chars=4, suggester_label="prefix", code_type="soc"
     )
 
     assert (
@@ -264,7 +264,7 @@ def test_rank_of_correct_code_in_suggestions_returns_none_when_not_found():
     )
 
     rank = rank_of_correct_code_in_suggestions(
-        row, num_chars=4, suggester_label="prefix", code_length=4
+        row, num_chars=4, suggester_label="prefix", code_type="soc"
     )
 
     assert (
@@ -282,7 +282,7 @@ def test_rank_of_correct_code_in_suggestions_works_with_list_of_correct_codes():
     )
 
     rank = rank_of_correct_code_in_suggestions(
-        row, num_chars=4, suggester_label="prefix", code_length=4
+        row, num_chars=4, suggester_label="prefix", code_type="soc"
     )
 
     assert rank == 3, (
@@ -304,7 +304,7 @@ def test_rank_of_correct_code_in_suggestions_uses_custom_correct_codes_col():
         row,
         num_chars=5,
         suggester_label="semantic",
-        code_length=5,
+        code_type="sic",
         correct_codes_col="my_correct_code",
     )
 
@@ -324,7 +324,7 @@ def test_clean_codes_columns_adds_clean_correct_codes_column():
     df = pd.DataFrame({"correct_code": ["1111", "1231"]})
 
     result = clean_codes_columns(
-        df, code_digit_match_length=3, code_length=4, correct_codes_col="correct_code"
+        df, code_digit_match_length=3, code_type="soc", correct_codes_col="correct_code"
     )
 
     assert result["correct_code_clean"].tolist() == [
@@ -339,10 +339,10 @@ def test_clean_codes_columns_adds_clean_correct_codes_column():
 
 def test_clean_codes_columns_correct_codes_empty_returns_empty_set():
     """Missing correct-codes values should produce an empty clean set."""
-    df = pd.DataFrame({"correct_code": [None, ""]})
+    df = pd.DataFrame({"correct_code": [None, None]})
 
     result = clean_codes_columns(
-        df, code_digit_match_length=3, code_length=4, correct_codes_col="correct_code"
+        df, code_digit_match_length=3, code_type="soc", correct_codes_col="correct_code"
     )
 
     assert result["correct_code_clean"].tolist() == [
@@ -356,7 +356,7 @@ def test_clean_codes_columns_adds_clean_retrieved_codes_column():
     df = pd.DataFrame({"retrieved": [["1111", "1231"]]})
 
     result = clean_codes_columns(
-        df, code_digit_match_length=3, code_length=4, retrieved_codes_col="retrieved"
+        df, code_digit_match_length=3, code_type="soc", retrieved_codes_col="retrieved"
     )
 
     assert result["retrieved_clean"].tolist() == [
@@ -372,7 +372,7 @@ def test_clean_codes_columns_keeps_duplicates_and_order_in_retrieved_clean():
     df = pd.DataFrame({"retrieved": [["1231", "1111", "1231"]]})
 
     result = clean_codes_columns(
-        df, code_digit_match_length=3, code_length=4, retrieved_codes_col="retrieved"
+        df, code_digit_match_length=3, code_type="soc", retrieved_codes_col="retrieved"
     )
 
     assert result["retrieved_clean"].tolist() == [["123", "111", "123"]], (
@@ -386,7 +386,7 @@ def test_clean_codes_columns_replaces_invalid_retrieved_codes_with_sentinel():
     df = pd.DataFrame({"retrieved": [["1111", "9999"]]})
 
     result = clean_codes_columns(
-        df, code_digit_match_length=3, code_length=4, retrieved_codes_col="retrieved"
+        df, code_digit_match_length=3, code_type="soc", retrieved_codes_col="retrieved"
     )
 
     assert result["retrieved_clean"].tolist() == [["111", None]], (
@@ -400,7 +400,7 @@ def test_clean_codes_columns_handles_missing_retrieved_codes():
     df = pd.DataFrame({"retrieved": [None]})
 
     result = clean_codes_columns(
-        df, code_digit_match_length=3, code_length=4, retrieved_codes_col="retrieved"
+        df, code_digit_match_length=3, code_type="soc", retrieved_codes_col="retrieved"
     )
 
     assert result["retrieved_clean"].tolist() == [
@@ -420,7 +420,7 @@ def test_clean_codes_columns_handles_both_columns_together():
     result = clean_codes_columns(
         df,
         code_digit_match_length=3,
-        code_length=4,
+        code_type="soc",
         correct_codes_col="correct_code",
         retrieved_codes_col="retrieved",
     )
@@ -446,7 +446,6 @@ def test_clean_codes_columns_handles_both_columns_together_with_block_section_re
     result = clean_codes_columns(
         df,
         code_digit_match_length=0,
-        code_length=5,
         code_type="sic",
         correct_codes_col="correct_code",
         retrieved_codes_col="retrieved",
@@ -468,7 +467,7 @@ def test_clean_codes_columns_skips_columns_not_requested():
     df = pd.DataFrame({"retrieved": [["1111"]]})
 
     result = clean_codes_columns(
-        df, code_digit_match_length=3, code_length=4, retrieved_codes_col="retrieved"
+        df, code_digit_match_length=3, code_type="soc", retrieved_codes_col="retrieved"
     )
 
     assert "correct_code_clean" not in result.columns, (
@@ -483,7 +482,7 @@ def test_clean_codes_columns_does_not_mutate_input():
     original_df = df.copy(deep=True)
 
     clean_codes_columns(
-        df, code_digit_match_length=3, code_length=4, correct_codes_col="correct_code"
+        df, code_digit_match_length=3, code_type="soc", correct_codes_col="correct_code"
     )
 
     assert df.equals(
@@ -499,7 +498,7 @@ def test_clean_codes_columns_raises_when_columns_are_the_same():
         clean_codes_columns(
             df,
             code_digit_match_length=3,
-            code_length=4,
+            code_type="soc",
             correct_codes_col="code",
             retrieved_codes_col="code",
         )
@@ -512,7 +511,7 @@ def test_clean_codes_columns_raises_when_both_columns_are_none():
     df = pd.DataFrame({"correct_code": ["1111"], "retrieved": [["2222"]]})
 
     with pytest.raises(ValueError, match="or both None"):
-        clean_codes_columns(df, code_digit_match_length=3, code_length=4)
+        clean_codes_columns(df, code_digit_match_length=3, code_type="soc")
 
 
 def test_clean_codes_columns_is_safe_to_call_again_on_its_own_output():
@@ -529,14 +528,14 @@ def test_clean_codes_columns_is_safe_to_call_again_on_its_own_output():
     once = clean_codes_columns(
         df,
         code_digit_match_length=3,
-        code_length=4,
+        code_type="soc",
         correct_codes_col="correct_code",
         retrieved_codes_col="retrieved",
     )
     twice = clean_codes_columns(
         once,
         code_digit_match_length=3,
-        code_length=4,
+        code_type="soc",
         correct_codes_col="correct_code",
         retrieved_codes_col="retrieved",
     )

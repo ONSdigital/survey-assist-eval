@@ -2,27 +2,60 @@
 
 import pandas as pd
 
-from survey_assist_eval.data_cleaning.code_standard import SIC_EXPECTED_CODE_LENGTH
+from survey_assist_eval.data_cleaning.code_standard import (
+    SIC_EXPECTED_CODE_LENGTH,
+    SOC_EXPECTED_CODE_LENGTH,
+)
 from survey_assist_eval.data_cleaning.prep_data import (
     get_clean_n_digit_codes,
 )
 
 
+def get_code_length_from_type(code_type: str = "sic") -> int:
+    """Get the expected code length for a given code classification system.
+
+    Args:
+        code_type: Type of code classification system. Either 'sic' (Standard
+            Industrial Classification) or 'soc' (Standard Occupational Classification).
+            Case-insensitive.
+
+    Returns:
+        int: The expected length of the code suffix for the given code_type.
+
+    Raises:
+        ValueError: If code_type is not 'sic' or 'soc'.
+    """
+    code_lengths = {
+        "sic": SIC_EXPECTED_CODE_LENGTH,
+        "soc": SOC_EXPECTED_CODE_LENGTH,
+    }
+
+    code_type_lower = code_type.lower()
+    if code_type_lower not in code_lengths:
+        raise ValueError(
+            f"Unsupported code_type: {code_type!r}. "
+            f"Must be one of {list(code_lengths.keys())}"
+        )
+
+    return code_lengths[code_type_lower]
+
+
 def get_codes_from_suggestions(
     row: pd.Series,
     suggestions_col: str,
-    code_length: int = 5,
+    code_type: str = "sic",
 ) -> list[str]:
     """Extract code suffixes from suggestion strings for a single input row.
 
     Args:
         row: Input row containing a suggestions column.
         suggestions_col: Column name containing suggestion strings.
-        code_length: Number of trailing characters to extract as a code.
+        code_type: Type of code ('sic' or 'soc').
 
     Returns:
         list[str]: Extracted codes in suggestion order.
     """
+    code_length = get_code_length_from_type(code_type=code_type)
     return [suggestion[-code_length:] for suggestion in row[suggestions_col]]
 
 
@@ -108,11 +141,10 @@ def _get_valid_codes_list(
     return [next(iter(x)) if len(x) == 1 else None for x in out]
 
 
-def clean_codes_columns(  # noqa: PLR0913 pylint: disable=R0913, R0914, R0917
+def clean_codes_columns(
     df: pd.DataFrame,
-    code_digit_match_length: int,
-    code_length: int | None = None,
-    code_type: str | None = None,
+    code_digit_match_length: int | None = None,
+    code_type: str = "sic",
     correct_codes_col: str | None = None,
     retrieved_codes_col: str | None = None,
 ) -> pd.DataFrame:
@@ -123,8 +155,8 @@ def clean_codes_columns(  # noqa: PLR0913 pylint: disable=R0913, R0914, R0917
         df: DataFrame containing the correct-codes column and, optionally, the
             retrieved-codes column.
         code_digit_match_length: Number of leading characters to keep.
-        code_length: Full code length used to infer code_type ('sic' if 5, else 'soc').
-        code_type: Type of code ('sic' or 'soc'). If None, it will be inferred from code_length.
+            Defaults to the full code length based on the code type.
+        code_type: Type of code ('sic' or 'soc'). Defaults to 'sic'.
         correct_codes_col: Column name containing correct code(s) (string or list).
         retrieved_codes_col: Optional column name containing lists of retrieved
             codes to clean and truncate as well.
@@ -146,19 +178,14 @@ def clean_codes_columns(  # noqa: PLR0913 pylint: disable=R0913, R0914, R0917
     """
     df = df.copy()
 
-    code_type = "sic" if code_length == SIC_EXPECTED_CODE_LENGTH else "soc"
-
     if correct_codes_col == retrieved_codes_col:
         raise ValueError(
             "correct_codes_col and retrieved_codes_col must be different "
             "(both cannot be the same value or both None)."
         )
 
-    if code_type is None and code_length is None:
-        raise ValueError("Either code_type or code_length must be provided.")
-
-    if code_type is None:
-        code_type = "sic" if code_length == SIC_EXPECTED_CODE_LENGTH else "soc"
+    if code_digit_match_length is None:
+        code_digit_match_length = get_code_length_from_type(code_type=code_type)
 
     if correct_codes_col is not None:
         df[f"{correct_codes_col}_clean"] = df[correct_codes_col].apply(
@@ -181,7 +208,7 @@ def rank_of_correct_code_in_suggestions(
     row: pd.Series,
     num_chars: int,
     suggester_label: str,
-    code_length: int = 5,
+    code_type: str = "sic",
     correct_codes_col: str = "correct_sic_code",
 ) -> int | None:
     """Return the rank of the correct code in generated suggestions.
@@ -190,7 +217,7 @@ def rank_of_correct_code_in_suggestions(
         row: Input row containing suggestion outputs and the correct code.
         num_chars: Prefix length used to generate suggestions.
         suggester_label: Label used in the suggestion column name.
-        code_length: Number of trailing characters to compare as code.
+        code_type: Type of code ('sic' or 'soc'). Defaults to 'sic'.
         correct_codes_col: Column name holding the correct SIC code(s).
 
     Returns:
@@ -201,7 +228,7 @@ def rank_of_correct_code_in_suggestions(
     suggested_codes = get_codes_from_suggestions(
         row,
         suggestions_col=f"suggestions_{num_chars}chars_{suggester_label}",
-        code_length=code_length,
+        code_type=code_type,
     )
 
     return get_rank_of_first_matching_code(suggested_codes, correct_codes)

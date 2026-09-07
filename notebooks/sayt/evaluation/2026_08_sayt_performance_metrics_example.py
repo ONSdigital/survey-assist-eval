@@ -20,7 +20,6 @@ from notebooks.sayt.sayt_utils import (
     build_lookup_suggester,
     build_sayt_corpus_from_df,
     get_suggestions_by_chars,
-    validate_one_code,
 )
 from survey_assist_eval.evaluation.sayt.performance_metrics_functions import (
     build_sayt_metrics_comparison_table,
@@ -28,9 +27,10 @@ from survey_assist_eval.evaluation.sayt.performance_metrics_functions import (
 )
 
 # %%
-SIC_CODE_LENGTH = 5
+CODE_TYPE = "sic"
 MAX_SUGGESTIONS = 9  # for the evaluation we will look at ranks up to 9 only
 correct_codes_col = "correct_sic_code"
+
 
 load_dotenv()
 bucket_name = os.getenv("EVALUATION_BUCKET_NAME")
@@ -68,17 +68,6 @@ for col in [
     )
 
 # %%
-# check the codes are well formed
-print(
-    f"Clerical codes validated: {
-        test_df[correct_codes_col]
-        .apply(validate_one_code,
-               code_length=SIC_CODE_LENGTH)
-               .all()
-               }"
-)
-
-# %%
 sic_kb_for_classifai = pd.read_csv(
     f"gs://{bucket_name}/sic_knowledgebase/sic_kb_for_sayt.csv", dtype=str
 )
@@ -88,7 +77,7 @@ _, sayt2_corpus = build_sayt_corpus_from_df(
     search_text_col="search_text",
     display_text_col="display_text",
     code_col="code",
-    expected_code_length=SIC_CODE_LENGTH,
+    code_type=CODE_TYPE,
     incl_code_in_display=True,
 )
 
@@ -128,7 +117,7 @@ metrics = compute_performance_metrics_from_suggestions(
     test_df,
     correct_codes_col=correct_codes_col,
     suggestions_col=suggestions_cols_to_compare[2],
-    code_length=SIC_CODE_LENGTH,
+    code_type=CODE_TYPE,
     k_values=[1, 3, 5, MAX_SUGGESTIONS],
     ave_time_per_query=avg_ms_dict.get(suggestions_cols_to_compare[2], 0),
 )
@@ -141,7 +130,7 @@ metrics_2_digit_match = compute_performance_metrics_from_suggestions(
     test_df,
     correct_codes_col=correct_codes_col,
     suggestions_col=suggestions_cols_to_compare[2],
-    code_length=SIC_CODE_LENGTH,
+    code_type=CODE_TYPE,
     k_values=[1, 3, 5, MAX_SUGGESTIONS],
     ave_time_per_query=avg_ms_dict.get(suggestions_cols_to_compare[2], 0),
     code_digit_match_length=2,
@@ -156,7 +145,7 @@ compare_performance_metrics = build_sayt_metrics_comparison_table(
     test_df,
     suggestions_cols_to_compare=suggestions_cols_to_compare,
     correct_codes_col=correct_codes_col,
-    code_length=SIC_CODE_LENGTH,
+    code_type=CODE_TYPE,
     k_values=[1, 3, 5, MAX_SUGGESTIONS],
     ave_time_per_query_dict=avg_ms_dict,
 )
@@ -205,7 +194,7 @@ compare_performance_metrics = build_sayt_metrics_comparison_table(
     test_df_list_codes,
     suggestions_cols_to_compare=suggestions_cols_to_compare,
     correct_codes_col=correct_codes_col,
-    code_length=SIC_CODE_LENGTH,
+    code_type=CODE_TYPE,
     k_values=[1, 3, 5, MAX_SUGGESTIONS],
     ave_time_per_query_dict=avg_ms_dict,
 )
@@ -217,7 +206,7 @@ compare_performance_metrics = build_sayt_metrics_comparison_table(
     test_df_list_codes,
     suggestions_cols_to_compare=suggestions_cols_to_compare,
     correct_codes_col=correct_codes_col,
-    code_length=SIC_CODE_LENGTH,
+    code_type=CODE_TYPE,
     code_digit_match_length=2,
     k_values=[1, 3, 5, MAX_SUGGESTIONS],
     ave_time_per_query_dict=avg_ms_dict,

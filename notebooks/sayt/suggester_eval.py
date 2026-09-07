@@ -27,7 +27,7 @@ def run_eval_for_suggesters(  # noqa: PLR0913 pylint: disable=R0913, R0914
     suggesters_dict: dict,
     num_chars: list[int],
     output_dir: str,
-    code_length: int = 5,
+    code_type: str = "sic",
     code_digit_match_length: int | None = None,
     suggestions_list: list | None = None,
     suggestions_limit: int = 9,
@@ -44,7 +44,7 @@ def run_eval_for_suggesters(  # noqa: PLR0913 pylint: disable=R0913, R0914
         num_chars (list): number of characters to be tested.
         suggestions_limit: the maximum rank of suggestions considered as valid.
         output_dir (str): path to file location to be saved.
-        code_length (int): expected SIC/SOC code length.
+        code_type (str): type of the code, e.g., "sic" or "soc". Defaults to "sic".
         suggestions_list (list): optional variable; list of suggestions to be checked.
         hard_suggestions_limit (bool): whether to enforce a hard limit on the number of suggestions.
         only_unambiguous_correct_codes (bool): whether to only consider rows
@@ -101,7 +101,7 @@ def run_eval_for_suggesters(  # noqa: PLR0913 pylint: disable=R0913, R0914
         df_copy,
         suggesters_dict=suggesters_dict,
         correct_codes_col=correct_codes_col,
-        code_length=code_length,
+        code_type=code_type,
         code_digit_match_length=code_digit_match_length,
         num_chars=num_chars,
         suggestions_limit=suggestions_limit,
@@ -120,7 +120,7 @@ def run_eval_for_suggesters(  # noqa: PLR0913 pylint: disable=R0913, R0914
         suggestions_df,
         suggestions_cols_to_compare=suggestions_cols_to_compare,
         correct_codes_col=correct_codes_col,
-        code_length=code_length,
+        code_type=code_type,
         k_values=suggestions_list,
         ave_time_per_query_dict=avg_ms_dict,
         code_digit_match_length=code_digit_match_length,

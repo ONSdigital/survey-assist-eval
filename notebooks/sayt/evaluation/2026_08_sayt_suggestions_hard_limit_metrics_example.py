@@ -23,14 +23,13 @@ from notebooks.sayt.sayt_utils import (
     build_lookup_suggester,
     build_sayt_corpus_from_df,
     get_suggestions_by_chars,
-    validate_one_code,
 )
 from survey_assist_eval.evaluation.sayt.performance_metrics_functions import (
     build_sayt_metrics_comparison_table,
 )
 
 # %%
-SIC_CODE_LENGTH = 5
+CODE_TYPE = "sic"
 MAX_SUGGESTIONS = 9  # for the evaluation we will look at ranks up to 9 only
 correct_codes_col = "correct_sic_code"
 
@@ -69,16 +68,6 @@ for col in [
         test_df[col].replace({"5 or 12": "5"}), errors="coerce"
     )
 
-# %%
-# check the codes are well formed
-print(
-    f"Clerical codes validated: {
-        test_df[correct_codes_col]
-        .apply(validate_one_code,
-               code_length=SIC_CODE_LENGTH)
-               .all()
-               }"
-)
 
 # %%
 sic_kb_for_classifai = pd.read_csv(
@@ -90,7 +79,7 @@ _, sayt2_corpus = build_sayt_corpus_from_df(
     search_text_col="search_text",
     display_text_col="display_text",
     code_col="code",
-    expected_code_length=SIC_CODE_LENGTH,
+    code_type=CODE_TYPE,
     incl_code_in_display=True,
 )
 
@@ -125,6 +114,7 @@ test_df_hard_limit, avg_ms_dict = get_suggestions_by_chars(
     suggestions_limit=MAX_SUGGESTIONS,
     hard_suggestions_limit=True,
     with_scores=True,
+    code_type=CODE_TYPE,
 )
 
 suggestions_cols_to_compare = test_df_hard_limit.columns[
@@ -136,7 +126,7 @@ compare_performance_metrics_hard_limit = build_sayt_metrics_comparison_table(
     test_df_hard_limit,
     suggestions_cols_to_compare=suggestions_cols_to_compare,
     correct_codes_col=correct_codes_col,
-    code_length=SIC_CODE_LENGTH,
+    code_type=CODE_TYPE,
     k_values=[1, 3, 5, MAX_SUGGESTIONS],
     ave_time_per_query_dict=avg_ms_dict,
 )
@@ -152,6 +142,7 @@ test_df_none_hard_limit, avg_ms_dict = get_suggestions_by_chars(
     suggestions_limit=MAX_SUGGESTIONS,
     hard_suggestions_limit=False,
     with_scores=True,
+    code_type=CODE_TYPE,
 )
 
 print(
@@ -160,7 +151,7 @@ print(
         correct_codes_col=correct_codes_col,
         suggestions_col=suggestions_cols_to_compare[0],
         cutoff_k=MAX_SUGGESTIONS,
-        code_length=SIC_CODE_LENGTH,
+        code_type=CODE_TYPE,
         score_col=suggestions_cols_to_compare[0].replace("suggestions_", "scores_"),
     ).report_metrics()
 )

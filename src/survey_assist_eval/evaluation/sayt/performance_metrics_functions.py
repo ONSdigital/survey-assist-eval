@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 from survey_assist_eval.evaluation.sayt.suggestion_ranking_functions import (
     clean_codes_columns,
+    get_code_length_from_type,
     get_codes_from_suggestions,
     get_rank_of_first_matching_code,
     is_correct_codes_empty,
@@ -50,8 +51,8 @@ def compute_performance_metrics_from_suggestions(  # noqa: PLR0913 pylint: disab
     df,
     correct_codes_col: str,
     suggestions_col: str,
-    code_length: int,
     ave_time_per_query: float,
+    code_type: str = "sic",
     k_values: list[int] | None = None,
     code_digit_match_length: int | None = None,
 ) -> SAYTPerformanceMetrics:
@@ -61,7 +62,7 @@ def compute_performance_metrics_from_suggestions(  # noqa: PLR0913 pylint: disab
         df: DataFrame containing the queries and suggestions.
         correct_codes_col: Column name containing correct code(s).
         suggestions_col: Column name containing the list of suggestion strings.
-        code_length: Number of trailing characters to extract as a code.
+        code_type: Type of code ('sic' or 'soc'). Defaults to 'sic'.
         k_values: List of k values for which to compute Precision@K and Recall@K.
         ave_time_per_query: Average time taken per query in milliseconds.
         code_digit_match_length: Optional length of the code to match for evaluation.
@@ -74,18 +75,14 @@ def compute_performance_metrics_from_suggestions(  # noqa: PLR0913 pylint: disab
     df["_retrieved_codes"] = df.apply(
         get_codes_from_suggestions,
         suggestions_col=suggestions_col,
-        code_length=code_length,
+        code_type=code_type,
         axis=1,
     )
 
     df = clean_codes_columns(
         df,
-        code_digit_match_length=(
-            code_digit_match_length
-            if code_digit_match_length is not None
-            else code_length
-        ),
-        code_length=code_length,
+        code_digit_match_length=code_digit_match_length,
+        code_type=code_type,
         correct_codes_col=correct_codes_col,
         retrieved_codes_col="_retrieved_codes",
     )
@@ -104,7 +101,7 @@ def compute_performance_metrics_from_suggestions(  # noqa: PLR0913 pylint: disab
         code_digit_match_length=(
             code_digit_match_length
             if code_digit_match_length is not None
-            else code_length
+            else get_code_length_from_type(code_type=code_type)
         ),
         k_values=k_values if k_values is not None else [],
         ave_time_per_query=ave_time_per_query,
@@ -241,7 +238,7 @@ def summarise_performance_metrics(  # noqa: PLR0913 pylint: disable = R0913, R09
     df,
     suggestions_col: str,
     correct_codes_col: str,
-    code_digit_match_length: int,
+    code_digit_match_length: int | str,
     ave_time_per_query: float,
     k_values: list[int] | None = None,
     prefix: str | None = None,
@@ -297,7 +294,7 @@ def build_sayt_metrics_comparison_table(  # noqa: PLR0913 pylint: disable = R091
     suggestions_cols_to_compare: list[str],
     correct_codes_col: str,
     ave_time_per_query_dict: dict[str, float],
-    code_length: int = 5,
+    code_type: str = "sic",
     code_digit_match_length: int | None = None,
     k_values: list[int] | None = None,
 ):
@@ -310,7 +307,7 @@ def build_sayt_metrics_comparison_table(  # noqa: PLR0913 pylint: disable = R091
         correct_codes_col: Column name containing correct code(s).
         ave_time_per_query_dict: Average time per query (ms) for each suggestion column,
             keyed by the suggestion column name.
-        code_length: Length of the correct codes (default is 5).
+        code_type: Type of code ('sic' or 'soc'). Defaults to 'sic'. Defaults to 'sic'.
         code_digit_match_length: Length of the code digit match to consider (default is None).
         k_values: List of k values for which to compute Precision@K and Recall@K.
 
@@ -325,7 +322,7 @@ def build_sayt_metrics_comparison_table(  # noqa: PLR0913 pylint: disable = R091
                 df,
                 correct_codes_col=correct_codes_col,
                 suggestions_col=col,
-                code_length=code_length,
+                code_type=code_type,
                 k_values=k_values if k_values is not None else [],
                 ave_time_per_query=ave_time_per_query_dict[col],
                 code_digit_match_length=code_digit_match_length,

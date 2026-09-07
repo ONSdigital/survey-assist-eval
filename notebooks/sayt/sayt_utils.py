@@ -13,9 +13,12 @@ from survey_assist_embed_core.sayt import (
 )
 from survey_assist_utils.logging import get_logger
 
-from survey_assist_eval.data_cleaning.code_standard import get_clean_n_digit_codes
+from survey_assist_eval.data_cleaning.code_standard import (
+    get_clean_n_digit_codes,
+)
 from survey_assist_eval.evaluation.sayt.suggestion_ranking_functions import (
     clean_codes_columns,
+    get_code_length_from_type,
     get_codes_from_suggestions,
     get_rank_of_first_matching_code,
     is_correct_codes_empty,
@@ -135,7 +138,7 @@ def build_sayt_corpus_from_df(  # noqa: PLR0913, pylint: disable=R0917,R0913
     search_text_col: str,
     display_text_col: str,
     code_col: str = "code",
-    expected_code_length: int = 5,
+    code_type: str = "sic",
     incl_code_in_display: bool = True,
 ) -> tuple[pd.DataFrame, list[tuple[str, str]]]:
     """Build a SAYT corpus from a DataFrame.
@@ -149,7 +152,7 @@ def build_sayt_corpus_from_df(  # noqa: PLR0913, pylint: disable=R0917,R0913
         search_text_col: Column containing searchable text.
         display_text_col: Column containing display text.
         code_col: Column containing codes to normalise.
-        expected_code_length: Expected code length used for normalisation.
+        code_type: Code type used for normalisation. Defaults to "sic".
         incl_code_in_display: Whether to append codes to display text.
 
     Returns:
@@ -159,7 +162,8 @@ def build_sayt_corpus_from_df(  # noqa: PLR0913, pylint: disable=R0917,R0913
     output_df = df.copy()
 
     output_df[code_col] = output_df[code_col].apply(
-        pad_code_with_leading_zero, expected_length=expected_code_length
+        pad_code_with_leading_zero,
+        expected_length=get_code_length_from_type(code_type=code_type),
     )
 
     final_display_col = display_text_col
@@ -235,7 +239,7 @@ def get_suggestions_by_chars(  # noqa: PLR0913 pylint: disable=R0917,R0913,R0914
     df: pd.DataFrame,
     suggesters_dict: dict[str, Any],
     correct_codes_col: str = "correct_sic_code",
-    code_length: int = 5,
+    code_type: str = "sic",
     code_digit_match_length: int | None = None,
     num_chars: list | None = None,
     suggestions_limit: int = 9,
@@ -248,7 +252,7 @@ def get_suggestions_by_chars(  # noqa: PLR0913 pylint: disable=R0917,R0913,R0914
         df: dataframe containing melted suggestions.
         suggesters_dict: a dictionary with initialised suggester models.
         correct_codes_col: name of the column containing correct codes.
-        code_length: expected SIC/SOC code length.
+        code_type: type of the code, e.g., "sic" or "soc". Defaults to "sic".
         code_digit_match_length: Length of the code digit match to consider. If
             None, falls back to code_length.
         num_chars: number of characters to be tested.
@@ -265,17 +269,13 @@ def get_suggestions_by_chars(  # noqa: PLR0913 pylint: disable=R0917,R0913,R0914
     """
     df = df.copy()
 
-    effective_digit_match_length = (
-        code_digit_match_length if code_digit_match_length is not None else code_length
-    )
+    if code_digit_match_length is None:
+        code_digit_match_length = get_code_length_from_type(code_type)
 
-    logger.info(
-        f"Cleaning correct codes to {effective_digit_match_length}-digit match",
-        code_digit_match_length=effective_digit_match_length,
-    )
     df = clean_codes_columns(
         df,
-        effective_digit_match_length,
+        code_digit_match_length,
+        code_type=code_type,
         correct_codes_col=correct_codes_col,
     )
 
@@ -318,30 +318,31 @@ def get_suggestions_by_chars(  # noqa: PLR0913 pylint: disable=R0917,R0913,R0914
 
             df[retrieved_codes_col] = df.apply(
                 get_codes_from_suggestions,
-                code_length=code_length,
+                code_type=code_type,
                 suggestions_col=suggestions_col,
                 axis=1,
             )
 
             rank_col_name = (
                 f"rank_{prefix_chars}chars_{suggester_name}"
-                f"_{effective_digit_match_length}digitmatch"
+                f"_{code_digit_match_length}digitmatch"
             )
 
             logger.info(
-                f"Cleaning retrieved codes to {effective_digit_match_length}-digit match",
-                code_digit_match_length=effective_digit_match_length,
+                f"Cleaning retrieved codes to {code_digit_match_length}-digit match",
+                code_digit_match_length=code_digit_match_length,
             )
 
             df = clean_codes_columns(
                 df,
-                effective_digit_match_length,
+                code_digit_match_length,
+                code_type=code_type,
                 retrieved_codes_col=retrieved_codes_col,
             )
 
             logger.info(
-                f"Computing rank for {effective_digit_match_length}-digit match",
-                code_digit_match_length=effective_digit_match_length,
+                f"Computing rank for {code_digit_match_length}-digit match",
+                code_digit_match_length=code_digit_match_length,
                 rank_col_name=rank_col_name,
             )
 
