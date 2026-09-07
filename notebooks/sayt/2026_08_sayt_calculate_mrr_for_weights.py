@@ -75,8 +75,8 @@ for col in [
     )
 
 # %%
-LOOKUP_FILE_NAME = f"gs://{bucket_name}/evaluation-pipeline/SAYT/Lookup_IT3_Final.csv"
-# LOOKUP_FILE_NAME = f"gs://{bucket_name}/sic_knowledgebase/sic_kb_for_sayt.csv"
+# LOOKUP_FILE_NAME = f"gs://{bucket_name}/evaluation-pipeline/SAYT/Lookup_IT3_Final.csv"
+LOOKUP_FILE_NAME = f"gs://{bucket_name}/sic_knowledgebase/sic_kb_for_sayt.csv"
 
 sayt_df = pd.read_csv(LOOKUP_FILE_NAME, dtype=str)
 if LOOKUP_FILE_NAME.endswith("sic_kb_for_sayt.csv"):
@@ -208,7 +208,7 @@ for character_file in NUM_CHARACTERS_LIST:
             ):
                 full_path = os.path.join(OUTPUT_DIR + FOLDER_SUFFIX, filename)
                 key_name = filename[:-5]  # remove .json from the file name
-                test_name = f"test{key_name[3:]}"
+                test_name = key_name.lstrip(f"w_{character_file}")
                 with open(full_path, encoding="utf-8") as f:
                     master_dict[test_name] = json.load(f)
                 files_to_delete.append(full_path)
