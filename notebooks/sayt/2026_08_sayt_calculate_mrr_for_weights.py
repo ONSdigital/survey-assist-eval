@@ -193,35 +193,36 @@ with ngram={ngram}, prefix={prefix}, semantic={semantic}."""
 remove_files = False  # set to True to remove the individual test files after combining
 save_to_bucket = True  # set to True to save the combined file to the GCS bucket
 
-if save_to_bucket:
-    for character_file in NUM_CHARACTERS_LIST:
-        master_dict = {}
-        files_to_delete = []
-        final_file_name = f"weight_test_{character_file}chars_n_p_s.json"
-        main_file_name = f"{OUTPUT_DIR}{FOLDER_SUFFIX}/{final_file_name}"
+for character_file in NUM_CHARACTERS_LIST:
+    master_dict = {}
+    files_to_delete = []
+    final_file_name = f"weight_test_{character_file}chars_n_p_s.json"
+    main_file_name = f"{OUTPUT_DIR}{FOLDER_SUFFIX}/{final_file_name}"
 
-        if os.path.exists(main_file_name):
-            print("Final file already exists.")
-        else:
-            for filename in sorted(os.listdir(OUTPUT_DIR + FOLDER_SUFFIX)):
-                if filename.startswith(f"w_{character_file}_n") and filename.endswith(
-                    ".json"
-                ):
-                    full_path = os.path.join(OUTPUT_DIR + FOLDER_SUFFIX, filename)
-                    key_name = filename[:-5]  # remove .json from the file name
-                    test_name = f"test{key_name[3:]}"
-                    with open(full_path, encoding="utf-8") as f:
-                        master_dict[test_name] = json.load(f)
-                    files_to_delete.append(full_path)
-            # Save locally
-            with open(
-                os.path.join(OUTPUT_DIR + FOLDER_SUFFIX, final_file_name),
-                "w",
-                encoding="utf-8",
-            ) as f:
-                json.dump(master_dict, f, indent=4)
+    if os.path.exists(main_file_name):
+        print("Final file already exists.")
+    else:
+        for filename in sorted(os.listdir(OUTPUT_DIR + FOLDER_SUFFIX)):
+            if filename.startswith(f"w_{character_file}_n") and filename.endswith(
+                ".json"
+            ):
+                full_path = os.path.join(OUTPUT_DIR + FOLDER_SUFFIX, filename)
+                key_name = filename[:-5]  # remove .json from the file name
+                test_name = f"test{key_name[3:]}"
+                with open(full_path, encoding="utf-8") as f:
+                    master_dict[test_name] = json.load(f)
+                files_to_delete.append(full_path)
+        # Save locally
+        with open(
+            os.path.join(OUTPUT_DIR + FOLDER_SUFFIX, final_file_name),
+            "w",
+            encoding="utf-8",
+        ) as f:
+            json.dump(master_dict, f, indent=4)
 
-            print(f"File {final_file_name} saved.")
+        print(f"File {final_file_name} saved.")
+
+        if save_to_bucket:
             # Save to the bucket
             blob = client.bucket(bucket_name).blob(blob_name + final_file_name)
             blob.upload_from_string(
