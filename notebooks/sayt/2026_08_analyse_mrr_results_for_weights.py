@@ -1,4 +1,3 @@
-# %%
 """Find best performing MRR and corresponding test."""
 
 # pylint: disable=C0103
@@ -22,6 +21,39 @@ bucket_name = os.getenv("EVALUATION_BUCKET_NAME")
 if not bucket_name:
     raise ValueError("EVALUATION_BUCKET_NAME environment variable not set")
 blob_name = "evaluation-pipeline/SAYT/weights_by_character/"
+
+
+# %%
+def get_data(
+    characters: int,
+    use_bucket: bool,
+    bucket_path: str | None = None,
+    local_path: str | None = None,
+) -> dict:
+    """Get data for visualisation of weight combinations.
+
+    Args:
+        characters (int): The number of characters to consider for the test.
+        use_bucket (bool): Whether to read data from a cloud bucket or local file.
+        bucket_path (str, optional): The path to the cloud bucket. Required if use_bucket is True.
+        local_path (str, optional): The path to the local directory.
+            Required if use_bucket is False.
+
+    Returns:
+        dict: A dictionary containing the test results with MRR scores.
+    """
+    file_name = f"weight_test_{characters}chars_n_p_s.json"
+    if use_bucket:
+        path = bucket_path + file_name
+        data = _read_json(path)
+
+    else:
+        weights_file = f"{local_path}{file_name}"
+
+        with open(weights_file, encoding="utf-8") as f:
+            data = json.load(f)
+
+    return data
 
 
 # %%
@@ -133,19 +165,12 @@ def generate_ternary_plot(data: dict):
 
 # %%
 for i in range(4, 10):
-
-    file_name = f"weight_test_{i}chars_n_p_s.json"
-
-    if USE_BUCKET:
-        print("read data from storage")
-        path = f"gs://{bucket_name}/{blob_name}{file_name}"
-        data_file = _read_json(path)
-
-    else:
-        weights_file = f"{LOCAL_DIR}{file_name}"
-
-        with open(weights_file, encoding="utf-8") as f:
-            data_file = json.load(f)
+    data_file = get_data(
+        characters=i,
+        use_bucket=USE_BUCKET,
+        bucket_path=f"gs://{bucket_name}/{blob_name}",
+        local_path=LOCAL_DIR,
+    )
 
     mrr_score, best_dict = find_best_performing_setup(data_file)
     print(f"Best MRR for {i} characters: {mrr_score}")
@@ -154,16 +179,12 @@ for i in range(4, 10):
 # %%
 character = 5
 
-file_name = f"weight_test_{character}chars_n_p_s.json"
-if USE_BUCKET:
-    path = f"gs://{bucket_name}/{blob_name}{file_name}"
-    data_file = _read_json(path)
-
-else:
-    weights_file = f"{LOCAL_DIR}{file_name}"
-
-    with open(weights_file, encoding="utf-8") as f:
-        data_file = json.load(f)
+data_file = get_data(
+    characters=character,
+    use_bucket=USE_BUCKET,
+    bucket_path=f"gs://{bucket_name}/{blob_name}",
+    local_path=LOCAL_DIR,
+)
 
 rankings_by_weight = get_ranked_setups(data_file)
 
@@ -176,21 +197,17 @@ for rank, (individual_score, setups) in enumerate(rankings_by_weight.items(), st
 # %%
 # Access data for visualisation
 character = 7
-
-file_name = f"weight_test_{character}chars_n_p_s.json"
-if bucket_name:
-    print("read from storage")
-    path = f"gs://{bucket_name}/{blob_name}{file_name}"
-    data_file = _read_json(path)
-
-else:
-    print("read from local file")
-    weights_file = f"data/sayt/weights_grid_10_lookup_it3/{file_name}"
-
-    with open(weights_file, encoding="utf-8") as f:
-        data_file = json.load(f)
-
-# %%
-generate_ternary_plot(data_file)
+for character in range(4, 10):
+    data_file = get_data(
+        characters=character,
+        use_bucket=USE_BUCKET,
+        bucket_path=f"gs://{bucket_name}/{blob_name}",
+        local_path=LOCAL_DIR,
+    )
+    plot = generate_ternary_plot(data_file)
+    plot.show()
+    plot.write_html(
+        f"data/sayt/weights_grid_10_lookup_it3/ternary_plot_{character}_chars.html"
+    )
 
 # %%
