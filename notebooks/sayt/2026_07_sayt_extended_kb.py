@@ -212,7 +212,17 @@ def cosine_similarity_matrix(
     right_embeddings: np.ndarray | None = None,
     eps: float = 1e-12,
 ) -> np.ndarray:
-    """Return pairwise cosine similarities between row-wise embedding matrices."""
+    """Return pairwise cosine similarities between row-wise embedding matrices.
+
+    Args:
+        left_embeddings: Left embedding matrix of shape (n_samples_left, n_features).
+        right_embeddings: Right embedding matrix of shape (n_samples_right, n_features).
+            If None, the left_embeddings will be used for both sides.
+        eps: Small value to avoid division by zero.
+
+    Returns:
+        Pairwise cosine similarity matrix of shape (n_samples_left, n_samples_right).
+    """
     left = np.asarray(left_embeddings)
     if left.ndim == 1:
         left = left.reshape(1, -1)
