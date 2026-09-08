@@ -31,6 +31,7 @@ SIC_CODE_LENGTH = 5
 MAX_SUGGESTIONS = 9
 CORRECT_CODE_COL = "correct_sic_code"
 NUM_CHARACTERS_LIST = list(range(4, 10))
+HARD_LIMIT = False
 
 GRID_GRANULARITY = 10
 FOLDER_PREFIX = f"weights_grid_{GRID_GRANULARITY}"
@@ -164,7 +165,7 @@ with ngram={ngram}, prefix={prefix}, semantic={semantic}."""
                 suggesters_dict=suggesters_three,
                 num_chars=[characters],
                 suggestions_limit=MAX_SUGGESTIONS,
-                hard_suggestions_limit=False,
+                hard_suggestions_limit=HARD_LIMIT,
             )
 
             suggestions_cols_to_compare = suggestions_df.columns[
