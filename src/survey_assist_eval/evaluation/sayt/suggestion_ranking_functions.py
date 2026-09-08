@@ -113,8 +113,9 @@ def _get_valid_codes(
     Returns:
         set[str]: Set of valid, cleaned codes, or an empty set if codes is missing.
     """
-    if codes is None or is_correct_codes_empty(codes):
+    if codes is None:
         return set()
+
     return get_clean_n_digit_codes(
         codes if isinstance(codes, str) else list(codes), n=n, code_type=code_type
     )[0]
