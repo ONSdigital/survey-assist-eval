@@ -5,8 +5,6 @@ import pandas as pd
 from survey_assist_eval.data_cleaning.code_standard import (
     SIC_EXPECTED_CODE_LENGTH,
     SOC_EXPECTED_CODE_LENGTH,
-)
-from survey_assist_eval.data_cleaning.prep_data import (
     get_clean_n_digit_codes,
 )
 
