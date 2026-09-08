@@ -15,6 +15,7 @@ from survey_assist_utils.logging import get_logger
 
 from survey_assist_eval.data_cleaning.code_standard import (
     get_clean_n_digit_codes,
+    parse_numerical_code,
 )
 from survey_assist_eval.evaluation.sayt.suggestion_ranking_functions import (
     clean_codes_columns,
@@ -75,35 +76,6 @@ def validate_one_code(code: str, code_length=5) -> bool:
     return True
 
 
-def pad_code_with_leading_zero(code: str, expected_length: int = 5) -> str:
-    """Pad a code string with leading zero if needed to match expected length.
-
-    Args:
-        code: Code string to normalize.
-        expected_length: Expected length of the code after padding.
-
-    Returns:
-        str: Code string padded with leading zero, or original code if already correct length
-            or if padding is not possible.
-    """
-    if pd.isna(code):
-        return code
-
-    code_str = str(code)
-    if len(code_str) == expected_length:
-        return code_str
-    if len(code_str) == expected_length - 1:
-        return f"0{code_str}"
-    if len(code_str) < expected_length - 1:
-        logger.warning(
-            "SIC code shorter than expected_length - 1; leaving unchanged",
-            code=code_str,
-            expected_length=expected_length,
-            observed_length=len(code_str),
-        )
-    return code_str
-
-
 def add_display_text_with_code(
     df: pd.DataFrame,
     text_col: str,
@@ -143,7 +115,7 @@ def build_sayt_corpus_from_df(  # noqa: PLR0913, pylint: disable=R0917,R0913
 ) -> tuple[pd.DataFrame, list[tuple[str, str]]]:
     """Build a SAYT corpus from a DataFrame.
 
-    Normalises codes using `pad_code_with_leading_zero`, optionally appends
+    Normalises codes using `parse_numerical_code`, optionally appends
     codes to display text, and returns both the updated DataFrame and the
     resulting SAYT corpus.
 
@@ -162,8 +134,7 @@ def build_sayt_corpus_from_df(  # noqa: PLR0913, pylint: disable=R0917,R0913
     output_df = df.copy()
 
     output_df[code_col] = output_df[code_col].apply(
-        pad_code_with_leading_zero,
-        expected_length=get_code_length_from_type(code_type=code_type),
+        lambda x: parse_numerical_code(x, code_type=code_type).pop(),
     )
 
     final_display_col = display_text_col
