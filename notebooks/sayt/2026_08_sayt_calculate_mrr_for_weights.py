@@ -21,6 +21,7 @@ from notebooks.sayt.sayt_utils import (
     build_sayt_corpus_from_df,
     get_suggestions_by_chars,
 )
+from src.survey_assist_eval.pipeline.shared_components import _write_json
 from survey_assist_eval.evaluation.sayt.performance_metrics_functions import (
     build_sayt_metrics_comparison_table,
 )
@@ -75,8 +76,8 @@ for col in [
     )
 
 # %%
-# LOOKUP_FILE_NAME = f"gs://{bucket_name}/evaluation-pipeline/SAYT/Lookup_IT3_Final.csv"
-LOOKUP_FILE_NAME = f"gs://{bucket_name}/sic_knowledgebase/sic_kb_for_sayt.csv"
+LOOKUP_FILE_NAME = f"gs://{bucket_name}/evaluation-pipeline/SAYT/Lookup_IT3_Final.csv"
+# LOOKUP_FILE_NAME = f"gs://{bucket_name}/sic_knowledgebase/sic_kb_for_sayt.csv"
 
 sayt_df = pd.read_csv(LOOKUP_FILE_NAME, dtype=str)
 if LOOKUP_FILE_NAME.endswith("sic_kb_for_sayt.csv"):
@@ -96,7 +97,6 @@ else:
 sayt_corpus = build_sayt_corpus_from_df(sayt_df, "search_text", "search_text", "code")[
     1
 ]
-
 
 # %%
 if not os.path.exists(OUTPUT_DIR + SAVE_FOLDER):
@@ -164,6 +164,7 @@ with ngram={ngram}, prefix={prefix}, semantic={semantic}."""
                 suggesters_dict=suggesters_three,
                 num_chars=[characters],
                 suggestions_limit=MAX_SUGGESTIONS,
+                hard_suggestions_limit=False,
             )
 
             suggestions_cols_to_compare = suggestions_df.columns[
@@ -188,12 +189,10 @@ with ngram={ngram}, prefix={prefix}, semantic={semantic}."""
             print(data)
 
             with open(sub_file_name, "w", encoding="utf-8") as f:
-
                 json.dump(data, f, indent=4)
 
 # %%
 # combine separate test results into one file
-
 remove_files = False  # set to True to remove the individual test files after combining
 save_to_bucket = True  # set to True to save the combined file to the GCS bucket
 
@@ -226,12 +225,10 @@ for character_file in NUM_CHARACTERS_LIST:
 
         print(f"File {final_file_name} saved.")
 
+        # Save to the bucket
         if save_to_bucket:
-            # Save to the bucket
-            blob = client.bucket(bucket_name).blob(blob_name + final_file_name)
-            blob.upload_from_string(
-                json.dumps(master_dict, indent=4), content_type="application/json"
-            )
+            bucket_path = "gs://" + bucket_name + "/" + blob_name + final_file_name
+            _write_json(master_dict, bucket_path)
 
         # remove files
         if remove_files:
