@@ -164,6 +164,7 @@ with ngram={ngram}, prefix={prefix}, semantic={semantic}."""
                 suggesters_dict=suggesters_three,
                 num_chars=[characters],
                 suggestions_limit=MAX_SUGGESTIONS,
+                hard_suggestions_limit=False,
             )
 
             suggestions_cols_to_compare = suggestions_df.columns[
