@@ -12,6 +12,10 @@ from dotenv import load_dotenv
 from src.survey_assist_eval.pipeline.shared_components import _read_json
 
 # %%
+LOCAL_DIR = "data/sayt/weights_grid_10_lookup_it_3/"
+USE_BUCKET = True
+
+# %%
 load_dotenv()
 bucket_name = os.getenv("EVALUATION_BUCKET_NAME")
 if not bucket_name:
@@ -62,14 +66,13 @@ def get_ranked_setups(data: dict):
 for i in range(4, 10):
     file_name = f"weight_test_{i}chars_n_p_s.json"
 
-    if bucket_name:
-        # data_file = read_json_from_gcs(blob_name, file_name)
-        print("read from storage")
+    if USE_BUCKET:
+        print("read data from storage")
         path = f"gs://{bucket_name}/{blob_name}{file_name}"
         data_file = _read_json(path)
 
     else:
-        weights_file = f"notebooks/sayt/weights_sum_10/{file_name}"
+        weights_file = f"{LOCAL_DIR}{file_name}"
 
         with open(weights_file, encoding="utf-8") as f:
             data_file = json.load(f)
@@ -82,12 +85,12 @@ for i in range(4, 10):
 character = 5
 
 file_name = f"weight_test_{character}chars_n_p_s.json"
-if bucket_name:
+if USE_BUCKET:
     path = f"gs://{bucket_name}/{blob_name}{file_name}"
     data_file = _read_json(path)
 
 else:
-    weights_file = f"notebooks/sayt/weights_sum_10/{file_name}"
+    weights_file = f"{LOCAL_DIR}{file_name}"
 
     with open(weights_file, encoding="utf-8") as f:
         data_file = json.load(f)
