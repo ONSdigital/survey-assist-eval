@@ -227,7 +227,7 @@ for character_file in NUM_CHARACTERS_LIST:
 
         # Save to the bucket
         if save_to_bucket:
-            bucket_path = "gs://" + bucket_name + blob_name + final_file_name
+            bucket_path = "gs://" + bucket_name + "/" + blob_name + final_file_name
             _write_json(master_dict, bucket_path)
 
         # remove files
