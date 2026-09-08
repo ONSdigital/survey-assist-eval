@@ -59,11 +59,11 @@ def get_one_clean_n_digit_code(
     otherwise return the original string.
 
     Args:
-        x (str): The input code string.
-        n (int, optional): The expected number of digits in the code.
+        x: The input code string.
+        n: The expected number of digits in the code.
             Defaults to SIC_EXPECTED_CODE_LENGTH.
-        code_type (str, optional): The type of code. Defaults to "sic".
-        expand (bool, optional): Whether to return all possible clean codes if
+        code_type: The type of code. Defaults to "sic".
+        expand: Whether to return all possible clean codes if
             there are multiple. Defaults to False.
 
     Returns:
