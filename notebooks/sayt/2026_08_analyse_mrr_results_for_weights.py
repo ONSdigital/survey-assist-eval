@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 from src.survey_assist_eval.pipeline.shared_components import _read_json
 
 # %%
-LOCAL_DIR = "data/sayt/weights_grid_10_lookup_it_3/"
+LOCAL_DIR = "data/sayt/weights_grid_10_lookup_it3/"
 USE_BUCKET = True
 
 # %%
