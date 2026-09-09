@@ -16,6 +16,7 @@ from src.survey_assist_eval.pipeline.shared_components import _read_json
 TEST_FOLDER = "weights_grid_10_sic_kb"
 LOCAL_DIR = f"data/sayt/{TEST_FOLDER}/"
 USE_BUCKET = True
+SAVE_PLOT = True
 
 # %%
 load_dotenv()
@@ -130,58 +131,76 @@ for rank, (individual_score, setups) in enumerate(rankings_by_weight.items(), st
         break
 
 # %%
-colours = ["Blues"]
-characters_list = [4]
-for char in characters_list:
-    for c in colours:
-        data_weights = get_data(
-            characters=char,
-            use_bucket=USE_BUCKET,
-            bucket_path=f"gs://{bucket_name}/{BLOB_NAME}",
-            local_path=LOCAL_DIR,
-        )
-        df = pd.DataFrame.from_dict(data_weights, orient="index")
-        heatmap_data = df.pivot_table(
-            index="Ngram_weight", columns="Semantic_weight", values="MRR"
-        )
-        semantic_matrix = df.pivot_table(
-            index="Ngram_weight", columns="Semantic_weight", values="Prefix_weight"
-        )
-        x_vals = [val / 10 for val in heatmap_data.columns]
-        y_vals = [val / 10 for val in heatmap_data.index]
-        c_scaled = [
-            [val / 10 if pd.notna(val) else None for val in row]
-            for row in semantic_matrix.values
-        ]
-        text_matrix = [
-            [f"{val*100:.2f}" if pd.notna(val) and val != 0 else "" for val in row]
-            for row in heatmap_data.values
-        ]
 
-        heat_fig = go.Figure(
-            data=go.Heatmap(
-                x=x_vals,
-                y=y_vals,
-                z=heatmap_data.values.tolist(),
-                customdata=c_scaled,
-                text=text_matrix,
-                texttemplate="%{text}",
-                textfont={"size": 10},
-                colorscale=c,
-                colorbar={"title": "MRR"},
-                hovertemplate=(
-                    "Ngram Weight: %{y}<br>"
-                    "Semantic Weight: %{x}<br>"
-                    "Prefix Weight: %{customdata}<br>"
-                    "MRR: %{z}<extra></extra>"
-                ),
-            )
+
+def generate_heatmap(data: pd.DataFrame, character: int):
+    """Generate a heatmap of the n/p/s weight combinations.
+
+    Args:
+        data (dict): A dictionary containing the test results with MRR scores.
+        character (int): The number of characters to consider for the test.
+
+    Returns:
+        fig: A Plotly figure object representing the heatmap.
+    """
+    df = pd.DataFrame.from_dict(data, orient="index")
+    heatmap_data = df.pivot_table(
+        index="Ngram_weight", columns="Semantic_weight", values="MRR"
+    )
+    semantic_matrix = df.pivot_table(
+        index="Ngram_weight", columns="Semantic_weight", values="Prefix_weight"
+    )
+    x_vals = [val / 10 for val in heatmap_data.columns]
+    y_vals = [val / 10 for val in heatmap_data.index]
+    c_scaled = [
+        [val / 10 if pd.notna(val) else None for val in row]
+        for row in semantic_matrix.values
+    ]
+    text_matrix = [
+        [f"{val*100:.2f}" if pd.notna(val) and val != 0 else "" for val in row]
+        for row in heatmap_data.values
+    ]
+
+    fig = go.Figure(
+        data=go.Heatmap(
+            x=x_vals,
+            y=y_vals,
+            z=heatmap_data.values.tolist(),
+            customdata=c_scaled,
+            text=text_matrix,
+            texttemplate="%{text}",
+            textfont={"size": 10},
+            colorscale="Blues",
+            colorbar={"title": "MRR"},
+            hovertemplate=(
+                "Ngram Weight: %{y}<br>"
+                "Semantic Weight: %{x}<br>"
+                "Prefix Weight: %{customdata}<br>"
+                "MRR: %{z}<extra></extra>"
+            ),
         )
-        heat_fig.update_layout(
-            title=f"Weight Configurations ({char} characters, colour: {c})",
-            xaxis_title="semantic",
-            yaxis_title="ngram",
-            plot_bgcolor="white",
-        )
-        heat_fig.show()
+    )
+    fig.update_layout(
+        title=f"Weight Configurations ({character} characters)",
+        xaxis_title="semantic",
+        yaxis_title="ngram",
+        plot_bgcolor="white",
+    )
+
+    return fig
+
+
 # %%
+
+characters_list = list(range(4, 10))
+for char in characters_list:
+    data_weights = get_data(
+        characters=char,
+        use_bucket=USE_BUCKET,
+        bucket_path=f"gs://{bucket_name}/{BLOB_NAME}",
+        local_path=LOCAL_DIR,
+    )
+    plot = generate_heatmap(data_weights, char)
+    if SAVE_PLOT:
+        plot.write_html(f"data/sayt/{TEST_FOLDER}/heatmap_{char}_chars.html")
+    plot.show()
