@@ -3,9 +3,11 @@
 import pandas as pd
 from pydantic import BaseModel
 
+from survey_assist_eval.data_cleaning.code_standard import (
+    validate_n_digits_for_code_type,
+)
 from survey_assist_eval.evaluation.sayt.suggestion_ranking_functions import (
     clean_codes_columns,
-    get_code_length_from_type,
     get_codes_from_suggestions,
     get_rank_of_first_matching_code,
     is_correct_codes_empty,
@@ -101,7 +103,7 @@ def compute_performance_metrics_from_suggestions(  # noqa: PLR0913 pylint: disab
         code_digit_match_length=(
             code_digit_match_length
             if code_digit_match_length is not None
-            else get_code_length_from_type(code_type=code_type)
+            else validate_n_digits_for_code_type(code_type)
         ),
         k_values=k_values if k_values is not None else [],
         ave_time_per_query=ave_time_per_query,

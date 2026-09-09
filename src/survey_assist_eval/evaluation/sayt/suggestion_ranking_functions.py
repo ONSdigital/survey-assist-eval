@@ -3,39 +3,9 @@
 import pandas as pd
 
 from survey_assist_eval.data_cleaning.code_standard import (
-    SIC_EXPECTED_CODE_LENGTH,
-    SOC_EXPECTED_CODE_LENGTH,
     get_clean_n_digit_codes,
+    validate_n_digits_for_code_type,
 )
-
-
-def get_code_length_from_type(code_type: str = "sic") -> int:
-    """Get the expected code length for a given code classification system.
-
-    Args:
-        code_type: Type of code classification system. Either 'sic' (Standard
-            Industrial Classification) or 'soc' (Standard Occupational Classification).
-            Case-insensitive.
-
-    Returns:
-        int: The expected length of the code suffix for the given code_type.
-
-    Raises:
-        ValueError: If code_type is not 'sic' or 'soc'.
-    """
-    code_lengths = {
-        "sic": SIC_EXPECTED_CODE_LENGTH,
-        "soc": SOC_EXPECTED_CODE_LENGTH,
-    }
-
-    code_type_lower = code_type.lower()
-    if code_type_lower not in code_lengths:
-        raise ValueError(
-            f"Unsupported code_type: {code_type!r}. "
-            f"Must be one of {list(code_lengths.keys())}"
-        )
-
-    return code_lengths[code_type_lower]
 
 
 def get_codes_from_suggestions(
@@ -53,8 +23,11 @@ def get_codes_from_suggestions(
     Returns:
         list[str]: Extracted codes in suggestion order.
     """
-    code_length = get_code_length_from_type(code_type=code_type)
-    return [suggestion[-code_length:] for suggestion in row[suggestions_col]]
+    code_length: int = validate_n_digits_for_code_type(code_type)
+    return [
+        suggestion[len(suggestion) - code_length :]
+        for suggestion in row[suggestions_col]
+    ]
 
 
 def get_rank_of_first_matching_code(
@@ -187,7 +160,7 @@ def clean_codes_columns(
         )
 
     if code_digit_match_length is None:
-        code_digit_match_length = get_code_length_from_type(code_type=code_type)
+        code_digit_match_length = validate_n_digits_for_code_type(code_type)
 
     if correct_codes_col is not None:
         df[f"{correct_codes_col}_clean"] = df[correct_codes_col].apply(
