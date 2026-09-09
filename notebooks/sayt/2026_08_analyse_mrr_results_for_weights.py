@@ -97,107 +97,6 @@ def get_ranked_setups(data: dict):
 
 
 # %%
-def generate_ternary_plot(data: dict, character: int):
-    """Generate a ternary plot of the n/p/s weight combinations.
-
-    Args:
-        data (dict): A dictionary containing the test results with MRR scores.
-        character (int): The number of characters to consider for the test.
-
-    Returns:
-        fig: A Plotly figure object representing the ternary plot.
-    """
-    # Plot n/p/s weight combinations in a ternary diagram.
-    points = []
-
-    for setup_name, results in data.items():
-        # get points
-        points.append(
-            {
-                "setup": setup_name,
-                "n": results["Ngram_weight"],
-                "p": results["Prefix_weight"],
-                "s": results["Semantic_weight"],
-                "mrr": results["MRR"],
-            }
-        )
-
-    if not points:
-        raise ValueError("No records containing 'n', 'p', and 's' weights were found.")
-
-    # ternary plot
-    fig = go.Figure(
-        go.Scatterternary(
-            a=[point["n"] for point in points],
-            b=[point["p"] for point in points],
-            c=[point["s"] for point in points],
-            mode="markers",
-            text=[point["setup"] for point in points],
-            customdata=[[point["mrr"]] for point in points],
-            hovertemplate=(
-                "Setup: %{text}<br>"
-                "n: %{a}<br>"
-                "p: %{b}<br>"
-                "s: %{c}<br>"
-                "MRR: %{customdata[0]}<extra></extra>"
-            ),
-            marker={
-                "size": 10,
-                "color": [point["mrr"] for point in points],
-                "colorscale": "Jet",
-                "showscale": True,
-                "colorbar": {"title": "MRR score"},
-                "reversescale": True,
-            },
-        )
-    )
-
-    fig.update_layout(
-        title=f"Weight Configurations ({character} characters)",
-        ternary={
-            "sum": 1,
-            "aaxis": {"title": ""},
-            "baxis": {"title": ""},
-            "caxis": {"title": ""},
-        },
-    )
-
-    fig.add_annotation(
-        text="ngram",
-        x=0.25,
-        y=0.5,
-        xref="paper",
-        yref="paper",
-        textangle=-60,
-        showarrow=False,
-        font={"size": 14},
-    )
-    fig.add_annotation(
-        text="prefix",
-        x=0.5,
-        y=-0.15,
-        xref="paper",
-        yref="paper",
-        textangle=0,
-        showarrow=False,
-        font={"size": 14},
-    )
-    fig.add_annotation(
-        text="semantic",
-        x=0.75,
-        y=0.5,
-        xref="paper",
-        yref="paper",
-        textangle=60,
-        showarrow=False,
-        font={"size": 14},
-    )
-
-    # fig.show()
-    return fig
-
-
-# %%
 # Best performing setup for each character count
 for i in range(4, 10):
     data_weights = get_data(
@@ -229,21 +128,6 @@ for rank, (individual_score, setups) in enumerate(rankings_by_weight.items(), st
     print(f"  {list(setups.keys())}\n")
     if rank == 5:  # noqa: PLR2004
         break
-
-# %%
-# Access data for visualisation
-
-characters_list = [6, 9]
-for char in characters_list:
-    data_weights = get_data(
-        characters=char,
-        use_bucket=USE_BUCKET,
-        bucket_path=f"gs://{bucket_name}/{BLOB_NAME}",
-        local_path=LOCAL_DIR,
-    )
-    plot = generate_ternary_plot(data_weights, char)
-    plot.show()
-    # plot.write_html(f"data/sayt/{TEST_FOLDER}/ternary_plot_{char}_chars.html")
 
 # %%
 colours = ["Blues"]
