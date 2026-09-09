@@ -19,7 +19,7 @@ The output is written to `sic_kb_for_sayt.csv` with columns `code`,
 Expects `EVALUATION_BUCKET_NAME` to be set, loaded from `.env`.
 """
 
-# pylint: disable=invalid-name, duplicate-code
+# pylint: disable=invalid-name
 
 # %%
 import os
@@ -448,6 +448,25 @@ out_df = (
     .reset_index(drop=True)
 )
 logger.info(f"Output dataframe shape: {out_df.shape}")
+
+# replace café with cafe in display text as agreed
+msk = out_df["display_text"].str.contains("é")
+if msk.any():
+    examples = out_df.loc[msk, "display_text"].unique().head(5).tolist()
+    logger.info(
+        "found instances of 'é' in display text",
+        num_lines_msk=msk.sum(),
+        examples=examples,
+    )
+out_df["display_text"] = out_df["display_text"].str.replace("é", "e")
+
 out_df.to_csv(f"{OUTPUT_DIR}/sic_kb_for_sayt.csv", index=False)
+
+# %%
+out_df["display_text_without_code"] = out_df["display_text"]
+out_df["display_text"] = out_df["display_text_without_code"] + ": " + out_df["code"]
+
+out_df.to_csv(f"{OUTPUT_DIR}/sic_kb_for_sayt_with_code.csv", index=False)
+
 
 # %%
