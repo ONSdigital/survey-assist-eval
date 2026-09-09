@@ -48,7 +48,7 @@ logger = get_logger(__name__)
 logger.info("Location specs", bucket_name=bucket_name, output_dir=OUTPUT_DIR)
 
 client = gcs.Client()
-blob_name = f"evaluation-pipeline/SAYT/weights_by_character/{FOLDER_PREFIX}/"
+BLOB_NAME = f"evaluation-pipeline/SAYT/weights_by_character/{FOLDER_PREFIX}/"
 
 # %%
 test_df = pd.read_excel(
@@ -83,6 +83,7 @@ LOOKUP_FILE_NAME = f"gs://{bucket_name}/sic_knowledgebase/sic_kb_for_sayt.csv"
 sayt_df = pd.read_csv(LOOKUP_FILE_NAME, dtype=str)
 if LOOKUP_FILE_NAME.endswith("sic_kb_for_sayt.csv"):
     SAVE_FOLDER = FOLDER_PREFIX + "_sic_kb"
+    BLOB_NAME = BLOB_NAME + "sic_kb/"
     sayt_corpus = build_sayt_corpus_from_df(
         sayt_df,
         search_text_col="search_text",
@@ -92,6 +93,7 @@ if LOOKUP_FILE_NAME.endswith("sic_kb_for_sayt.csv"):
 
 elif LOOKUP_FILE_NAME.endswith("Lookup_IT3_Final.csv"):
     SAVE_FOLDER = FOLDER_PREFIX + "_lookup_it3"
+    BLOB_NAME = BLOB_NAME + "lookup_it3/"
     sayt_df["code"] = sayt_df["SIC07"].apply(
         lambda x: x if len(x) == SIC_CODE_LENGTH else f"0{x}"
     )
@@ -236,7 +238,7 @@ for character_file in NUM_CHARACTERS_LIST:
 
         # Save to the bucket
         if save_to_bucket:
-            bucket_path = "gs://" + bucket_name + "/" + blob_name + final_file_name
+            bucket_path = "gs://" + bucket_name + "/" + BLOB_NAME + final_file_name
             _write_json(master_dict, bucket_path)
 
         # remove files
