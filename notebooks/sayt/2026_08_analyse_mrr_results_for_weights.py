@@ -144,12 +144,15 @@ def generate_heatmap(data: pd.DataFrame, character: int):
         fig: A Plotly figure object representing the heatmap.
     """
     df = pd.DataFrame.from_dict(data, orient="index")
+    # get values for the heatmap
     heatmap_data = df.pivot_table(
         index="Ngram_weight", columns="Semantic_weight", values="MRR"
     )
+    # get values of retrievers weights
     semantic_matrix = df.pivot_table(
         index="Ngram_weight", columns="Semantic_weight", values="Prefix_weight"
     )
+    # convert values for more readability
     x_vals = [val / 10 for val in heatmap_data.columns]
     y_vals = [val / 10 for val in heatmap_data.index]
     c_scaled = [
@@ -161,6 +164,7 @@ def generate_heatmap(data: pd.DataFrame, character: int):
         for row in heatmap_data.values
     ]
 
+    # crete figure
     fig = go.Figure(
         data=go.Heatmap(
             x=x_vals,
