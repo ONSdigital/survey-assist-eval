@@ -98,41 +98,6 @@ def get_ranked_setups(data: dict):
 
 
 # %%
-# Best performing setup for each character count
-for i in range(4, 10):
-    data_weights = get_data(
-        characters=i,
-        use_bucket=USE_BUCKET,
-        bucket_path=f"gs://{bucket_name}/{BLOB_NAME}",
-        local_path=LOCAL_DIR,
-    )
-
-    mrr_score, best_dict = find_best_performing_setup(data_weights)
-    print(f"Best MRR for {i} characters: {mrr_score}")
-    print(f"Best setup for {i} characters: {best_dict.keys()}\n")
-
-# %%
-# Top 5 performing setups
-char = 9
-
-data_weights = get_data(
-    characters=char,
-    use_bucket=USE_BUCKET,
-    bucket_path=f"gs://{bucket_name}/{BLOB_NAME}",
-    local_path=LOCAL_DIR,
-)
-
-rankings_by_weight = get_ranked_setups(data_weights)
-
-for rank, (individual_score, setups) in enumerate(rankings_by_weight.items(), start=1):
-    print(f"Rank {rank}: MRR={individual_score}")
-    print(f"  {list(setups.keys())}\n")
-    if rank == 5:  # noqa: PLR2004
-        break
-
-# %%
-
-
 def generate_heatmap(data: pd.DataFrame, character: int):
     """Generate a heatmap of the n/p/s weight combinations.
 
@@ -195,7 +160,40 @@ def generate_heatmap(data: pd.DataFrame, character: int):
 
 
 # %%
+# Best performing setup for each character count
+characters_list = list(range(4, 10))
+for char in characters_list:
+    data_weights = get_data(
+        characters=char,
+        use_bucket=USE_BUCKET,
+        bucket_path=f"gs://{bucket_name}/{BLOB_NAME}",
+        local_path=LOCAL_DIR,
+    )
 
+    mrr_score, best_dict = find_best_performing_setup(data_weights)
+    print(f"Best MRR for {char} characters: {mrr_score}")
+    print(f"Best setup for {char} characters: {best_dict.keys()}\n")
+
+# %%
+# Top 5 performing setups for specific characters
+char = 9
+
+data_weights = get_data(
+    characters=char,
+    use_bucket=USE_BUCKET,
+    bucket_path=f"gs://{bucket_name}/{BLOB_NAME}",
+    local_path=LOCAL_DIR,
+)
+
+rankings_by_weight = get_ranked_setups(data_weights)
+
+for rank, (individual_score, setups) in enumerate(rankings_by_weight.items(), start=1):
+    print(f"Rank {rank}: MRR={individual_score}")
+    print(f"  {list(setups.keys())}\n")
+    if rank == 5:  # noqa: PLR2004
+        break
+# %%
+# create heatmaps for specific character
 characters_list = list(range(4, 10))
 for char in characters_list:
     data_weights = get_data(
