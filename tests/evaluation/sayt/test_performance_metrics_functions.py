@@ -48,6 +48,13 @@ def test_compute_precision_at_k_raises_for_non_positive_k(k):
         compute_precision_at_k(["1111", "5678"], "1111", k)
 
 
+@pytest.mark.parametrize("k", [0.5, "2", None])
+def test_compute_precision_at_k_raises_for_non_integers_k(k):
+    """Precision@k should reject non-integer cutoffs."""
+    with pytest.raises(ValueError, match="k must be a positive integer"):
+        compute_precision_at_k(["1111", "5678"], "1111", k)
+
+
 @pytest.mark.parametrize(
     "retrieved_codes,correct_codes,k,expected_precision",
     [
@@ -186,6 +193,13 @@ def test_compute_precision_at_k_with_none_values(
 @pytest.mark.parametrize("k", [0, -1])
 def test_compute_recall_at_k_raises_for_non_positive_k(k):
     """Recall@k should reject non-positive cutoffs."""
+    with pytest.raises(ValueError, match="k must be a positive integer"):
+        compute_recall_at_k(["1111", "5678"], "1111", k)
+
+
+@pytest.mark.parametrize("k", [0.5, "2", None])
+def test_compute_recall_at_k_raises_for_non_integers_k(k):
+    """Recall@k should reject non-integer cutoffs."""
     with pytest.raises(ValueError, match="k must be a positive integer"):
         compute_recall_at_k(["1111", "5678"], "1111", k)
 

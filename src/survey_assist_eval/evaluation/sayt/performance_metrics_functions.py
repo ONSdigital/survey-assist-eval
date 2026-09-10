@@ -121,7 +121,7 @@ def compute_precision_at_k(
     Returns:
         float: Precision@K value.
     """
-    if k <= 0:
+    if not isinstance(k, int) or k <= 0:
         raise ValueError("k must be a positive integer.")
 
     if correct_codes is None or is_correct_codes_empty(correct_codes):
@@ -148,7 +148,7 @@ def compute_recall_at_k(
     Returns:
         float: Recall@K value (relevant codes in top-k / total correct codes).
     """
-    if k <= 0:
+    if not isinstance(k, int) or k <= 0:
         raise ValueError("k must be a positive integer.")
 
     if correct_codes is None or is_correct_codes_empty(correct_codes):
