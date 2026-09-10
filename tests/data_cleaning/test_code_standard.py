@@ -40,25 +40,6 @@ from survey_assist_eval.data_cleaning.code_standard import (
         ("SOC", 4, 4),
         ("Soc", 3, 3),
     ],
-    ids=[
-        "none_sic",
-        "none_SIC_uppercase",
-        "5_digits_sic",
-        "4_digits_sic",
-        "3_digits_sic",
-        "2_digits_sic",
-        "0_digits_sic",
-        "5_digits_SIC_uppercase",
-        "4_digits_Sic_mixedcase",
-        "none_soc",
-        "none_SOC_uppercase",
-        "4_digits_soc",
-        "3_digits_soc",
-        "2_digits_soc",
-        "1_digit_soc",
-        "4_digits_SOC_uppercase",
-        "3_digits_Soc_mixedcase",
-    ],
 )
 def test_validate_n_digits_for_code_type_valid_inputs(code_type, digits, expected):
     """Valid digit values should be accepted and returned."""
@@ -101,16 +82,6 @@ def test_validate_n_digits_for_code_type_raises_for_invalid_code_type(
         ("soc", 5),
         ("soc", 6),
         ("soc", 10),
-    ],
-    ids=[
-        "1_digit_sic_invalid",
-        "6_digits_sic_invalid",
-        "7_digits_sic_invalid",
-        "10_digits_sic_invalid",
-        "0_digits_soc_invalid",
-        "5_digits_soc_invalid",
-        "6_digits_soc_invalid",
-        "10_digits_soc_invalid",
     ],
 )
 def test_validate_n_digits_for_code_type_raises_for_invalid_digits(
