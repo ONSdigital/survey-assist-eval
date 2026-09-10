@@ -80,7 +80,7 @@ def prep_clerical_codes(
             f"{', '.join([clerical_col + str(i) for i in range(1, 4)])}"
         )
 
-    digits = validate_n_digits_for_code_type(code_type, digits)
+    digits = validate_n_digits_for_code_type(digits, code_type)
 
     df = df[[ID_COL, *clerical_3cols]].copy()
     df[clerical_col] = df[clerical_3cols].agg(
@@ -175,7 +175,7 @@ def prep_model_codes(
         out_df[invalid_col] = pd.Series([], dtype=object)
         return out_df
 
-    digits = validate_n_digits_for_code_type(code_type, digits)
+    digits = validate_n_digits_for_code_type(digits, code_type)
 
     if codes_col not in input_df.columns:
         codes_col = None

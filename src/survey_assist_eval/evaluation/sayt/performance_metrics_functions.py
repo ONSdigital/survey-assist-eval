@@ -101,7 +101,7 @@ def compute_performance_metrics_from_suggestions(  # noqa: PLR0913 pylint: disab
         suggestions_col=suggestions_col,
         correct_codes_col=correct_codes_col,
         code_digit_match_length=validate_n_digits_for_code_type(
-            code_type, code_digit_match_length
+            code_digit_match_length, code_type
         ),
         k_values=k_values if k_values is not None else [],
         ave_time_per_query=ave_time_per_query,

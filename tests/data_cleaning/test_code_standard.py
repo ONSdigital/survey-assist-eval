@@ -43,7 +43,7 @@ from survey_assist_eval.data_cleaning.code_standard import (
 )
 def test_validate_n_digits_for_code_type_valid_inputs(code_type, digits, expected):
     """Valid digit values should be accepted and returned."""
-    result = validate_n_digits_for_code_type(code_type, digits)
+    result = validate_n_digits_for_code_type(digits, code_type)
     assert result == expected, (
         f"Expected validate_n_digits_for_code_type({code_type!r}, {digits!r}) "
         f"to return {expected}, but got {result}"
@@ -66,7 +66,7 @@ def test_validate_n_digits_for_code_type_raises_for_invalid_code_type(
 ):
     """Unsupported code_type values should raise a ValueError."""
     with pytest.raises(ValueError, match="Invalid code_type"):
-        validate_n_digits_for_code_type(invalid_code_type, 5)
+        validate_n_digits_for_code_type(5, invalid_code_type)
 
 
 @pytest.mark.parametrize(
@@ -89,7 +89,7 @@ def test_validate_n_digits_for_code_type_raises_for_invalid_digits(
 ):
     """Invalid digit values for the given code type should raise a ValueError."""
     with pytest.raises(ValueError, match="Invalid 'digits'"):
-        validate_n_digits_for_code_type(code_type, invalid_digits)
+        validate_n_digits_for_code_type(invalid_digits, code_type)
 
 
 @pytest.mark.parametrize(
@@ -108,7 +108,7 @@ def test_validate_n_digits_for_code_type_raises_for_negative_digits(
 ):
     """Negative digit values should raise a ValueError about non-negative integers."""
     with pytest.raises(ValueError, match="must be a non-negative integer"):
-        validate_n_digits_for_code_type(code_type, negative_digits)
+        validate_n_digits_for_code_type(negative_digits, code_type)
 
 
 @pytest.mark.parametrize(
@@ -126,13 +126,13 @@ def test_validate_n_digits_for_code_type_raises_for_non_integer_types(
 ):
     """Non-integer, non-None digit inputs should raise a ValueError."""
     with pytest.raises(ValueError, match="must be a non-negative integer"):
-        validate_n_digits_for_code_type("sic", non_integer_digits)
+        validate_n_digits_for_code_type(non_integer_digits, "sic")
 
 
 def test_validate_n_digits_for_code_type_error_message_lists_valid_values():
     """The error message should list valid digit values for the given code type."""
     with pytest.raises(ValueError) as exc_info:
-        validate_n_digits_for_code_type("sic", 7)
+        validate_n_digits_for_code_type(7, "sic")
     error_msg = str(exc_info.value)
     # Should mention expected values
     assert "Expected one of" in error_msg or "Invalid 'digits'" in error_msg

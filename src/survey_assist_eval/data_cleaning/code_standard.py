@@ -60,7 +60,7 @@ SOC_CODABILITY_LEVELS = (
 )
 
 
-def validate_n_digits_for_code_type(code_type: str, digits: int | None = None) -> int:
+def validate_n_digits_for_code_type(digits: int | None, code_type: str) -> int:
     """Validate the 'digits' parameter based on the code type.
 
     Args:

@@ -23,7 +23,7 @@ def get_codes_from_suggestions(
     Returns:
         list[str]: Extracted codes in suggestion order.
     """
-    code_length = validate_n_digits_for_code_type(code_type)
+    code_length = validate_n_digits_for_code_type(None, code_type)
     return [
         suggestion[len(suggestion) - code_length :]
         for suggestion in row[suggestions_col]
@@ -160,7 +160,7 @@ def clean_codes_columns(
         )
 
     code_digit_match_length = validate_n_digits_for_code_type(
-        code_type, code_digit_match_length
+        code_digit_match_length, code_type
     )
 
     if correct_codes_col is not None:

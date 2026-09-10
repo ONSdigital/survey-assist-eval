@@ -241,7 +241,7 @@ def get_suggestions_by_chars(  # noqa: PLR0913 pylint: disable=R0917,R0913,R0914
     df = df.copy()
 
     code_digit_match_length = validate_n_digits_for_code_type(
-        code_type, code_digit_match_length
+        code_digit_match_length, code_type
     )
 
     df = clean_codes_columns(
