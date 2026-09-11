@@ -1,4 +1,3 @@
-# %%
 """Find best performing MRR and corresponding test."""
 
 # pylint: disable=C0103
@@ -7,20 +6,56 @@
 import json
 import os
 
+import pandas as pd
+import plotly.graph_objects as go
 from dotenv import load_dotenv
 
 from src.survey_assist_eval.pipeline.shared_components import _read_json
 
 # %%
-LOCAL_DIR = "data/sayt/weights_grid_10_lookup_it3/"
+TEST_FOLDER = "weights_grid_10_sic_kb"
+LOCAL_DIR = f"data/sayt/{TEST_FOLDER}/"
 USE_BUCKET = True
+SAVE_PLOT = True
 
 # %%
 load_dotenv()
 bucket_name = os.getenv("EVALUATION_BUCKET_NAME")
 if not bucket_name:
     raise ValueError("EVALUATION_BUCKET_NAME environment variable not set")
-blob_name = "evaluation-pipeline/SAYT/weights_by_character/"
+BLOB_NAME = f"evaluation-pipeline/SAYT/weights_by_character/{TEST_FOLDER}/"
+
+
+# %%
+def get_data(
+    characters: int,
+    use_bucket: bool,
+    bucket_path: str | None = None,
+    local_path: str | None = None,
+) -> dict:
+    """Get data for visualisation of weight combinations.
+
+    Args:
+        characters (int): The number of characters to consider for the test.
+        use_bucket (bool): Whether to read data from a cloud bucket or local file.
+        bucket_path (str, optional): The path to the cloud bucket. Required if use_bucket==True.
+        local_path (str, optional): The path to the local directory. Required if use_bucket==False.
+
+    Returns:
+        dict: A dictionary containing the test results with MRR scores.
+    """
+    file_name = f"weight_test_{characters}chars_n_p_s.json"
+    if use_bucket:
+        path = bucket_path + file_name
+        data_file = _read_json(path)
+
+    else:
+        weights_file = f"{local_path}{file_name}"
+
+        with open(weights_file, encoding="utf-8") as f:
+            data_file = json.load(f)
+
+    return data_file
 
 
 # %%
@@ -63,42 +98,111 @@ def get_ranked_setups(data: dict):
 
 
 # %%
-for i in range(4, 10):
-    file_name = f"weight_test_{i}chars_n_p_s.json"
+def generate_heatmap(data: pd.DataFrame, character: int):
+    """Generate a heatmap of the n/p/s weight combinations.
 
-    if USE_BUCKET:
-        print("read data from storage")
-        path = f"gs://{bucket_name}/{blob_name}{file_name}"
-        data_file = _read_json(path)
+    Args:
+        data (dict): A dictionary containing the test results with MRR scores.
+        character (int): The number of characters to consider for the test.
 
-    else:
-        weights_file = f"{LOCAL_DIR}{file_name}"
+    Returns:
+        fig: A Plotly figure object representing the heatmap.
+    """
+    df = pd.DataFrame.from_dict(data, orient="index")
+    # get values for the heatmap
+    heatmap_data = df.pivot_table(
+        index="Ngram_weight", columns="Semantic_weight", values="MRR"
+    )
+    # get values of retrievers weights
+    semantic_matrix = df.pivot_table(
+        index="Ngram_weight", columns="Semantic_weight", values="Prefix_weight"
+    )
+    # convert values for more readability
+    x_vals = [val / 10 for val in heatmap_data.columns]
+    y_vals = [val / 10 for val in heatmap_data.index]
+    c_scaled = [
+        [val / 10 if pd.notna(val) else None for val in row]
+        for row in semantic_matrix.values
+    ]
+    text_matrix = [
+        [f"{val*100:.2f}" if pd.notna(val) and val != 0 else "" for val in row]
+        for row in heatmap_data.values
+    ]
 
-        with open(weights_file, encoding="utf-8") as f:
-            data_file = json.load(f)
+    # crete figure
+    fig = go.Figure(
+        data=go.Heatmap(
+            x=x_vals,
+            y=y_vals,
+            z=heatmap_data.values.tolist(),
+            customdata=c_scaled,
+            text=text_matrix,
+            texttemplate="%{text}",
+            textfont={"size": 10},
+            colorscale="Blues",
+            colorbar={"title": "MRR"},
+            hovertemplate=(
+                "Ngram Weight: %{y}<br>"
+                "Semantic Weight: %{x}<br>"
+                "Prefix Weight: %{customdata}<br>"
+                "MRR: %{z}<extra></extra>"
+            ),
+        )
+    )
+    fig.update_layout(
+        title=f"Weight Configurations ({character} characters)",
+        xaxis_title="semantic",
+        yaxis_title="ngram",
+        plot_bgcolor="white",
+    )
 
-    mrr_score, best_dict = find_best_performing_setup(data_file)
-    print(f"Best MRR for {i} characters: {mrr_score}")
-    print(f"Best setup for {i} characters: {best_dict.keys()}\n")
+    return fig
+
 
 # %%
-character = 5
+# Best performing setup for each character count
+characters_list = list(range(4, 10))
+for char in characters_list:
+    data_weights = get_data(
+        characters=char,
+        use_bucket=USE_BUCKET,
+        bucket_path=f"gs://{bucket_name}/{BLOB_NAME}",
+        local_path=LOCAL_DIR,
+    )
 
-file_name = f"weight_test_{character}chars_n_p_s.json"
-if USE_BUCKET:
-    path = f"gs://{bucket_name}/{blob_name}{file_name}"
-    data_file = _read_json(path)
+    mrr_score, best_dict = find_best_performing_setup(data_weights)
+    print(f"Best MRR for {char} characters: {mrr_score}")
+    print(f"Best setup for {char} characters: {best_dict.keys()}\n")
 
-else:
-    weights_file = f"{LOCAL_DIR}{file_name}"
+# %%
+# Top 5 performing setups for specific characters
+char = 9
 
-    with open(weights_file, encoding="utf-8") as f:
-        data_file = json.load(f)
+data_weights = get_data(
+    characters=char,
+    use_bucket=USE_BUCKET,
+    bucket_path=f"gs://{bucket_name}/{BLOB_NAME}",
+    local_path=LOCAL_DIR,
+)
 
-rankings_by_weight = get_ranked_setups(data_file)
+rankings_by_weight = get_ranked_setups(data_weights)
 
 for rank, (individual_score, setups) in enumerate(rankings_by_weight.items(), start=1):
     print(f"Rank {rank}: MRR={individual_score}")
     print(f"  {list(setups.keys())}\n")
     if rank == 5:  # noqa: PLR2004
         break
+# %%
+# create heatmaps for specific character
+characters_list = list(range(4, 10))
+for char in characters_list:
+    data_weights = get_data(
+        characters=char,
+        use_bucket=USE_BUCKET,
+        bucket_path=f"gs://{bucket_name}/{BLOB_NAME}",
+        local_path=LOCAL_DIR,
+    )
+    plot = generate_heatmap(data_weights, char)
+    if SAVE_PLOT:
+        plot.write_html(f"data/sayt/{TEST_FOLDER}/heatmap_{char}_chars.html")
+    plot.show()
