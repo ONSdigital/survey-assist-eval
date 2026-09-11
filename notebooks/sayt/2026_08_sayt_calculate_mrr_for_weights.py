@@ -175,7 +175,7 @@ with ngram={ngram}, prefix={prefix}, semantic={semantic}."""
             compare_performance_metrics = build_sayt_metrics_comparison_table(
                 suggestions_df,
                 suggestions_cols_to_compare=suggestions_cols_to_compare,
-                correct_code_col=CORRECT_CODE_COL,
+                correct_codes_col=CORRECT_CODE_COL,
                 k_values=[characters],
                 ave_time_per_query_dict=avg_ms_dict,
             )

@@ -60,8 +60,19 @@ SOC_CODABILITY_LEVELS = (
 )
 
 
-def _validate_n_digits_for_code_type(digits: int | None, code_type: str) -> int:
-    """Validate the 'digits' parameter based on the code type."""
+def validate_n_digits_for_code_type(digits: int | None, code_type: str) -> int:
+    """Validate the 'digits' parameter based on the code type.
+
+    Args:
+        digits: Number of digits to validate.
+        code_type: Type of code ('sic' or 'soc').
+
+    Returns:
+        int: Validated number of digits.
+
+    Raises:
+        ValueError: If digits is not valid for the given code type.
+    """
     if code_type.lower() not in {"sic", "soc"}:
         raise ValueError(f"Invalid code_type '{code_type}'. Expected 'SIC' or 'SOC'.")
     if digits is None:
