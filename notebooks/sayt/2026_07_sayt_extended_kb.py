@@ -1,7 +1,9 @@
 """Build `sic_kb_for_sayt.csv` for the SAYT suggester.
 
-The notebook reads three bucket sources:
-- `evaluation-pipeline/SAYT/Lookup_IT3_Final.csv` for reviewed SAYT lookup terms.
+The notebook reads following bucket sources:
+- `evaluation-pipeline/SAYT/Lookup_IT2.csv` for reviewed SAYT lookup terms, it2
+- `evaluation-pipeline/SAYT/Lookup_IT3_Final.csv` for reviewed SAYT lookup terms, it3.
+- `evaluation-pipeline/SAYT/Lookup_IT4_Build.xlsx` for reviewed SAYT lookup terms, it4.
 - `sic_knowledgebase/sic_kb_for_classifai.csv` for the wider SIC search-text base.
 - `sic_knowledgebase/sic_rephrased.csv` for reworded SIC descriptions.
 
@@ -28,7 +30,13 @@ from dotenv import load_dotenv
 from survey_assist_embed_core.adapters.classifai.vectoriser import build_vectoriser
 from survey_assist_utils.logging import get_logger
 
+from survey_assist_eval.data_cleaning.code_standard import (
+    SIC_EXPECTED_CODE_LENGTH,
+    get_clean_n_digit_codes,
+)
+
 # %%
+# Set-up
 load_dotenv()
 bucket_name = os.getenv("EVALUATION_BUCKET_NAME")
 if not bucket_name:
@@ -41,12 +49,162 @@ if not os.path.exists(OUTPUT_DIR):
 logger = get_logger(__name__)
 logger.info("Location specs", bucket_name=bucket_name, output_dir=OUTPUT_DIR)
 
+
 # %%
-SIC_CODE_LENGTH = 5
+# Helper function wrapper to clean codes
+def get_one_clean_n_digit_code(
+    x: str, n=SIC_EXPECTED_CODE_LENGTH, code_type: str = "sic", expand: bool = False
+) -> str | set[str]:
+    """Return the one clean n-digit code if there is exactly one,
+    otherwise return the original string.
+
+    Args:
+        x: The input code string.
+        n: The expected number of digits in the code.
+            Defaults to SIC_EXPECTED_CODE_LENGTH.
+        code_type: The type of code. Defaults to "sic".
+        expand: Whether to return all possible clean codes if
+            there are multiple. Defaults to False.
+
+    Returns:
+        The clean n-digit code if exactly one exists, otherwise the original
+        string or all possible codes if expand is True.
+    """
+    x = x.rstrip("0")
+    codes = get_clean_n_digit_codes(x, n, code_type=code_type)[0]
+    if len(codes) == 1:
+        return next(iter(codes))
+    if expand:
+        return codes
+    return x
+
+
+# %%
+# Load SAYT lookup data and normalise codes to 5 digits
+sayt_df = {}
+sayt_df["it3"] = pd.read_csv(
+    f"gs://{bucket_name}/evaluation-pipeline/SAYT/Lookup_IT3_Final.csv", dtype=str
+).rename(columns={"SIC_lookup": "display_text"})
+sayt_df["it3"]["code"] = (
+    sayt_df["it3"]["SIC07"]
+    .apply(lambda x: x if len(x) == SIC_EXPECTED_CODE_LENGTH else f"0{x}")
+    .map(get_one_clean_n_digit_code)
+)
+
+sayt_df["it2"] = pd.read_csv(
+    f"gs://{bucket_name}/evaluation-pipeline/SAYT/Lookup_IT2.csv",
+    dtype=str,
+    encoding="windows-1252",
+).rename(columns={"SIC_lookup": "display_text"})
+sayt_df["it2"]["code"] = sayt_df["it2"]["SIC07"].map(get_one_clean_n_digit_code)
+
+sayt_df["it4"] = pd.read_excel(
+    f"gs://{bucket_name}/evaluation-pipeline/SAYT/Lookup_IT4_Build.xlsx", dtype=str
+).rename(columns={"QEmploy.sic2007_employed_main_job_lookup_text": "display_text"})
+sayt_df["it4"]["code"] = sayt_df["it4"][
+    "Qemploy_sic2007_employed_main_job_lookup_code "
+].apply(lambda x: get_one_clean_n_digit_code(x[:SIC_EXPECTED_CODE_LENGTH]))
+
+# %%
+# Expand the SAYT lookup data to include all possible 5-digit codes for each entry
+sayt_df_aggr = {}
+for lab, one_df in sayt_df.items():
+    df = one_df.copy()
+    df[f"display_text_{lab}"] = df["display_text"].str.strip()
+
+    # explode rows by full codes
+    df["full_code"] = df["code"].map(
+        lambda x: get_one_clean_n_digit_code(x, expand=True)
+    )
+    df = df.explode("full_code").reset_index(drop=True)
+
+    # drop high level code where lower code is present for the same full_code
+    df["code_len"] = df["code"].str.len()
+    code_lens = df.groupby("full_code")["code_len"].transform("max")
+    df = df[df["code_len"] == code_lens]
+
+    df = df[["code", "full_code", f"display_text_{lab}"]].rename(
+        columns={"code": f"code_{lab}"}
+    )
+    df = df.groupby([f"code_{lab}", "full_code"]).agg(list).reset_index()
+    sayt_df_aggr[lab] = df
+
+# %%
+# Load rephrased (surveyassist) titles and merge with SAYT lookup data
+rephrased_df = pd.read_csv(
+    f"gs://{bucket_name}/sic_knowledgebase/sic_rephrased.csv", dtype=str
+).rename(
+    columns={"rephrased_description": "sa_rephrased_text", "sic_code": "full_code"}
+)
+
+merge_with_duplicates = rephrased_df.merge(
+    sayt_df_aggr["it2"].merge(
+        sayt_df_aggr["it3"].merge(sayt_df_aggr["it4"], how="outer"), how="outer"
+    ),
+    how="left",
+).reset_index(drop=True)
+
+# %%
+# Report missing or collapsed titles to SAYT team
+msk = merge_with_duplicates["code_it4"].apply(
+    lambda x: pd.isna(x) or len(x) < SIC_EXPECTED_CODE_LENGTH
+)
+out = merge_with_duplicates[msk]
+
+out.head(10)
+out.to_csv(
+    f"gs://{bucket_name}/evaluation-pipeline/SAYT/wip/collapsed_or_missing_code_groups_it4.csv",
+    index=False,
+)
+out.to_csv(f"{OUTPUT_DIR}/collapsed_or_missing_code_groups_it4.csv", index=False)
+
+# %%
+# Collate display texts from it4, when missing fallback to i3 then it2 and lastly rephrased
+df4 = sayt_df["it4"][["code", "display_text"]]
+display_text_all = df4[df4["code"].isin(rephrased_df["full_code"])]
+df3 = sayt_df["it3"][["code", "display_text"]]
+msk3 = df3["code"].isin(rephrased_df["full_code"]) & ~df3["code"].isin(
+    display_text_all["code"]
+)
+display_text_all = pd.concat([display_text_all, df3[msk3]], ignore_index=True)
+df2 = sayt_df["it2"][["code", "display_text"]]
+msk2 = df2["code"].isin(rephrased_df["full_code"]) & ~df2["code"].isin(
+    display_text_all["code"]
+)
+display_text_all = pd.concat([display_text_all, df2[msk2]], ignore_index=True)
+df1 = rephrased_df.rename(
+    columns={"sa_rephrased_text": "display_text", "full_code": "code"}
+)
+msk1 = ~df1["code"].isin(display_text_all["code"])
+display_text_all = pd.concat([display_text_all, df1[msk1]], ignore_index=True)
+
+logger.info(
+    f"Total number of display_texts: {len(display_text_all)}",
+    most_common_codes=display_text_all.groupby("code")
+    .size()
+    .sort_values(ascending=False)
+    .head(10)
+    .to_dict(),
+)
+
+# %%
+# Define similarity thresholds on semantic embeddings for deduplications and links
 DISPLAY_DUPLICATE_THRESHOLD = 0.85
 SEARCH_DUPLICATE_THRESHOLD = 0.95
 LOG_BORDERLINE_MARGIN = 0.01
-LOG_LOW_MATCH_THRESHOLD = 0.10
+LOG_LOW_MATCH_THRESHOLD = 0.40
+
+
+# %%
+# Define text vectoriser and cosine similarity function
+vectoriser = build_vectoriser("nomic-ai/nomic-embed-text-v1.5")
+# The download first time can take 10 mins,
+# alternatively use "sentence-transformers/all-MiniLM-L6-v2"
+logger.info(
+    "Vectoriser built successfully.",
+    model_name=vectoriser.model_name,
+    vectoriser_class=vectoriser.__class__.__name__,
+)
 
 
 def cosine_similarity_matrix(
@@ -54,7 +212,17 @@ def cosine_similarity_matrix(
     right_embeddings: np.ndarray | None = None,
     eps: float = 1e-12,
 ) -> np.ndarray:
-    """Return pairwise cosine similarities between row-wise embedding matrices."""
+    """Return pairwise cosine similarities between row-wise embedding matrices.
+
+    Args:
+        left_embeddings: Left embedding matrix of shape (n_samples_left, n_features).
+        right_embeddings: Right embedding matrix of shape (n_samples_right, n_features).
+            If None, the left_embeddings will be used for both sides.
+        eps: Small value to avoid division by zero.
+
+    Returns:
+        Pairwise cosine similarity matrix of shape (n_samples_left, n_samples_right).
+    """
     left = np.asarray(left_embeddings)
     if left.ndim == 1:
         left = left.reshape(1, -1)
@@ -73,58 +241,7 @@ def cosine_similarity_matrix(
 
 
 # %%
-sayt_df = pd.read_csv(
-    f"gs://{bucket_name}/evaluation-pipeline/SAYT/Lookup_IT3_Final.csv", dtype=str
-).rename(columns={"SIC_lookup": "search_text"})
-sayt_df["code"] = sayt_df["SIC07"].apply(
-    lambda x: x if len(x) == SIC_CODE_LENGTH else f"0{x}"
-)
-sayt_df["display_text"] = sayt_df["search_text"]
-sayt_df = (
-    sayt_df[["code", "search_text", "display_text"]]
-    .sort_values(by=["code", "search_text"])
-    .reset_index(drop=True)
-)
-
-# %%
-sic_kb_for_classifai = pd.read_csv(
-    f"gs://{bucket_name}/sic_knowledgebase/sic_kb_for_classifai.csv", dtype=str
-).rename(columns={"text": "search_text", "label": "code"})
-rephrased_df = (
-    pd.read_csv(f"gs://{bucket_name}/sic_knowledgebase/sic_rephrased.csv", dtype=str)
-    .rename(columns={"rephrased_description": "search_text", "sic_code": "code"})
-    .sort_values(by=["code", "search_text"])
-    .reset_index(drop=True)
-)
-rephrased_df["display_text"] = rephrased_df["search_text"]
-
-
-# %%
-# remove higher level codes from SAYT data
-higher_codes = ~sayt_df["code"].isin(rephrased_df["code"])
-logger.warning(
-    f"Following sayt records have higher level codes and will be removed:\n"
-    f"{sayt_df.loc[higher_codes, ['code', 'search_text']]}"
-)
-
-# %%
-display_text_all = pd.concat(
-    [
-        sayt_df.loc[~higher_codes, ["code", "display_text"]],
-        rephrased_df[["code", "display_text"]],
-    ],
-    ignore_index=True,
-)
-logger.info(
-    f"Total number of display_texts: {len(display_text_all)}",
-    most_common_codes=display_text_all.groupby("code")
-    .size()
-    .sort_values(ascending=False)
-    .head(10)
-    .to_dict(),
-)
-
-# %% drop duplicates
+# Embed display texts (remove codes if included in the text)
 alpha_numeric = (
     display_text_all["display_text"]
     .fillna("")
@@ -135,18 +252,19 @@ display_text_all = display_text_all.loc[~alpha_numeric.duplicated()].reset_index
     drop=True
 )
 
-vectoriser = build_vectoriser("sentence-transformers/all-MiniLM-L6-v2")
 display_text_embeddings = vectoriser.transform(
     display_text_all["display_text"].to_list()
 )
 
 # %%
-# drop display_texts that are too similar to other display_texts for the same code
-# keep the sayt approved ones (thats why the start of the ind range is sum(~higher_codes)
+# Drop display_texts that are too similar to other display_texts for the same code
 display_text_all["max_similarity_score"] = 0.0
 display_text_all["most_similar_entry"] = None
+report_similar = pd.DataFrame(
+    columns=["code", "display_text", "max_similarity_score", "most_similar_entry"]
+)
 
-for ind in range(sum(~higher_codes), len(display_text_all)):
+for ind in range(len(display_text_all)):
     code = display_text_all.loc[ind, "code"]
     display_text = display_text_all.loc[ind, "display_text"]
     one_embedding = display_text_embeddings[ind]
@@ -164,9 +282,9 @@ for ind in range(sum(~higher_codes), len(display_text_all)):
 # print borderline cases to sense check the threshold
 borderline_msk = display_text_all["max_similarity_score"].gt(
     DISPLAY_DUPLICATE_THRESHOLD - LOG_BORDERLINE_MARGIN
-) & display_text_all["max_similarity_score"].le(
-    DISPLAY_DUPLICATE_THRESHOLD + LOG_BORDERLINE_MARGIN
-)
+)  # & display_text_all["max_similarity_score"].le(
+# DISPLAY_DUPLICATE_THRESHOLD + LOG_BORDERLINE_MARGIN
+# )
 borderline_display_texts = display_text_all.loc[borderline_msk].sort_values(
     "max_similarity_score"
 )
@@ -198,12 +316,27 @@ logger.info(
     .head(10)
     .to_dict(),
 )
+borderline_display_texts.to_csv(f"{OUTPUT_DIR}/very_similar_display_texts.csv")
+
+#  discuss the filtering with TLFS SAYT team, for now keep all
+display_text_filtered = display_text_all.copy()
 
 # %%
+# Prepare options for search_texts, including the extended SIC knowledge base
+sic_kb_for_classifai = pd.read_csv(
+    f"gs://{bucket_name}/sic_knowledgebase/sic_kb_for_classifai.csv", dtype=str
+).rename(columns={"text": "search_text", "label": "code"})
+
+search_text_from_display = pd.concat([df4, df3, df2, df1]).rename(
+    columns={"display_text": "search_text"}
+)
+search_text_from_display = search_text_from_display[
+    search_text_from_display["code"].map(len) == SIC_EXPECTED_CODE_LENGTH
+]
+
 search_text_all = pd.concat(
     [
-        sayt_df.loc[~higher_codes, ["code", "search_text"]],
-        rephrased_df[["code", "search_text"]],
+        search_text_from_display[["code", "search_text"]],
         sic_kb_for_classifai[["code", "search_text"]],
     ],
 ).reset_index(drop=True)
@@ -302,14 +435,38 @@ logger.warning(
     "Please consider extending the display_texts input to cover these cases.",
     low_similarity_pairs=low_similarity_pairs.to_dict(orient="records"),
 )
+low_similarity_pairs.to_csv(
+    f"{OUTPUT_DIR}/low_similarity_search_display_pairs.csv", index=False
+)
+
 
 # %%
+# Save final output dataframe
 out_df = (
     pairs_df[["code", "search_text", "display_text"]]
     .sort_values(by=["code", "search_text"])
     .reset_index(drop=True)
 )
 logger.info(f"Output dataframe shape: {out_df.shape}")
+
+# replace café with cafe in display text as agreed
+msk = out_df["display_text"].str.contains("é")
+if msk.any():
+    examples = out_df.loc[msk, "display_text"].unique().head(5).tolist()
+    logger.info(
+        "found instances of 'é' in display text",
+        num_lines_msk=msk.sum(),
+        examples=examples,
+    )
+out_df["display_text"] = out_df["display_text"].str.replace("é", "e")
+
 out_df.to_csv(f"{OUTPUT_DIR}/sic_kb_for_sayt.csv", index=False)
+
+# %%
+out_df["display_text_without_code"] = out_df["display_text"]
+out_df["display_text"] = out_df["display_text_without_code"] + ": " + out_df["code"]
+
+out_df.to_csv(f"{OUTPUT_DIR}/sic_kb_for_sayt_with_code.csv", index=False)
+
 
 # %%
