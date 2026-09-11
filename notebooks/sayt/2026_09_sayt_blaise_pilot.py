@@ -17,7 +17,7 @@ bucket_name = os.getenv("PREPROD_DATA_BUCKET_NAME")
 if not bucket_name:
     raise ValueError("PREPROD_DATA_BUCKET_NAME environment variable not set")
 
-logger = get_logger(__name__)
+logger = get_logger("sayt_blaise_pilot_sic_classification")
 work_folder = f"gs://{bucket_name}/2026-08-tlfs-sayt-free-text/tmp"
 input_data_xlsx = (
     f"gs://{bucket_name}/2026-08-tlfs-sayt-free-text/SA_coding_sheet_01.xlsx"
@@ -73,6 +73,12 @@ JOB_TITLE_COL = "soc2020_job_title"
 JOB_DESCRIPTION_COL = "soc2020_job_description"
 INDUSTRY_DESCR_COL = "sic2007_employee"
 SELF_EMPLOYED_DESC_COL = "sic2007_self_employed"
+payload_cols = [
+    JOB_TITLE_COL,
+    JOB_DESCRIPTION_COL,
+    INDUSTRY_DESCR_COL,
+    SELF_EMPLOYED_DESC_COL,
+]
 
 df = pd.concat(
     [
@@ -91,31 +97,17 @@ df = pd.concat(
         ),
     ],
     ignore_index=True,
-)
+)[["unique_id", *payload_cols]]
 print(df.describe().T)
 
 all_missing = pd.Series(True, index=df.index)
-for col in [
-    JOB_TITLE_COL,
-    JOB_DESCRIPTION_COL,
-    INDUSTRY_DESCR_COL,
-    SELF_EMPLOYED_DESC_COL,
-]:
+for col in payload_cols:
+    df[col] = df[col].str.capitalize()
+    # capitalise for consistency, but not needed anymore (see spellcheck issue)
     all_missing = all_missing & (df[col].isna() | df[col] == "-9")
 if all_missing.any():
     logger.warning(f"Rows with all relevant columns missing: {all_missing.sum()}")
-    print(
-        df.loc[
-            all_missing,
-            [
-                "unique_id",
-                JOB_TITLE_COL,
-                JOB_DESCRIPTION_COL,
-                INDUSTRY_DESCR_COL,
-                SELF_EMPLOYED_DESC_COL,
-            ],
-        ]
-    )
+    print(df[all_missing])
 
 input_data_file = work_folder + "/prep_input_data.parquet"
 df.to_parquet(input_data_file, index=False)
@@ -151,9 +143,8 @@ out_df_tlfs = (
         how="left",
     )
 )
-out_df_tlfs[df_tlfs.columns].to_csv(
-    input_data_xlsx.replace(".xlsx", "_tlfs.csv"), index=False, quoting=False
-)
+tlfs_output_file = input_data_xlsx.replace(".xlsx", "_tlfs.csv")
+out_df_tlfs[df_tlfs.columns].to_csv(tlfs_output_file, index=False, quoting=False)
 
 out_df_fus = (
     df_fus[df_fus.columns.difference(["initial_code", "alt_sic_candidates"])]
@@ -164,8 +155,13 @@ out_df_fus = (
         how="left",
     )
 )
-out_df_fus[df_fus.columns].to_csv(
-    input_data_xlsx.replace(".xlsx", "_fus.csv"), index=False, quoting=False
+fus_output_file = input_data_xlsx.replace(".xlsx", "_fus.csv")
+out_df_fus[df_fus.columns].to_csv(fus_output_file, index=False, quoting=False)
+
+logger.info(
+    "SIC Classification attached to TLFS and FUS dataframes.",
+    tlfs_output_file=tlfs_output_file,
+    fus_output_file=fus_output_file,
 )
 
 # %%
