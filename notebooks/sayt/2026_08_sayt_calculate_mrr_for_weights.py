@@ -6,6 +6,7 @@
 import json
 import os
 
+import numpy as np
 import pandas as pd
 from dotenv import load_dotenv
 from google.cloud import storage as gcs
@@ -37,6 +38,8 @@ USE_2K = True
 GRID_GRANULARITY = 10
 OUTPUT_DIR = "data/sayt/"
 FOLDER_PREFIX = f"weights_grid_{GRID_GRANULARITY}"
+KB = ""
+DF_SIZE = ""
 
 # %%
 load_dotenv()
@@ -49,16 +52,28 @@ logger = get_logger(__name__)
 logger.info("Location specs", bucket_name=bucket_name, output_dir=OUTPUT_DIR)
 
 client = gcs.Client()
-blob_name = f"evaluation-pipeline/SAYT/weights_by_character/{FOLDER_PREFIX}"
 
 # %%
 # access data for evaluation
-# use either 100 or 2k dataset. alter the path where it gets saved.
-DF_SIZE = ""
-
+# use either 100 or 2k dataset
 if USE_2K:
     DF_SIZE = "_2k"
+    test_df = pd.read_parquet(
+        f"gs://{bucket_name}/evaluation-pipeline/original_datasets/sic_2k/sic_2k_test_data.parquet"
+    )
 
+    is_self_employed = test_df["sic2007_employee"] == "-9"
+
+    test_df["full_entry"] = np.where(
+        is_self_employed,
+        test_df["sic2007_self_employed"],
+        test_df["sic2007_employee"],
+    )
+    test_df["employment_status"] = np.where(
+        is_self_employed, "self_employed", "employed"
+    )
+
+    test_df = test_df.rename(columns={"clerical_codes": CORRECT_CODE_COL})
 
 else:
     DF_SIZE = "_100"
@@ -88,10 +103,9 @@ else:
         )
 
 # %%
-LOOKUP_FILE_NAME = f"gs://{bucket_name}/evaluation-pipeline/SAYT/Lookup_IT3_Final.csv"
-# LOOKUP_FILE_NAME = f"gs://{bucket_name}/sic_knowledgebase/sic_kb_for_sayt.csv"
+# LOOKUP_FILE_NAME = f"gs://{bucket_name}/evaluation-pipeline/SAYT/Lookup_IT3_Final.csv"
+LOOKUP_FILE_NAME = f"gs://{bucket_name}/sic_knowledgebase/sic_kb_for_sayt.csv"
 
-KB = ""
 sayt_df = pd.read_csv(LOOKUP_FILE_NAME, dtype=str)
 if LOOKUP_FILE_NAME.endswith("sic_kb_for_sayt.csv"):
     KB = "_sic_kb"
@@ -111,11 +125,9 @@ sayt_corpus = build_sayt_corpus_from_df(sayt_df, "search_text", "search_text", "
     1
 ]
 
-SAVE_FOLDER = FOLDER_PREFIX + KB + DF_SIZE
+SAVE_FOLDER = FOLDER_PREFIX + DF_SIZE + KB
 blob_name = f"evaluation-pipeline/SAYT/weights_by_character/{SAVE_FOLDER}/"
 
-SAVE_FOLDER = FOLDER_PREFIX + KB + DF_SIZE
-blob_name = f"evaluation-pipeline/SAYT/weights_by_character/{SAVE_FOLDER}/"
 
 # %%
 if not os.path.exists(OUTPUT_DIR + SAVE_FOLDER):
