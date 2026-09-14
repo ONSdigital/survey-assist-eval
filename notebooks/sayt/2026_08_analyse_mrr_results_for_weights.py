@@ -27,7 +27,7 @@ BLOB_NAME = f"evaluation-pipeline/SAYT/weights_by_character/{TEST_FOLDER}/"
 
 
 # %%
-def get_data(
+def get_weight_by_char_dicts(
     characters: int,
     use_bucket: bool,
     bucket_path: str | None = None,
@@ -163,7 +163,7 @@ def generate_heatmap(data: pd.DataFrame, character: int):
 # Best performing setup for each character count
 characters_list = list(range(4, 10))
 for char in characters_list:
-    data_weights = get_data(
+    data_weights = get_weight_by_char_dicts(
         characters=char,
         use_bucket=USE_BUCKET,
         bucket_path=f"gs://{bucket_name}/{BLOB_NAME}",
@@ -178,7 +178,7 @@ for char in characters_list:
 # Top 5 performing setups for specific characters
 char = 9
 
-data_weights = get_data(
+data_weights = get_weight_by_char_dicts(
     characters=char,
     use_bucket=USE_BUCKET,
     bucket_path=f"gs://{bucket_name}/{BLOB_NAME}",
@@ -196,7 +196,7 @@ for rank, (individual_score, setups) in enumerate(rankings_by_weight.items(), st
 # create heatmaps for specific character
 characters_list = list(range(4, 10))
 for char in characters_list:
-    data_weights = get_data(
+    data_weights = get_weight_by_char_dicts(
         characters=char,
         use_bucket=USE_BUCKET,
         bucket_path=f"gs://{bucket_name}/{BLOB_NAME}",
