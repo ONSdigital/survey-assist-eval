@@ -32,10 +32,11 @@ MAX_SUGGESTIONS = 9
 CORRECT_CODE_COL = "correct_sic_code"
 NUM_CHARACTERS_LIST = list(range(4, 10))
 HARD_LIMIT = False
+USE_2K = True
 
 GRID_GRANULARITY = 10
-FOLDER_PREFIX = f"weights_grid_{GRID_GRANULARITY}"
 OUTPUT_DIR = "data/sayt/"
+FOLDER_PREFIX = f"weights_grid_{GRID_GRANULARITY}"
 
 # %%
 load_dotenv()
@@ -48,44 +49,55 @@ logger = get_logger(__name__)
 logger.info("Location specs", bucket_name=bucket_name, output_dir=OUTPUT_DIR)
 
 client = gcs.Client()
-blob_name = f"evaluation-pipeline/SAYT/weights_by_character/{FOLDER_PREFIX}/"
+blob_name = f"evaluation-pipeline/SAYT/weights_by_character/{FOLDER_PREFIX}"
 
 # %%
-test_df = pd.read_excel(
-    f"gs://{bucket_name}/evaluation-pipeline/SAYT/SAYT matching.xlsx",
-    dtype=str,
-    nrows=100,  # Excel formatting causes 10s of thousands of blank input rows after the real 100
-    header=1,  # first row is header
-)
-rename_columns = {
-    "Correct SIC code": "correct_sic_code",
-    "Full entry looking for": "full_entry",
-    "Position of correct SIC ": "rank_5chars_Blaise (as reported from SAYT team)",
-    "Position of correct SIC .1": "_rank_5chars_sa_shared",
-}
+# access data for evaluation
+# use either 100 or 2k dataset. alter the path where it gets saved.
+DF_SIZE = ""
 
-test_df = test_df.rename(columns=rename_columns)
-test_df = test_df[rename_columns.values()]
+if USE_2K:
+    DF_SIZE = "_2k"
 
-# clean the rank values reported by the SAYT team
-for col in [
-    "rank_5chars_Blaise (as reported from SAYT team)",
-    "_rank_5chars_sa_shared",
-]:
-    test_df[col] = pd.to_numeric(
-        test_df[col].replace({"5 or 12": "5"}), errors="coerce"
+
+else:
+    DF_SIZE = "_100"
+    test_df = pd.read_excel(
+        f"gs://{bucket_name}/evaluation-pipeline/SAYT/SAYT matching.xlsx",
+        dtype=str,
+        nrows=100,  # Excel formatting causes 10s of thousands of blank input rows after the real 100
+        header=1,  # first row is header
     )
+    rename_columns = {
+        "Correct SIC code": "correct_sic_code",
+        "Full entry looking for": "full_entry",
+        "Position of correct SIC ": "rank_5chars_Blaise (as reported from SAYT team)",
+        "Position of correct SIC .1": "_rank_5chars_sa_shared",
+    }
+
+    test_df = test_df.rename(columns=rename_columns)
+    test_df = test_df[rename_columns.values()]
+
+    # clean the rank values reported by the SAYT team
+    for col in [
+        "rank_5chars_Blaise (as reported from SAYT team)",
+        "_rank_5chars_sa_shared",
+    ]:
+        test_df[col] = pd.to_numeric(
+            test_df[col].replace({"5 or 12": "5"}), errors="coerce"
+        )
 
 # %%
 LOOKUP_FILE_NAME = f"gs://{bucket_name}/evaluation-pipeline/SAYT/Lookup_IT3_Final.csv"
 # LOOKUP_FILE_NAME = f"gs://{bucket_name}/sic_knowledgebase/sic_kb_for_sayt.csv"
 
+KB = ""
 sayt_df = pd.read_csv(LOOKUP_FILE_NAME, dtype=str)
 if LOOKUP_FILE_NAME.endswith("sic_kb_for_sayt.csv"):
-    SAVE_FOLDER = FOLDER_PREFIX + "_sic_kb"
+    KB = "_sic_kb"
 
 elif LOOKUP_FILE_NAME.endswith("Lookup_IT3_Final.csv"):
-    SAVE_FOLDER = FOLDER_PREFIX + "_lookup_it3"
+    KB = "_lookup_it3"
     sayt_df["code"] = sayt_df["SIC07"].apply(
         lambda x: x if len(x) == SIC_CODE_LENGTH else f"0{x}"
     )
@@ -98,6 +110,12 @@ else:
 sayt_corpus = build_sayt_corpus_from_df(sayt_df, "search_text", "search_text", "code")[
     1
 ]
+
+SAVE_FOLDER = FOLDER_PREFIX + KB + DF_SIZE
+blob_name = f"evaluation-pipeline/SAYT/weights_by_character/{SAVE_FOLDER}/"
+
+SAVE_FOLDER = FOLDER_PREFIX + KB + DF_SIZE
+blob_name = f"evaluation-pipeline/SAYT/weights_by_character/{SAVE_FOLDER}/"
 
 # %%
 if not os.path.exists(OUTPUT_DIR + SAVE_FOLDER):
@@ -161,8 +179,9 @@ with ngram={ngram}, prefix={prefix}, semantic={semantic}."""
             sub_file_name = f"{OUTPUT_DIR}{SAVE_FOLDER}/w_{characters}_n{ngram}_p{prefix}_s{semantic}.json"
 
             suggestions_df, avg_ms_dict = get_suggestions_by_chars(
-                test_df,
+                df=test_df,
                 suggesters_dict=suggesters_three,
+                correct_codes_col=CORRECT_CODE_COL,
                 num_chars=[characters],
                 suggestions_limit=MAX_SUGGESTIONS,
                 hard_suggestions_limit=HARD_LIMIT,
