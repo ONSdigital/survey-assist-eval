@@ -45,7 +45,7 @@ bucket_name = os.getenv("EVALUATION_BUCKET_NAME")
 if not bucket_name:
     raise ValueError("EVALUATION_BUCKET_NAME environment variable not set")
 
-OUTPUT_DIR = f"gs://{bucket_name}/evaluation-pipeline/SAYT/wip/"
+OUTPUT_DIR = "data/sayt"  # f"gs://{bucket_name}/evaluation-pipeline/SAYT/wip/"
 
 logger = get_logger(__name__)
 logger.info("Location specs", bucket_name=bucket_name, output_dir=OUTPUT_DIR)
@@ -442,6 +442,12 @@ logger.warning(
     "Please consider extending the display_texts input to cover these cases.",
     low_similarity_pairs=low_similarity_pairs.to_dict(orient="records"),
 )
+# add source to the low similarity pairs
+low_similarity_pairs["source"] = "rephrased"
+for lab in ["it2", "it3", "it4"]:
+    msk = low_similarity_pairs["code"].isin(sayt_df[lab]["code"])
+    low_similarity_pairs.loc[msk, "source"] = f"sayt_{lab}"
+
 low_similarity_pairs.to_csv(
     f"{OUTPUT_DIR}/low_similarity_search_display_pairs.csv", index=False
 )
