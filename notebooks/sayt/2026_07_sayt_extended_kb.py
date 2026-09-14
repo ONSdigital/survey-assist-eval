@@ -23,16 +23,19 @@ Expects `EVALUATION_BUCKET_NAME` to be set, loaded from `.env`.
 
 # %%
 import os
+import unicodedata
 
 import numpy as np
 import pandas as pd
 from dotenv import load_dotenv
+from ftfy import fix_text
 from survey_assist_embed_core.adapters.classifai.vectoriser import build_vectoriser
 from survey_assist_utils.logging import get_logger
 
 from survey_assist_eval.data_cleaning.code_standard import (
     SIC_EXPECTED_CODE_LENGTH,
     get_clean_n_digit_codes,
+    parse_numerical_code,
 )
 
 # %%
@@ -42,9 +45,7 @@ bucket_name = os.getenv("EVALUATION_BUCKET_NAME")
 if not bucket_name:
     raise ValueError("EVALUATION_BUCKET_NAME environment variable not set")
 
-OUTPUT_DIR = "data/sayt"
-if not os.path.exists(OUTPUT_DIR):
-    os.makedirs(OUTPUT_DIR)
+OUTPUT_DIR = f"gs://{bucket_name}/evaluation-pipeline/SAYT/wip/"
 
 logger = get_logger(__name__)
 logger.info("Location specs", bucket_name=bucket_name, output_dir=OUTPUT_DIR)
@@ -70,13 +71,25 @@ def get_one_clean_n_digit_code(
         The clean n-digit code if exactly one exists, otherwise the original
         string or all possible codes if expand is True.
     """
-    x = x.rstrip("0")
-    codes = get_clean_n_digit_codes(x, n, code_type=code_type)[0]
-    if len(codes) == 1:
-        return next(iter(codes))
+    # replace 0s at the end by the same number of 'x's to match clerical coders practice
+    x_stripped = x[:n].rstrip("0")
+    x_stripped += "x" * (min(len(x), n) - len(x_stripped))
+
+    x_parsed = parse_numerical_code(x_stripped, code_type=code_type)
+    if len(x_parsed) != 1:
+        logger.warning("Numeric code was not parsed correctly", input_code=x)
+        return x
+    x_parsed = next(iter(x_parsed))
+
+    codes = get_clean_n_digit_codes(x_parsed, n, code_type=code_type)
+    if len(codes[1]) > 0:
+        logger.warning("Found invalid codes", input_code=x, invalid_codes=codes[1])
     if expand:
-        return codes
-    return x
+        return codes[0]
+
+    if len(codes[0]) == 1:
+        return next(iter(codes[0]))
+    return x_parsed
 
 
 # %%
@@ -85,11 +98,7 @@ sayt_df = {}
 sayt_df["it3"] = pd.read_csv(
     f"gs://{bucket_name}/evaluation-pipeline/SAYT/Lookup_IT3_Final.csv", dtype=str
 ).rename(columns={"SIC_lookup": "display_text"})
-sayt_df["it3"]["code"] = (
-    sayt_df["it3"]["SIC07"]
-    .apply(lambda x: x if len(x) == SIC_EXPECTED_CODE_LENGTH else f"0{x}")
-    .map(get_one_clean_n_digit_code)
-)
+sayt_df["it3"]["code"] = sayt_df["it3"]["SIC07"].map(get_one_clean_n_digit_code)
 
 sayt_df["it2"] = pd.read_csv(
     f"gs://{bucket_name}/evaluation-pipeline/SAYT/Lookup_IT2.csv",
@@ -103,7 +112,7 @@ sayt_df["it4"] = pd.read_excel(
 ).rename(columns={"QEmploy.sic2007_employed_main_job_lookup_text": "display_text"})
 sayt_df["it4"]["code"] = sayt_df["it4"][
     "Qemploy_sic2007_employed_main_job_lookup_code "
-].apply(lambda x: get_one_clean_n_digit_code(x[:SIC_EXPECTED_CODE_LENGTH]))
+].map(get_one_clean_n_digit_code)
 
 # %%
 # Expand the SAYT lookup data to include all possible 5-digit codes for each entry
@@ -119,7 +128,7 @@ for lab, one_df in sayt_df.items():
     df = df.explode("full_code").reset_index(drop=True)
 
     # drop high level code where lower code is present for the same full_code
-    df["code_len"] = df["code"].str.len()
+    df["code_len"] = df["code"].str.rstrip("x").str.len()
     code_lens = df.groupby("full_code")["code_len"].transform("max")
     df = df[df["code_len"] == code_lens]
 
@@ -150,12 +159,6 @@ msk = merge_with_duplicates["code_it4"].apply(
     lambda x: pd.isna(x) or len(x) < SIC_EXPECTED_CODE_LENGTH
 )
 out = merge_with_duplicates[msk]
-
-out.head(10)
-out.to_csv(
-    f"gs://{bucket_name}/evaluation-pipeline/SAYT/wip/collapsed_or_missing_code_groups_it4.csv",
-    index=False,
-)
 out.to_csv(f"{OUTPUT_DIR}/collapsed_or_missing_code_groups_it4.csv", index=False)
 
 # %%
@@ -190,6 +193,7 @@ logger.info(
 # %%
 # Define similarity thresholds on semantic embeddings for deduplications and links
 DISPLAY_DUPLICATE_THRESHOLD = 0.85
+DROP_DISPLAY_TEXT_DUPLICATES = False
 SEARCH_DUPLICATE_THRESHOLD = 0.95
 LOG_BORDERLINE_MARGIN = 0.01
 LOG_LOW_MATCH_THRESHOLD = 0.40
@@ -282,9 +286,9 @@ for ind in range(len(display_text_all)):
 # print borderline cases to sense check the threshold
 borderline_msk = display_text_all["max_similarity_score"].gt(
     DISPLAY_DUPLICATE_THRESHOLD - LOG_BORDERLINE_MARGIN
-)  # & display_text_all["max_similarity_score"].le(
-# DISPLAY_DUPLICATE_THRESHOLD + LOG_BORDERLINE_MARGIN
-# )
+) & display_text_all["max_similarity_score"].le(
+    DISPLAY_DUPLICATE_THRESHOLD + LOG_BORDERLINE_MARGIN
+)
 borderline_display_texts = display_text_all.loc[borderline_msk].sort_values(
     "max_similarity_score"
 )
@@ -297,9 +301,11 @@ logger.info(
 
 to_drop_msk = display_text_all["max_similarity_score"].gt(DISPLAY_DUPLICATE_THRESHOLD)
 logger.info(
-    f"Dropping {sum(to_drop_msk)} display_texts that are too similar "
+    f"Found {sum(to_drop_msk)} display_texts that are too similar "
     "to other display_texts for the same code."
 )
+display_text_all[to_drop_msk].to_csv(f"{OUTPUT_DIR}/very_similar_display_texts.csv")
+
 display_text_filtered = (
     display_text_all.loc[
         ~to_drop_msk,
@@ -316,22 +322,23 @@ logger.info(
     .head(10)
     .to_dict(),
 )
-borderline_display_texts.to_csv(f"{OUTPUT_DIR}/very_similar_display_texts.csv")
 
 #  discuss the filtering with TLFS SAYT team, for now keep all
-display_text_filtered = display_text_all.copy()
+if not DROP_DISPLAY_TEXT_DUPLICATES:
+    display_text_filtered = display_text_all.copy()
 
 # %%
 # Prepare options for search_texts, including the extended SIC knowledge base
 sic_kb_for_classifai = pd.read_csv(
-    f"gs://{bucket_name}/sic_knowledgebase/sic_kb_for_classifai.csv", dtype=str
+    f"gs://{bucket_name}/sic_knowledgebase/sic_kb_for_classifai.csv",
+    dtype=str,
 ).rename(columns={"text": "search_text", "label": "code"})
 
 search_text_from_display = pd.concat([df4, df3, df2, df1]).rename(
     columns={"display_text": "search_text"}
 )
 search_text_from_display = search_text_from_display[
-    search_text_from_display["code"].map(len) == SIC_EXPECTED_CODE_LENGTH
+    ~search_text_from_display["code"].str.endswith("x")
 ]
 
 search_text_all = pd.concat(
@@ -441,6 +448,20 @@ low_similarity_pairs.to_csv(
 
 
 # %%
+def remove_accents(text):
+    """Normalize text and remove accents.
+
+    Args:
+        text: The input text string.
+
+    Returns:
+        The normalized text string with accents removed.
+    """
+    normalized = unicodedata.normalize("NFKD", fix_text(text))
+    return "".join(char for char in normalized if not unicodedata.combining(char))
+
+
+# %%
 # Save final output dataframe
 out_df = (
     pairs_df[["code", "search_text", "display_text"]]
@@ -449,16 +470,21 @@ out_df = (
 )
 logger.info(f"Output dataframe shape: {out_df.shape}")
 
-# replace café with cafe in display text as agreed
-msk = out_df["display_text"].str.contains("é")
-if msk.any():
-    examples = out_df.loc[msk, "display_text"].unique().head(5).tolist()
-    logger.info(
-        "found instances of 'é' in display text",
-        num_lines_msk=msk.sum(),
-        examples=examples,
-    )
-out_df["display_text"] = out_df["display_text"].str.replace("é", "e")
+# replace wrong characters with unicode
+for col in ["display_text", "search_text"]:
+    unice_text = out_df[col].map(remove_accents)
+    msk = unice_text != out_df[col]
+    if msk.any():
+        examples = out_df[msk].copy()
+        examples[f"fixed_{col}"] = unice_text[msk]
+        examples.to_csv(f"{OUTPUT_DIR}/nonunicode_chars_fixed_{col}.csv", index=False)
+        logger.info(
+            "Found instances of non unicode characters",
+            column=col,
+            num_lines_msk=str(msk.sum()),
+        )
+        out_df.loc[msk, col] = unice_text[msk]
+
 
 out_df.to_csv(f"{OUTPUT_DIR}/sic_kb_for_sayt.csv", index=False)
 
