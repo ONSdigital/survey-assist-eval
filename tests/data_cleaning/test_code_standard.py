@@ -13,7 +13,129 @@ from survey_assist_eval.data_cleaning.code_standard import (
     get_codability_level,
     parse_numerical_code,
     validate_codes,
+    validate_n_digits_for_code_type,
 )
+
+
+@pytest.mark.parametrize(
+    "code_type,digits,expected",
+    [
+        # SIC tests
+        ("sic", None, 5),
+        ("SIC", None, 5),
+        ("sic", 5, 5),
+        ("sic", 4, 4),
+        ("sic", 3, 3),
+        ("sic", 2, 2),
+        ("sic", 0, 0),
+        ("SIC", 5, 5),
+        ("Sic", 4, 4),
+        # SOC tests
+        ("soc", None, 4),
+        ("SOC", None, 4),
+        ("soc", 4, 4),
+        ("soc", 3, 3),
+        ("soc", 2, 2),
+        ("soc", 1, 1),
+        ("SOC", 4, 4),
+        ("Soc", 3, 3),
+    ],
+)
+def test_validate_n_digits_for_code_type_valid_inputs(code_type, digits, expected):
+    """Valid digit values should be accepted and returned."""
+    result = validate_n_digits_for_code_type(digits, code_type)
+    assert result == expected, (
+        f"Expected validate_n_digits_for_code_type({code_type!r}, {digits!r}) "
+        f"to return {expected}, but got {result}"
+    )
+
+
+@pytest.mark.parametrize(
+    "invalid_code_type",
+    [
+        "invalid",
+        "xyz",
+        "",
+        "soc_code",
+        "sic_code",
+        "SIC_CODE",
+    ],
+)
+def test_validate_n_digits_for_code_type_raises_for_invalid_code_type(
+    invalid_code_type,
+):
+    """Unsupported code_type values should raise a ValueError."""
+    with pytest.raises(ValueError, match="Invalid code_type"):
+        validate_n_digits_for_code_type(5, invalid_code_type)
+
+
+@pytest.mark.parametrize(
+    "code_type,invalid_digits",
+    [
+        # Invalid digit values for SIC (accepted digits: 5, 4, 3, 2, 0, -1)
+        ("sic", 1),
+        ("sic", 6),
+        ("sic", 7),
+        ("sic", 10),
+        # Invalid digit values for SOC (accepted digits: 4, 3, 2, 1, -1)
+        ("soc", 0),
+        ("soc", 5),
+        ("soc", 6),
+        ("soc", 10),
+    ],
+)
+def test_validate_n_digits_for_code_type_raises_for_invalid_digits(
+    code_type, invalid_digits
+):
+    """Invalid digit values for the given code type should raise a ValueError."""
+    with pytest.raises(ValueError, match="Invalid 'digits'"):
+        validate_n_digits_for_code_type(invalid_digits, code_type)
+
+
+@pytest.mark.parametrize(
+    "code_type,negative_digits",
+    [
+        ("sic", -2),
+        ("soc", -2),
+    ],
+    ids=[
+        "negative_2_sic",
+        "negative_2_soc",
+    ],
+)
+def test_validate_n_digits_for_code_type_raises_for_negative_digits(
+    code_type, negative_digits
+):
+    """Negative digit values should raise a ValueError about non-negative integers."""
+    with pytest.raises(ValueError, match="must be a non-negative integer"):
+        validate_n_digits_for_code_type(negative_digits, code_type)
+
+
+@pytest.mark.parametrize(
+    "non_integer_digits",
+    [
+        45.67,
+        "5",
+        [],
+        {},
+        object(),
+    ],
+)
+def test_validate_n_digits_for_code_type_raises_for_non_integer_types(
+    non_integer_digits,
+):
+    """Non-integer, non-None digit inputs should raise a ValueError."""
+    with pytest.raises(ValueError, match="must be a non-negative integer"):
+        validate_n_digits_for_code_type(non_integer_digits, "sic")
+
+
+def test_validate_n_digits_for_code_type_error_message_lists_valid_values():
+    """The error message should list valid digit values for the given code type."""
+    with pytest.raises(ValueError) as exc_info:
+        validate_n_digits_for_code_type(7, "sic")
+    error_msg = str(exc_info.value)
+    # Should mention expected values
+    assert "Expected one of" in error_msg or "Invalid 'digits'" in error_msg
 
 
 def test_parse_numerical_code_basic():
@@ -21,6 +143,7 @@ def test_parse_numerical_code_basic():
     assert parse_numerical_code("[86101, 86210]") == {"86101", "86210"}
     assert parse_numerical_code("86101;8602x;4+") == {"86101", "8602x"}
     assert parse_numerical_code(86101) == {"86101"}
+    assert parse_numerical_code(1110) == {"01110"}
 
 
 def test_parse_numerical_code_empty():

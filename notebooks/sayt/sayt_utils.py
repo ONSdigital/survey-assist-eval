@@ -13,7 +13,17 @@ from survey_assist_embed_core.sayt import (
 )
 from survey_assist_utils.logging import get_logger
 
-from survey_assist_eval.data_cleaning.code_standard import get_clean_n_digit_codes
+from survey_assist_eval.data_cleaning.code_standard import (
+    get_clean_n_digit_codes,
+    parse_numerical_code,
+    validate_n_digits_for_code_type,
+)
+from survey_assist_eval.evaluation.sayt.suggestion_ranking_functions import (
+    clean_codes_columns,
+    get_codes_from_suggestions,
+    get_rank_of_first_matching_code,
+    is_correct_codes_empty,
+)
 
 logger = get_logger(__name__)
 
@@ -66,35 +76,6 @@ def validate_one_code(code: str, code_length=5) -> bool:
     return True
 
 
-def pad_code_with_leading_zero(code: str, expected_length: int = 5) -> str:
-    """Pad a code string with leading zero if needed to match expected length.
-
-    Args:
-        code: Code string to normalize.
-        expected_length: Expected length of the code after padding.
-
-    Returns:
-        str: Code string padded with leading zero, or original code if already correct length
-            or if padding is not possible.
-    """
-    if pd.isna(code):
-        return code
-
-    code_str = str(code)
-    if len(code_str) == expected_length:
-        return code_str
-    if len(code_str) == expected_length - 1:
-        return f"0{code_str}"
-    if len(code_str) < expected_length - 1:
-        logger.warning(
-            "SIC code shorter than expected_length - 1; leaving unchanged",
-            code=code_str,
-            expected_length=expected_length,
-            observed_length=len(code_str),
-        )
-    return code_str
-
-
 def add_display_text_with_code(
     df: pd.DataFrame,
     text_col: str,
@@ -129,12 +110,12 @@ def build_sayt_corpus_from_df(  # noqa: PLR0913, pylint: disable=R0917,R0913
     search_text_col: str,
     display_text_col: str,
     code_col: str = "code",
-    expected_code_length: int = 5,
+    code_type: str = "sic",
     incl_code_in_display: bool = True,
 ) -> tuple[pd.DataFrame, list[tuple[str, str]]]:
     """Build a SAYT corpus from a DataFrame.
 
-    Normalises codes using `pad_code_with_leading_zero`, optionally appends
+    Normalises codes using `parse_numerical_code`, optionally appends
     codes to display text, and returns both the updated DataFrame and the
     resulting SAYT corpus.
 
@@ -143,7 +124,7 @@ def build_sayt_corpus_from_df(  # noqa: PLR0913, pylint: disable=R0917,R0913
         search_text_col: Column containing searchable text.
         display_text_col: Column containing display text.
         code_col: Column containing codes to normalise.
-        expected_code_length: Expected code length used for normalisation.
+        code_type: Code type used for normalisation. Defaults to "sic".
         incl_code_in_display: Whether to append codes to display text.
 
     Returns:
@@ -153,7 +134,7 @@ def build_sayt_corpus_from_df(  # noqa: PLR0913, pylint: disable=R0917,R0913
     output_df = df.copy()
 
     output_df[code_col] = output_df[code_col].apply(
-        pad_code_with_leading_zero, expected_length=expected_code_length
+        lambda x: parse_numerical_code(x, code_type=code_type).pop(),
     )
 
     final_display_col = display_text_col
@@ -225,41 +206,12 @@ def get_suggestions_for_row(  # noqa: PLR0913 pylint: disable=R0917,R0913
     return suggestions
 
 
-def rank_of_correct_code_in_suggestions(
-    row: pd.Series,
-    num_chars: int,
-    suggester_label: str,
-    code_length: int = 5,
-    correct_code_col: str = "correct_sic_code",
-) -> int | None:
-    """Return the rank of the correct code in generated suggestions.
-
-    Args:
-        row: Input row containing suggestion outputs and the correct code.
-        num_chars: Prefix length used to generate suggestions.
-        suggester_label: Label used in the suggestion column name.
-        code_length: Number of trailing characters to compare as code.
-        correct_code_col: Column name holding the correct SIC code.
-
-    Returns:
-        int | None: 1-based rank of the correct code, or None if not found.
-    """
-    correct_code = row[correct_code_col]
-    suggested_codes = get_codes_from_suggestions(
-        row,
-        suggestions_col=f"suggestions_{num_chars}chars_{suggester_label}",
-        code_length=code_length,
-    )
-
-    for rank, suggest in enumerate(suggested_codes):
-        if suggest == correct_code:
-            return rank + 1
-    return None
-
-
-def get_suggestions_by_chars(  # noqa: PLR0913 pylint: disable=R0917,R0913
+def get_suggestions_by_chars(  # noqa: PLR0913 pylint: disable=R0917,R0913,R0914
     df: pd.DataFrame,
     suggesters_dict: dict[str, Any],
+    correct_codes_col: str = "correct_sic_code",
+    code_type: str = "sic",
+    code_digit_match_length: int | None = None,
     num_chars: list | None = None,
     suggestions_limit: int = 9,
     hard_suggestions_limit: bool = False,
@@ -269,24 +221,43 @@ def get_suggestions_by_chars(  # noqa: PLR0913 pylint: disable=R0917,R0913
 
     Args:
         df: dataframe containing melted suggestions.
-        num_chars: number of characters to be tested.
         suggesters_dict: a dictionary with initialised suggester models.
+        correct_codes_col: name of the column containing correct codes.
+        code_type: type of the code, e.g., "sic" or "soc". Defaults to "sic".
+        code_digit_match_length: Length of the code digit match to consider. If
+            None, falls back to code_length.
+        num_chars: number of characters to be tested.
         suggestions_limit: the maximum rank of suggestions considered as valid.
         hard_suggestions_limit: if True, limit the number of suggestions to the
             specified suggestions_limit, otherwise allow more suggestions to be returned.
         with_scores: if True, return suggestions with scores instead of just strings.
 
     Returns:
-        tuple[pd.DataFrame, float]: Suggestions for specified characters typed;
-            average milliseconds per row.
+        tuple[pd.DataFrame, dict]: df with a
+            "rank_{num_chars}chars_{suggester_name}_{digit_match_length}digitmatch"
+            column added per (num_chars, suggester) combination; and a dict of
+            average milliseconds per row for each suggester.
     """
     df = df.copy()
+
+    code_digit_match_length = validate_n_digits_for_code_type(
+        code_digit_match_length, code_type
+    )
+
+    df = clean_codes_columns(
+        df,
+        code_digit_match_length,
+        code_type=code_type,
+        correct_codes_col=correct_codes_col,
+    )
 
     avg_ms_dict = {}
     if num_chars is None:
         num_chars = [4, 5, 7, 10]
     for prefix_chars in num_chars:
         for suggester_name, suggester_obj in suggesters_dict.items():
+            retrieved_codes_col = "_retrieved_codes"
+
             logger.info(
                 "Starting SAYT suggesting - one loop",
                 num_chars=prefix_chars,
@@ -316,14 +287,56 @@ def get_suggestions_by_chars(  # noqa: PLR0913 pylint: disable=R0917,R0913
                 df[suggestions_col] = suggestions_result
 
             logger.info("  -> suggestions done", elapsed_sec=avg_ms)
-            df[f"rank_{prefix_chars}chars_{suggester_name}"] = df.apply(
-                rank_of_correct_code_in_suggestions,
-                correct_code_col="correct_sic_code",
-                suggester_label=suggester_name,
-                num_chars=prefix_chars,
+
+            df[retrieved_codes_col] = df.apply(
+                get_codes_from_suggestions,
+                code_type=code_type,
+                suggestions_col=suggestions_col,
                 axis=1,
             )
+
+            rank_col_name = (
+                f"rank_{prefix_chars}chars_{suggester_name}"
+                f"_{code_digit_match_length}digitmatch"
+            )
+
+            logger.info(
+                f"Cleaning retrieved codes to {code_digit_match_length}-digit match",
+                code_digit_match_length=code_digit_match_length,
+            )
+
+            df = clean_codes_columns(
+                df,
+                code_digit_match_length,
+                code_type=code_type,
+                retrieved_codes_col=retrieved_codes_col,
+            )
+
+            logger.info(
+                f"Computing rank for {code_digit_match_length}-digit match",
+                code_digit_match_length=code_digit_match_length,
+                rank_col_name=rank_col_name,
+            )
+
+            df[rank_col_name] = [
+                get_rank_of_first_matching_code(retrieved, correct)
+                for retrieved, correct in zip(
+                    df[f"{retrieved_codes_col}_clean"],
+                    df[f"{correct_codes_col}_clean"],
+                    strict=False,
+                )
+            ]
+
             avg_ms_dict.update({suggestions_col: avg_ms})
+
+    df = df.drop(
+        columns=[
+            retrieved_codes_col,
+            f"{retrieved_codes_col}_valid",
+            f"{retrieved_codes_col}_clean",
+        ],
+        errors="ignore",
+    )
 
     return df, avg_ms_dict
 
@@ -344,6 +357,10 @@ def melt_results_for_analysis(
         pd.DataFrame: dataframe with results form suggesters, split by the type of suggester
             and number of characters.
     """
+    no_ground_truth = df[correct_code_column].apply(is_correct_codes_empty)
+
+    df = df.loc[~no_ground_truth].copy()
+
     results_df = df.melt(
         id_vars=[correct_code_column, "full_entry"],
         value_vars=[col for col in df.columns if col.startswith("rank_")],
@@ -417,24 +434,6 @@ def create_figure(
     fig.write_html(f"{output_dir}/sayt_eval_100sample_rank_histograms.html")
 
     return fig
-
-
-def get_codes_from_suggestions(
-    row: pd.Series,
-    suggestions_col: str,
-    code_length: int = 5,
-) -> list[str]:
-    """Extract code suffixes from suggestion strings for a single input row.
-
-    Args:
-        row: Input row containing a suggestions column.
-        suggestions_col: Column name containing suggestion strings.
-        code_length: Number of trailing characters to extract as a code.
-
-    Returns:
-        list[str]: Extracted codes in suggestion order.
-    """
-    return [suggestion[-code_length:] for suggestion in row[suggestions_col]]
 
 
 def timed_apply(df: pd.DataFrame, func, **kwargs) -> tuple[pd.Series, float]:
