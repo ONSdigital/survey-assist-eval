@@ -6,6 +6,7 @@
 import json
 import os
 
+import numpy as np
 import pandas as pd
 from dotenv import load_dotenv
 from google.cloud import storage as gcs
@@ -32,58 +33,82 @@ MAX_SUGGESTIONS = 9
 CORRECT_CODE_COL = "correct_sic_code"
 NUM_CHARACTERS_LIST = list(range(4, 10))
 HARD_LIMIT = False
+USE_2K = True
 
 GRID_GRANULARITY = 10
-FOLDER_PREFIX = f"weights_grid_{GRID_GRANULARITY}"
 OUTPUT_DIR = "data/sayt/"
+FOLDER_PREFIX = f"weights_grid_{GRID_GRANULARITY}"
+KB = ""
+DF_SIZE = ""
 
 # %%
 load_dotenv()
-bucket_name = os.getenv("EVALUATION_BUCKET_NAME")
-if not bucket_name:
+BUCKET_NAME = os.getenv("EVALUATION_BUCKET_NAME")
+if not BUCKET_NAME:
     raise ValueError("EVALUATION_BUCKET_NAME environment variable not set")
 
 
 logger = get_logger(__name__)
-logger.info("Location specs", bucket_name=bucket_name, output_dir=OUTPUT_DIR)
+logger.info("Location specs", BUCKET_NAME=BUCKET_NAME, output_dir=OUTPUT_DIR)
 
 client = gcs.Client()
-BLOB_NAME = f"evaluation-pipeline/SAYT/weights_by_character/{FOLDER_PREFIX}/"
 
 # %%
-test_df = pd.read_excel(
-    f"gs://{bucket_name}/evaluation-pipeline/SAYT/SAYT matching.xlsx",
-    dtype=str,
-    nrows=100,  # Excel formatting causes 10s of thousands of blank input rows after the real 100
-    header=1,  # first row is header
-)
-rename_columns = {
-    "Correct SIC code": "correct_sic_code",
-    "Full entry looking for": "full_entry",
-    "Position of correct SIC ": "rank_5chars_Blaise (as reported from SAYT team)",
-    "Position of correct SIC .1": "_rank_5chars_sa_shared",
-}
-
-test_df = test_df.rename(columns=rename_columns)
-test_df = test_df[rename_columns.values()]
-
-# clean the rank values reported by the SAYT team
-for col in [
-    "rank_5chars_Blaise (as reported from SAYT team)",
-    "_rank_5chars_sa_shared",
-]:
-    test_df[col] = pd.to_numeric(
-        test_df[col].replace({"5 or 12": "5"}), errors="coerce"
+# access data for evaluation
+# use either 100 or 2k dataset
+if USE_2K:
+    DF_SIZE = "_2k"
+    test_df = pd.read_parquet(
+        f"gs://{BUCKET_NAME}/evaluation-pipeline/original_datasets/sic_2k/sic_2k_test_data.parquet"
     )
 
+    is_self_employed = test_df["sic2007_employee"] == "-9"
+
+    test_df["full_entry"] = np.where(
+        is_self_employed,
+        test_df["sic2007_self_employed"],
+        test_df["sic2007_employee"],
+    )
+    test_df["employment_status"] = np.where(
+        is_self_employed, "self_employed", "employed"
+    )
+
+    test_df = test_df.rename(columns={"clerical_codes": CORRECT_CODE_COL})
+
+else:
+    DF_SIZE = "_100"
+    test_df = pd.read_excel(
+        f"gs://{BUCKET_NAME}/evaluation-pipeline/SAYT/SAYT matching.xlsx",
+        dtype=str,
+        nrows=100,  # Excel formatting causes 10s of thousands of blank input rows after the real 100
+        header=1,  # first row is header
+    )
+    rename_columns = {
+        "Correct SIC code": "correct_sic_code",
+        "Full entry looking for": "full_entry",
+        "Position of correct SIC ": "rank_5chars_Blaise (as reported from SAYT team)",
+        "Position of correct SIC .1": "_rank_5chars_sa_shared",
+    }
+
+    test_df = test_df.rename(columns=rename_columns)
+    test_df = test_df[rename_columns.values()]
+
+    # clean the rank values reported by the SAYT team
+    for col in [
+        "rank_5chars_Blaise (as reported from SAYT team)",
+        "_rank_5chars_sa_shared",
+    ]:
+        test_df[col] = pd.to_numeric(
+            test_df[col].replace({"5 or 12": "5"}), errors="coerce"
+        )
+
 # %%
-# LOOKUP_FILE_NAME = f"gs://{bucket_name}/evaluation-pipeline/SAYT/Lookup_IT3_Final.csv"
-LOOKUP_FILE_NAME = f"gs://{bucket_name}/sic_knowledgebase/sic_kb_for_sayt.csv"
+# LOOKUP_FILE_NAME = f"gs://{BUCKET_NAME}/evaluation-pipeline/SAYT/Lookup_IT3_Final.csv"
+LOOKUP_FILE_NAME = f"gs://{BUCKET_NAME}/sic_knowledgebase/sic_kb_for_sayt.csv"
 
 sayt_df = pd.read_csv(LOOKUP_FILE_NAME, dtype=str)
 if LOOKUP_FILE_NAME.endswith("sic_kb_for_sayt.csv"):
-    SAVE_FOLDER = FOLDER_PREFIX + "_sic_kb"
-    BLOB_NAME = BLOB_NAME + "sic_kb/"
+    KB = "_sic_kb"
     sayt_corpus = build_sayt_corpus_from_df(
         sayt_df,
         search_text_col="search_text",
@@ -92,8 +117,7 @@ if LOOKUP_FILE_NAME.endswith("sic_kb_for_sayt.csv"):
     )[1]
 
 elif LOOKUP_FILE_NAME.endswith("Lookup_IT3_Final.csv"):
-    SAVE_FOLDER = FOLDER_PREFIX + "_lookup_it3"
-    BLOB_NAME = BLOB_NAME + "lookup_it3/"
+    KB = "_lookup_it3"
     sayt_df["code"] = sayt_df["SIC07"].apply(
         lambda x: x if len(x) == SIC_CODE_LENGTH else f"0{x}"
     )
@@ -108,6 +132,14 @@ else:
     raise ValueError(
         f"LOOKUP_FILE_NAME {LOOKUP_FILE_NAME} does not match expected file names."
     )
+
+sayt_corpus = build_sayt_corpus_from_df(sayt_df, "search_text", "search_text", "code")[
+    1
+]
+
+SAVE_FOLDER = FOLDER_PREFIX + DF_SIZE + KB
+BLOB_NAME = f"evaluation-pipeline/SAYT/weights_by_character/{SAVE_FOLDER}/"
+
 
 # %%
 if not os.path.exists(OUTPUT_DIR + SAVE_FOLDER):
@@ -171,8 +203,9 @@ with ngram={ngram}, prefix={prefix}, semantic={semantic}."""
             sub_file_name = f"{OUTPUT_DIR}{SAVE_FOLDER}/w_{characters}_n{ngram}_p{prefix}_s{semantic}.json"
 
             suggestions_df, avg_ms_dict = get_suggestions_by_chars(
-                test_df,
+                df=test_df,
                 suggesters_dict=suggesters_three,
+                correct_codes_col=CORRECT_CODE_COL,
                 num_chars=[characters],
                 suggestions_limit=MAX_SUGGESTIONS,
                 hard_suggestions_limit=HARD_LIMIT,
@@ -196,6 +229,11 @@ with ngram={ngram}, prefix={prefix}, semantic={semantic}."""
                 "Semantic_weight": semantic,
                 "MRR": compare_performance_metrics["mrr"][0],
                 "avg_time": compare_performance_metrics["ave_time_per_query_ms"][0],
+                "mean_rank": compare_performance_metrics["mean_rank"][0],
+                "precision": compare_performance_metrics["precision_at_k"][0][
+                    characters
+                ],
+                "recall": compare_performance_metrics["recall_at_k"][0][characters],
             }
             print(data)
 
@@ -238,7 +276,7 @@ for character_file in NUM_CHARACTERS_LIST:
 
         # Save to the bucket
         if save_to_bucket:
-            bucket_path = "gs://" + bucket_name + "/" + BLOB_NAME + final_file_name
+            bucket_path = "gs://" + BUCKET_NAME + "/" + BLOB_NAME + final_file_name
             _write_json(master_dict, bucket_path)
 
         # remove files

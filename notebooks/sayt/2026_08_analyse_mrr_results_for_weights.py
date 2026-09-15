@@ -231,7 +231,7 @@ def _create_faceted_imshow(
         labels={
             "x": "semantic",
             "y": "ngram",
-            "color": "MMR (%)",
+            "color": "MRR (%)",
             "facet_col": "Characters",
         },
     )
@@ -281,7 +281,7 @@ def _add_faceted_heatmap_text(fig, character_order, label_matrices, prefix_matri
                 "Ngram Weight: %{y}<br>"
                 "Semantic Weight: %{x}<br>"
                 "Prefix Weight: %{customdata}<br>"
-                "MMR (%): %{z:.3f}<extra></extra>"
+                "MRR (%): %{z:.3f}<extra></extra>"
             ),
         )
 
@@ -338,7 +338,7 @@ def generate_faceted_heatmap(character_weight_results: dict[int, dict]):
         height=(360 * facet_rows) + 160,
         margin={"l": 80, "r": 120, "t": 90, "b": 70},
         plot_bgcolor="white",
-        coloraxis_colorbar={"title": "MMR (%)"},
+        coloraxis_colorbar={"title": "MRR (%)"},
     )
     _style_faceted_heatmap_axes(fig)
 
