@@ -9,7 +9,6 @@ import os
 import numpy as np
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go
 from dotenv import load_dotenv
 
 from src.survey_assist_eval.pipeline.shared_components import _read_json
@@ -99,119 +98,6 @@ def get_ranked_setups(data: dict):
         rankings.setdefault(score, {})[key] = value
 
     return rankings
-
-
-# %%
-def generate_heatmap(data: pd.DataFrame, character: int):
-    """Generate a heatmap of the n/p/s weight combinations.
-
-    Args:
-        data (dict): A dictionary containing the test results with MRR scores.
-        character (int): The number of characters to consider for the test.
-
-    Returns:
-        fig: A Plotly figure object representing the heatmap.
-    """
-    df = pd.DataFrame.from_dict(data, orient="index")
-    # get values for the heatmap
-    heatmap_data = df.pivot_table(
-        index="Ngram_weight", columns="Semantic_weight", values="MRR"
-    )
-    # get values of retrievers weights
-    semantic_matrix = df.pivot_table(
-        index="Ngram_weight", columns="Semantic_weight", values="Prefix_weight"
-    )
-    # convert values for more readability
-    x_vals = [val / 10 for val in heatmap_data.columns]
-    y_vals = [val / 10 for val in heatmap_data.index]
-    c_scaled = [
-        [val / 10 if pd.notna(val) else None for val in row]
-        for row in semantic_matrix.values
-    ]
-    text_matrix = [
-        [f"{val*100:.2f}" if pd.notna(val) and val != 0 else "" for val in row]
-        for row in heatmap_data.values
-    ]
-
-    # crete figure
-    fig = go.Figure(
-        data=go.Heatmap(
-            x=x_vals,
-            y=y_vals,
-            z=heatmap_data.values.tolist(),
-            customdata=c_scaled,
-            text=text_matrix,
-            texttemplate="%{text}",
-            textfont={"size": 10},
-            colorscale="Blues",
-            colorbar={"title": "MRR"},
-            hovertemplate=(
-                "Ngram Weight: %{y}<br>"
-                "Semantic Weight: %{x}<br>"
-                "Prefix Weight: %{customdata}<br>"
-                "MRR: %{z}<extra></extra>"
-            ),
-        )
-    )
-    fig.update_layout(
-        title=f"Weight Configurations ({character} characters)",
-        xaxis_title="semantic",
-        yaxis_title="ngram",
-        plot_bgcolor="white",
-    )
-
-    return fig
-
-
-# %%
-# Best performing setup for each character count
-characters_list = list(range(4, 10))
-for char in characters_list:
-    data_weights = get_weight_by_char_dicts(
-        characters=char,
-        use_bucket=USE_BUCKET,
-        bucket_path=f"gs://{bucket_name}/{BLOB_NAME}",
-        local_path=LOCAL_DIR,
-    )
-
-    mrr_score, best_dict = find_best_performing_setup(data_weights)
-    print(f"Best MRR for {char} characters: {mrr_score}")
-    print(f"Best setup for {char} characters: {best_dict.keys()}\n")
-
-# %%
-# Top 5 performing setups for specific characters
-char = 9
-
-data_weights = get_weight_by_char_dicts(
-    characters=char,
-    use_bucket=USE_BUCKET,
-    bucket_path=f"gs://{bucket_name}/{BLOB_NAME}",
-    local_path=LOCAL_DIR,
-)
-
-rankings_by_weight = get_ranked_setups(data_weights)
-
-for rank, (individual_score, setups) in enumerate(rankings_by_weight.items(), start=1):
-    print(f"Rank {rank}: MRR={individual_score}")
-    print(f"  {list(setups.keys())}\n")
-    if rank == 5:  # noqa: PLR2004
-        break
-# %%
-# create heatmaps for specific character
-characters_list = list(range(4, 10))
-data_by_character = {}
-for char in characters_list:
-    data_weights = get_weight_by_char_dicts(
-        characters=char,
-        use_bucket=USE_BUCKET,
-        bucket_path=f"gs://{bucket_name}/{BLOB_NAME}",
-        local_path=LOCAL_DIR,
-    )
-    data_by_character[char] = data_weights
-    plot = generate_heatmap(data_weights, char)
-    if SAVE_PLOT:
-        plot.write_html(f"data/sayt/{TEST_FOLDER}/heatmap_{char}_chars.html")
-    plot.show()
 
 
 # %%
@@ -458,6 +344,52 @@ def generate_faceted_heatmap(character_weight_results: dict[int, dict]):
 
     return fig
 
+
+# %%
+# Best performing setup for each character count
+characters_list = list(range(4, 10))
+for char in characters_list:
+    data_weights = get_weight_by_char_dicts(
+        characters=char,
+        use_bucket=USE_BUCKET,
+        bucket_path=f"gs://{bucket_name}/{BLOB_NAME}",
+        local_path=LOCAL_DIR,
+    )
+
+    mrr_score, best_dict = find_best_performing_setup(data_weights)
+    print(f"Best MRR for {char} characters: {mrr_score}")
+    print(f"Best setup for {char} characters: {best_dict.keys()}\n")
+
+# %%
+# Top 5 performing setups for specific characters
+char = 9
+
+data_weights = get_weight_by_char_dicts(
+    characters=char,
+    use_bucket=USE_BUCKET,
+    bucket_path=f"gs://{bucket_name}/{BLOB_NAME}",
+    local_path=LOCAL_DIR,
+)
+
+rankings_by_weight = get_ranked_setups(data_weights)
+
+for rank, (individual_score, setups) in enumerate(rankings_by_weight.items(), start=1):
+    print(f"Rank {rank}: MRR={individual_score}")
+    print(f"  {list(setups.keys())}\n")
+    if rank == 5:  # noqa: PLR2004
+        break
+# %%
+# create heatmaps for specific character
+characters_list = list(range(4, 10))
+data_by_character = {}
+for char in characters_list:
+    data_weights = get_weight_by_char_dicts(
+        characters=char,
+        use_bucket=USE_BUCKET,
+        bucket_path=f"gs://{bucket_name}/{BLOB_NAME}",
+        local_path=LOCAL_DIR,
+    )
+    data_by_character[char] = data_weights
 
 # %%
 faceted_plot = generate_faceted_heatmap(data_by_character)
