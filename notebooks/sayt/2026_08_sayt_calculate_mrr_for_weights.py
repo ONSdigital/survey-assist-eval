@@ -43,13 +43,13 @@ DF_SIZE = ""
 
 # %%
 load_dotenv()
-bucket_name = os.getenv("EVALUATION_BUCKET_NAME")
-if not bucket_name:
+BUCKET_NAME = os.getenv("EVALUATION_BUCKET_NAME")
+if not BUCKET_NAME:
     raise ValueError("EVALUATION_BUCKET_NAME environment variable not set")
 
 
 logger = get_logger(__name__)
-logger.info("Location specs", bucket_name=bucket_name, output_dir=OUTPUT_DIR)
+logger.info("Location specs", BUCKET_NAME=BUCKET_NAME, output_dir=OUTPUT_DIR)
 
 client = gcs.Client()
 
@@ -59,7 +59,7 @@ client = gcs.Client()
 if USE_2K:
     DF_SIZE = "_2k"
     test_df = pd.read_parquet(
-        f"gs://{bucket_name}/evaluation-pipeline/original_datasets/sic_2k/sic_2k_test_data.parquet"
+        f"gs://{BUCKET_NAME}/evaluation-pipeline/original_datasets/sic_2k/sic_2k_test_data.parquet"
     )
 
     is_self_employed = test_df["sic2007_employee"] == "-9"
@@ -78,7 +78,7 @@ if USE_2K:
 else:
     DF_SIZE = "_100"
     test_df = pd.read_excel(
-        f"gs://{bucket_name}/evaluation-pipeline/SAYT/SAYT matching.xlsx",
+        f"gs://{BUCKET_NAME}/evaluation-pipeline/SAYT/SAYT matching.xlsx",
         dtype=str,
         nrows=100,  # Excel formatting causes 10s of thousands of blank input rows after the real 100
         header=1,  # first row is header
@@ -103,12 +103,18 @@ else:
         )
 
 # %%
-# LOOKUP_FILE_NAME = f"gs://{bucket_name}/evaluation-pipeline/SAYT/Lookup_IT3_Final.csv"
-LOOKUP_FILE_NAME = f"gs://{bucket_name}/sic_knowledgebase/sic_kb_for_sayt.csv"
+# LOOKUP_FILE_NAME = f"gs://{BUCKET_NAME}/evaluation-pipeline/SAYT/Lookup_IT3_Final.csv"
+LOOKUP_FILE_NAME = f"gs://{BUCKET_NAME}/sic_knowledgebase/sic_kb_for_sayt.csv"
 
 sayt_df = pd.read_csv(LOOKUP_FILE_NAME, dtype=str)
 if LOOKUP_FILE_NAME.endswith("sic_kb_for_sayt.csv"):
     KB = "_sic_kb"
+    sayt_corpus = build_sayt_corpus_from_df(
+        sayt_df,
+        search_text_col="search_text",
+        display_text_col="display_text",
+        code_col="code",
+    )[1]
 
 elif LOOKUP_FILE_NAME.endswith("Lookup_IT3_Final.csv"):
     KB = "_lookup_it3"
@@ -116,6 +122,12 @@ elif LOOKUP_FILE_NAME.endswith("Lookup_IT3_Final.csv"):
         lambda x: x if len(x) == SIC_CODE_LENGTH else f"0{x}"
     )
     sayt_df = sayt_df.rename(columns={"SIC_lookup": "search_text"})
+    sayt_corpus = build_sayt_corpus_from_df(
+        sayt_df,
+        search_text_col="search_text",
+        display_text_col="search_text",
+        code_col="code",
+    )[1]
 else:
     raise ValueError(
         f"LOOKUP_FILE_NAME {LOOKUP_FILE_NAME} does not match expected file names."
@@ -126,7 +138,7 @@ sayt_corpus = build_sayt_corpus_from_df(sayt_df, "search_text", "search_text", "
 ]
 
 SAVE_FOLDER = FOLDER_PREFIX + DF_SIZE + KB
-blob_name = f"evaluation-pipeline/SAYT/weights_by_character/{SAVE_FOLDER}/"
+BLOB_NAME = f"evaluation-pipeline/SAYT/weights_by_character/{SAVE_FOLDER}/"
 
 
 # %%
@@ -259,7 +271,7 @@ for character_file in NUM_CHARACTERS_LIST:
 
         # Save to the bucket
         if save_to_bucket:
-            bucket_path = "gs://" + bucket_name + "/" + blob_name + final_file_name
+            bucket_path = "gs://" + BUCKET_NAME + "/" + BLOB_NAME + final_file_name
             _write_json(master_dict, bucket_path)
 
         # remove files
