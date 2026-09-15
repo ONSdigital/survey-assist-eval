@@ -229,6 +229,11 @@ with ngram={ngram}, prefix={prefix}, semantic={semantic}."""
                 "Semantic_weight": semantic,
                 "MRR": compare_performance_metrics["mrr"][0],
                 "avg_time": compare_performance_metrics["ave_time_per_query_ms"][0],
+                "mean_rank": compare_performance_metrics["mean_rank"][0],
+                "precision": compare_performance_metrics["precision_at_k"][0][
+                    characters
+                ],
+                "recall": compare_performance_metrics["recall_at_k"][0][characters],
             }
             print(data)
 
