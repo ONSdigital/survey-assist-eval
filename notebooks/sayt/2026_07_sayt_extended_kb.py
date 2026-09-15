@@ -45,7 +45,7 @@ bucket_name = os.getenv("EVALUATION_BUCKET_NAME")
 if not bucket_name:
     raise ValueError("EVALUATION_BUCKET_NAME environment variable not set")
 
-OUTPUT_DIR = "data/sayt"  # f"gs://{bucket_name}/evaluation-pipeline/SAYT/wip/"
+OUTPUT_DIR = f"gs://{bucket_name}/evaluation-pipeline/SAYT/wip"
 
 logger = get_logger(__name__)
 logger.info("Location specs", bucket_name=bucket_name, output_dir=OUTPUT_DIR)
