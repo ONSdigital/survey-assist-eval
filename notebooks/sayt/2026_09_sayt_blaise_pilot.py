@@ -109,8 +109,6 @@ print(df.describe().T)
 
 all_missing = pd.Series(True, index=df.index)
 for col in payload_cols:
-    df[col] = df[col].str.capitalize()
-    # capitalise for consistency, but not needed anymore (see spellcheck issue)
     all_missing = all_missing & (df[col].isna() | df[col] == "-9")
 if all_missing.any():
     logger.warning(
