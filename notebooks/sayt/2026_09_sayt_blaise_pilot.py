@@ -1,10 +1,11 @@
 """Run classification for free text responses subset of Blaise SAYT pilot survey."""
 
-# ruff: noqa: S605
+# ruff: noqa: S603
 # pylint: disable=C0103
 
 # %%
 import os
+import subprocess
 
 import pandas as pd
 from dotenv import load_dotenv
@@ -124,8 +125,17 @@ df.to_parquet(input_data_file, index=False)
 # %%
 # Run pipeline!
 # Only STG1 and STG2 are needed, so you may want to edit the pipeline script to skip the rest
-os.system(
-    f"./scripts/sic_pipeline/run_full_pipeline.sh -p 2 -i {input_data_file} -o {work_folder}"
+subprocess.run(
+    [
+        "./scripts/sic_pipeline/run_full_pipeline.sh",
+        "-p",
+        "2",
+        "-i",
+        input_data_file,
+        "-o",
+        work_folder,
+    ],
+    check=True,
 )
 
 # %%
@@ -133,7 +143,7 @@ os.system(
 out_df = pd.read_parquet(work_folder + "/STG2.parquet").rename(
     columns={"alt_sic_candidates": "alt_codes"}
 )
-alt_msk = out_df["initial_code"].isna() | (out_df["initial_code"] == "")
+alt_msk = ~out_df["unambiguously_codable"]
 out_df["alt_sic_candidates"] = ""
 out_df.loc[alt_msk, "alt_sic_candidates"] = out_df.loc[alt_msk, "alt_codes"].apply(
     lambda x: [y["code"] for y in x]
