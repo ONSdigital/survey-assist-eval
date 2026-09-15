@@ -57,15 +57,22 @@ print(df_fus.describe().T)
 # %%
 # Check ID properties/issues
 msk = df_fus.case_person_id.isin(df_tlfs.case_person_id)
-logger.info(f"Number of FUS unique_ids not in TLFS: {sum(~msk)}")
+logger.info(
+    "There are FUS records not in TLFS based on case_person_id.",
+    num_missing=str((~msk).sum()),
+)
 
 msk_fus = df_fus.case_person_id.duplicated(keep=False)
 if msk_fus.any():
-    logger.warning(f"Duplicated FUS case_person_ids: {msk_fus.sum()}")
+    logger.warning(
+        "There are duplicated FUS case_person_ids.", num_duplicates=str(msk_fus.sum())
+    )
 
 msk_tlfs = df_tlfs.case_person_id.duplicated(keep=False)
 if msk_tlfs.any():
-    logger.warning(f"Duplicated TLFS case_person_ids: {msk_tlfs.sum()}")
+    logger.warning(
+        "There are duplicated TLFS case_person_ids.", num_duplicates=str(msk_tlfs.sum())
+    )
 
 # %%
 # Prep data for pipeline (column names)
@@ -106,7 +113,10 @@ for col in payload_cols:
     # capitalise for consistency, but not needed anymore (see spellcheck issue)
     all_missing = all_missing & (df[col].isna() | df[col] == "-9")
 if all_missing.any():
-    logger.warning(f"Rows with all relevant columns missing: {all_missing.sum()}")
+    logger.warning(
+        "There are rows with all relevant columns missing.",
+        num_missing=str(all_missing.sum()),
+    )
     print(df[all_missing])
 
 input_data_file = work_folder + "/prep_input_data.parquet"
