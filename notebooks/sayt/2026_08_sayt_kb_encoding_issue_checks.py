@@ -8,6 +8,7 @@ import unicodedata
 import chardet
 import pandas as pd
 from dotenv import load_dotenv
+from ftfy import fix_encoding
 from google.cloud import storage
 from survey_assist_utils.logging import get_logger
 
@@ -133,4 +134,47 @@ print(
     ].drop_duplicates()
 )
 
+check = sic_kb_for_classifai[sic_kb_for_classifai["search_has_accent"]][
+    ["code", "search_text"]
+].drop_duplicates()
+
+check["encoding_fix"] = check["search_text"].apply(fix_encoding)
+
+
+def _remove_accents(text):
+    # Normalize the string to decompose characters with accents
+    normalized = unicodedata.normalize("NFD", text)
+    # Filter out combining marks (category 'Mn')
+    return "".join(char for char in normalized if unicodedata.category(char) != "Mn")
+
+
+# %%
+check["encoding_fix"] = check["search_text"].apply(fix_encoding)
+check["encoding_fix_and_no_accents"] = check["encoding_fix"].apply(_remove_accents)
+# %%
+
+
+def _fix_bom(text):
+    if isinstance(text, str):
+        text = text.encode("utf-8")
+    return text.decode("utf-8-sig")
+
+
+check["bom_fix"] = check["encoding_fix_and_no_accents"].apply(_fix_bom)
+check["bom_fix_only"] = check["search_text"].apply(_fix_bom)
+
+
+# Output: 'first line'
+# %%
+
+
+def _fix_encoding2(text):
+    try:
+        return text.encode("latin1").decode("utf-8")
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        return text
+
+
+check["encoding_fix2"] = check["search_text"].apply(_fix_encoding2)
+check["no_accents2"] = check["encoding_fix2"].apply(_remove_accents)
 # %%
