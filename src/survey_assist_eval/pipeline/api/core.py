@@ -276,7 +276,7 @@ class ApiEvaluator:
                 semaphore = self._classify["semaphore"]
                 session_method = session.post
                 request_kwargs["json"] = self._build_classify_payload(params)
-                request_kwargs["timeout"] = 30
+                request_kwargs["timeout"] = 60  # align with UI + API GW spec
             case "lookup":
                 endpoint_url = self._lookup["endpoint"]
                 semaphore = self._lookup["semaphore"]
