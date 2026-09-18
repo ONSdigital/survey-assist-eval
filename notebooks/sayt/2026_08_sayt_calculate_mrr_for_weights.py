@@ -39,8 +39,6 @@ USE_2K = True
 GRID_GRANULARITY = 10
 OUTPUT_DIR = "data/sayt/"
 FOLDER_PREFIX = f"weights_grid_{GRID_GRANULARITY}"
-KB = ""
-DF_SIZE = ""
 
 # %%
 load_dotenv()
@@ -278,5 +276,3 @@ for character_file in NUM_CHARACTERS_LIST:
             print("Source files removed.")
         else:
             print("Source files not removed.")
-
-# %%
