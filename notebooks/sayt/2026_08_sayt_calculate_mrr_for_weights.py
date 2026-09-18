@@ -31,6 +31,7 @@ from survey_assist_eval.evaluation.sayt.performance_metrics_functions import (
 SIC_CODE_LENGTH = 5
 MAX_SUGGESTIONS = 9
 CORRECT_CODE_COL = "correct_sic_code"
+SUGGESTERS_NAME = "ngram_prefix_semantic"
 NUM_CHARACTERS_LIST = list(range(4, 10))
 HARD_LIMIT = False
 USE_2K = True
@@ -189,7 +190,7 @@ for ngram in range(0, GRID_GRANULARITY + 1):
             retrievers_list.append(SemanticRetrieverSpec(weight=semantic))
 
         suggesters_three = {
-            "ngram, prefix and semantic": build_lookup_suggester(
+            SUGGESTERS_NAME: build_lookup_suggester(
                 sayt_corpus,
                 retrievers=retrievers_list,
             ),
@@ -211,9 +212,9 @@ with ngram={ngram}, prefix={prefix}, semantic={semantic}."""
                 hard_suggestions_limit=HARD_LIMIT,
             )
 
-            suggestions_cols_to_compare = suggestions_df.columns[
-                suggestions_df.columns.str.startswith("suggestions_")
-            ].tolist()
+            suggestions_cols_to_compare = [
+                f"suggestions_{characters}chars_{SUGGESTERS_NAME}"
+            ]
 
             compare_performance_metrics = build_sayt_metrics_comparison_table(
                 suggestions_df,
