@@ -293,8 +293,8 @@ def _prepare_faceted_heatmap_data(character_weight_results: dict[int, dict]):
         Prefix_weight=weight_results_df["Prefix_weight"] / 10,
         MRR_percent=weight_results_df["MRR"] * 100,
         Mean_rank=weight_results_df["mean_rank"],
-        Precision=weight_results_df["precision"],
-        Recall=weight_results_df["recall"],
+        Precision=weight_results_df["precision_at_k"],
+        Recall=weight_results_df["recall_at_k"],
     )
     weight_results_df = weight_results_df.assign(
         Ngram_weight_label=weight_results_df["Ngram_weight"].map(
