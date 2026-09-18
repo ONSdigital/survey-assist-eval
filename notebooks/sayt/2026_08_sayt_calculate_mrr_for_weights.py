@@ -34,7 +34,7 @@ CORRECT_CODE_COL = "correct_sic_code"
 SUGGESTERS_NAME = "ngram_prefix_semantic"
 NUM_CHARACTERS_LIST = list(range(4, 10))
 HARD_LIMIT = False
-USE_2K = True
+USE_2K = True  # If flase, use 100 sample
 
 GRID_GRANULARITY = 10
 OUTPUT_DIR = "data/sayt/"
@@ -56,7 +56,7 @@ client = gcs.Client()
 # access data for evaluation
 # use either 100 or 2k dataset
 if USE_2K:
-    DF_SIZE = "_2k"
+    df_size = "_2k"
     test_df = pd.read_parquet(
         f"gs://{BUCKET_NAME}/evaluation-pipeline/original_datasets/sic_2k/sic_2k_test_data.parquet"
     )
@@ -75,7 +75,7 @@ if USE_2K:
     test_df = test_df.rename(columns={"clerical_codes": CORRECT_CODE_COL})
 
 else:
-    DF_SIZE = "_100"
+    df_size = "_100"
     test_df = pd.read_excel(
         f"gs://{BUCKET_NAME}/evaluation-pipeline/SAYT/SAYT matching.xlsx",
         dtype=str,
@@ -107,11 +107,11 @@ LOOKUP_FILE_NAME = f"gs://{BUCKET_NAME}/sic_knowledgebase/sic_kb_for_sayt.csv"
 
 sayt_df = pd.read_csv(LOOKUP_FILE_NAME, dtype=str)
 if LOOKUP_FILE_NAME.endswith("sic_kb_for_sayt.csv"):
-    KB = "_sic_kb"
+    kb = "_sic_kb"
     display_text_col = "display_text"
 
 elif LOOKUP_FILE_NAME.endswith("Lookup_IT3_Final.csv"):
-    KB = "_lookup_it3"
+    kb = "_lookup_it3"
     sayt_df["code"] = sayt_df["SIC07"].apply(
         lambda x: x if len(x) == SIC_CODE_LENGTH else f"0{x}"
     )
@@ -129,7 +129,7 @@ sayt_corpus = build_sayt_corpus_from_df(
     code_col="code",
 )[1]
 
-SAVE_FOLDER = FOLDER_PREFIX + DF_SIZE + KB
+SAVE_FOLDER = FOLDER_PREFIX + df_size + kb
 BLOB_NAME = f"evaluation-pipeline/SAYT/weights_by_character/{SAVE_FOLDER}/"
 
 
