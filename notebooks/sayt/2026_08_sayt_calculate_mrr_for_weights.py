@@ -110,12 +110,7 @@ LOOKUP_FILE_NAME = f"gs://{BUCKET_NAME}/sic_knowledgebase/sic_kb_for_sayt.csv"
 sayt_df = pd.read_csv(LOOKUP_FILE_NAME, dtype=str)
 if LOOKUP_FILE_NAME.endswith("sic_kb_for_sayt.csv"):
     KB = "_sic_kb"
-    sayt_corpus = build_sayt_corpus_from_df(
-        sayt_df,
-        search_text_col="search_text",
-        display_text_col="display_text",
-        code_col="code",
-    )[1]
+    display_text_col = "display_text"
 
 elif LOOKUP_FILE_NAME.endswith("Lookup_IT3_Final.csv"):
     KB = "_lookup_it3"
@@ -123,20 +118,18 @@ elif LOOKUP_FILE_NAME.endswith("Lookup_IT3_Final.csv"):
         lambda x: x if len(x) == SIC_CODE_LENGTH else f"0{x}"
     )
     sayt_df = sayt_df.rename(columns={"SIC_lookup": "search_text"})
-    sayt_corpus = build_sayt_corpus_from_df(
-        sayt_df,
-        search_text_col="search_text",
-        display_text_col="search_text",
-        code_col="code",
-    )[1]
+    display_text_col = "search_text"
 else:
     raise ValueError(
         f"LOOKUP_FILE_NAME {LOOKUP_FILE_NAME} does not match expected file names."
     )
 
-sayt_corpus = build_sayt_corpus_from_df(sayt_df, "search_text", "search_text", "code")[
-    1
-]
+sayt_corpus = build_sayt_corpus_from_df(
+    df=sayt_df,
+    search_text_col="search_text",
+    display_text_col=display_text_col,
+    code_col="code",
+)[1]
 
 SAVE_FOLDER = FOLDER_PREFIX + DF_SIZE + KB
 BLOB_NAME = f"evaluation-pipeline/SAYT/weights_by_character/{SAVE_FOLDER}/"
