@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 from src.survey_assist_eval.pipeline.shared_components import _read_json
 
 # %%
-TEST_FOLDER = "weights_grid_10_sic_kb"
+TEST_FOLDER = "weights_grid_10_2k_sic_kb"
 LOCAL_DIR = f"data/sayt/{TEST_FOLDER}/"
 USE_BUCKET = True
 SAVE_PLOT = True
@@ -26,7 +26,7 @@ load_dotenv()
 bucket_name = os.getenv("EVALUATION_BUCKET_NAME")
 if not bucket_name:
     raise ValueError("EVALUATION_BUCKET_NAME environment variable not set")
-BLOB_NAME = f"evaluation-pipeline/SAYT/weights_by_character/{TEST_FOLDER}/"
+blob_name = f"evaluation-pipeline/SAYT/weights_by_character/{TEST_FOLDER}/"
 
 
 # %%
@@ -178,6 +178,9 @@ def _build_faceted_heatmap_matrices(
     mrr_matrices = []
     label_matrices = []
     prefix_matrices = []
+    mean_rank_matrices = []
+    precision_matrices = []
+    recall_matrices = []
 
     for character in character_order:
         mrr_matrix = _pivot_weight_matrix(
@@ -208,8 +211,45 @@ def _build_faceted_heatmap_matrices(
             .map(lambda value: f"{value:.1f}" if pd.notna(value) else "")
             .to_numpy()
         )
+        mean_rank_matrices.append(
+            _pivot_weight_matrix(
+                weight_results_df,
+                character,
+                "mean_rank",
+                weight_orders,
+            )
+            .map(lambda value: f"{value:.1f}" if pd.notna(value) else "")
+            .to_numpy()
+        )
+        precision_matrices.append(
+            _pivot_weight_matrix(
+                weight_results_df,
+                character,
+                "precision_at_k",
+                weight_orders,
+            )
+            .map(lambda value: f"{value:.1f}" if pd.notna(value) else "")
+            .to_numpy()
+        )
+        recall_matrices.append(
+            _pivot_weight_matrix(
+                weight_results_df,
+                character,
+                "recall_at_k",
+                weight_orders,
+            )
+            .map(lambda value: f"{value:.1f}" if pd.notna(value) else "")
+            .to_numpy()
+        )
 
-    return mrr_matrices, label_matrices, prefix_matrices
+    return (
+        mrr_matrices,
+        label_matrices,
+        prefix_matrices,
+        mean_rank_matrices,
+        precision_matrices,
+        recall_matrices,
+    )
 
 
 def _create_faceted_imshow(
@@ -231,7 +271,7 @@ def _create_faceted_imshow(
         labels={
             "x": "semantic",
             "y": "ngram",
-            "color": "MMR (%)",
+            "color": "MRR (%)",
             "facet_col": "Characters",
         },
     )
@@ -267,12 +307,45 @@ def _prepare_faceted_heatmap_data(character_weight_results: dict[int, dict]):
     return weight_results_df
 
 
-def _add_faceted_heatmap_text(fig, character_order, label_matrices, prefix_matrices):
-    for character, trace, labels, prefix_weights in zip(
-        character_order, fig.data, label_matrices, prefix_matrices, strict=True
+def _add_faceted_heatmap_text(  # noqa: PLR0913, pylint: disable=R0913,R0917
+    fig,
+    character_order,
+    label_matrices,
+    prefix_matrices,
+    mean_ranks_matrices,
+    precision_matrices,
+    recall_matrices,
+):
+    for (
+        character,
+        trace,
+        labels,
+        prefix_weights,
+        mean_ranks,
+        precisions,
+        recalls,
+    ) in zip(
+        character_order,
+        fig.data,
+        label_matrices,
+        prefix_matrices,
+        mean_ranks_matrices,
+        precision_matrices,
+        recall_matrices,
+        strict=True,
     ):
+        hover_matrix = [
+            [
+                f"Prefix Weight: {pw}<br>Mean Rank: {mr}<br>Precision:{pr}<br>Recall: {re}"
+                for pw, mr, pr, re in zip(row_pw, row_mr, row_pr, row_re, strict=False)
+            ]
+            for row_pw, row_mr, row_pr, row_re in zip(
+                prefix_weights, mean_ranks, precisions, recalls, strict=False
+            )
+        ]
         trace.update(
-            customdata=prefix_weights,
+            # customdata=customdata
+            hovertext=hover_matrix,
             text=labels,
             texttemplate="%{text}",
             textfont={"size": 10},
@@ -280,8 +353,8 @@ def _add_faceted_heatmap_text(fig, character_order, label_matrices, prefix_matri
                 f"Characters: {character}<br>"
                 "Ngram Weight: %{y}<br>"
                 "Semantic Weight: %{x}<br>"
-                "Prefix Weight: %{customdata}<br>"
-                "MMR (%): %{z:.3f}<extra></extra>"
+                "%{hovertext}<br>"
+                "MRR (%): %{z:.3f}<extra></extra>"
             ),
         )
 
@@ -329,7 +402,15 @@ def generate_faceted_heatmap(character_weight_results: dict[int, dict]):
         ngram_weight_order,
         facet_col_wrap,
     )
-    _add_faceted_heatmap_text(fig, character_order, matrices[1], matrices[2])
+    _add_faceted_heatmap_text(
+        fig,
+        character_order,
+        matrices[1],
+        matrices[2],
+        matrices[3],
+        matrices[4],
+        matrices[5],
+    )
     _rename_facet_titles(fig, character_order)
 
     fig.update_layout(
@@ -338,7 +419,7 @@ def generate_faceted_heatmap(character_weight_results: dict[int, dict]):
         height=(360 * facet_rows) + 160,
         margin={"l": 80, "r": 120, "t": 90, "b": 70},
         plot_bgcolor="white",
-        coloraxis_colorbar={"title": "MMR (%)"},
+        coloraxis_colorbar={"title": "MRR (%)"},
     )
     _style_faceted_heatmap_axes(fig)
 
@@ -352,7 +433,7 @@ for char in characters_list:
     data_weights = get_weight_by_char_dicts(
         characters=char,
         use_bucket=USE_BUCKET,
-        bucket_path=f"gs://{bucket_name}/{BLOB_NAME}",
+        bucket_path=f"gs://{bucket_name}/{blob_name}",
         local_path=LOCAL_DIR,
     )
 
@@ -367,7 +448,7 @@ char = 9
 data_weights = get_weight_by_char_dicts(
     characters=char,
     use_bucket=USE_BUCKET,
-    bucket_path=f"gs://{bucket_name}/{BLOB_NAME}",
+    bucket_path=f"gs://{bucket_name}/{blob_name}",
     local_path=LOCAL_DIR,
 )
 
@@ -386,7 +467,7 @@ for char in characters_list:
     data_weights = get_weight_by_char_dicts(
         characters=char,
         use_bucket=USE_BUCKET,
-        bucket_path=f"gs://{bucket_name}/{BLOB_NAME}",
+        bucket_path=f"gs://{bucket_name}/{blob_name}",
         local_path=LOCAL_DIR,
     )
     data_by_character[char] = data_weights
