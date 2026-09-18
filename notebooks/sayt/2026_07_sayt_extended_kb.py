@@ -45,7 +45,7 @@ bucket_name = os.getenv("EVALUATION_BUCKET_NAME")
 if not bucket_name:
     raise ValueError("EVALUATION_BUCKET_NAME environment variable not set")
 
-OUTPUT_DIR = f"gs://{bucket_name}/evaluation-pipeline/SAYT/wip"
+OUTPUT_DIR = "data/sayt"  # f"gs://{bucket_name}/evaluation-pipeline/SAYT/wip"
 
 logger = get_logger(__name__)
 logger.info("Location specs", bucket_name=bucket_name, output_dir=OUTPUT_DIR)
@@ -152,6 +152,26 @@ merge_with_duplicates = rephrased_df.merge(
     ),
     how="left",
 ).reset_index(drop=True)
+
+# %%
+merge_with_duplicates["final_source"] = "rephrased"
+merge_with_duplicates["final_display_text"] = merge_with_duplicates["sa_rephrased_text"]
+
+for lab in ["it2", "it3", "it4"]:
+    msk = ~merge_with_duplicates[f"code_{lab}"].apply(
+        lambda x: True if pd.isna(x) else x.endswith("x")
+    )
+    merge_with_duplicates.loc[msk, "final_source"] = lab
+    merge_with_duplicates.loc[msk, "final_display_text"] = merge_with_duplicates.loc[
+        msk, f"display_text_{lab}"
+    ]
+
+logger.info(
+    "Final source identified for each SIC class.",
+    num_classes_by_source=merge_with_duplicates["final_source"]
+    .value_counts()
+    .to_dict(),
+)
 
 # %%
 # Report missing or collapsed titles to SAYT team
