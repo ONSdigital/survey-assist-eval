@@ -8999,8 +8999,8 @@ survey-assist-utils = {git = "https://github.com/ONSdigital/survey-assist-utils.
 [package.source]
 type = "git"
 url = "https://github.com/ONSdigital/survey-assist-embed-core.git"
-reference = "v0.2.3"
-resolved_reference = "5a1ac90b0e1ad88ed6fb89b8a895299ab526ef43"
+reference = "450cb52"
+resolved_reference = "450cb522c8200a16664f21cd2f510679478447ac"
 
 [[package]]
 name = "survey-assist-utils"
@@ -10353,4 +10353,4 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<4.0"
-content-hash = "bb318121ea0c21989c56f299f9b7dc2adee18a790ab928cddeae5c0cd2415893"
+content-hash = "c9db0985ac193e595f783cc6bfbf5e81f95d994adb01a3216157e7145f69596c"

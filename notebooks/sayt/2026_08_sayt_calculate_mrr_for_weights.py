@@ -9,17 +9,13 @@ import os
 import pandas as pd
 from dotenv import load_dotenv
 from google.cloud import storage as gcs
-from survey_assist_embed_core.sayt import (
-    NgramRetrieverSpec,
-    PrefixRetrieverSpec,
-    SemanticRetrieverSpec,
-)
 from survey_assist_utils.logging import get_logger
 
 from notebooks.sayt.sayt_utils import (
     build_lookup_suggester,
     build_sayt_corpus_from_df,
     get_suggestions_by_chars,
+    update_suggester_weights,
 )
 from src.survey_assist_eval.pipeline.shared_components import _write_json
 from survey_assist_eval.evaluation.sayt.performance_metrics_functions import (
@@ -114,6 +110,7 @@ if not os.path.exists(OUTPUT_DIR + SAVE_FOLDER):
     os.makedirs(OUTPUT_DIR + SAVE_FOLDER)
     print(f"Created folder: {OUTPUT_DIR + SAVE_FOLDER}")
 # %%
+default_suggester = build_lookup_suggester(sayt_corpus)
 
 characters_to_run = NUM_CHARACTERS_LIST.copy()
 for characters in NUM_CHARACTERS_LIST.copy():
@@ -148,20 +145,12 @@ for ngram in range(0, GRID_GRANULARITY + 1):
             )
             continue
 
-        retrievers_list = []
-        if ngram > 0:
-            retrievers_list.append(NgramRetrieverSpec(weight=ngram))
-        if prefix > 0:
-            retrievers_list.append(PrefixRetrieverSpec(weight=prefix))
-        if semantic > 0:
-            retrievers_list.append(SemanticRetrieverSpec(weight=semantic))
-
-        suggesters_three = {
-            "ngram, prefix and semantic": build_lookup_suggester(
-                sayt_corpus,
-                retrievers=retrievers_list,
-            ),
-        }
+        suggester = update_suggester_weights(
+            default_suggester,
+            prefix_weights=prefix,
+            ngram_weights=ngram,
+            semantic_weights=semantic,
+        )
 
         for characters in characters_to_run2:
             print(
@@ -172,7 +161,7 @@ with ngram={ngram}, prefix={prefix}, semantic={semantic}."""
 
             suggestions_df, avg_ms_dict = get_suggestions_by_chars(
                 test_df,
-                suggesters_dict=suggesters_three,
+                suggesters_dict={"ngram, prefix and semantic": suggester},
                 num_chars=[characters],
                 suggestions_limit=MAX_SUGGESTIONS,
                 hard_suggestions_limit=HARD_LIMIT,

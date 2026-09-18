@@ -7,9 +7,13 @@ import pandas as pd
 import plotly.express as px
 from survey_assist_embed_core.sayt import (
     NgramRetrieverSpec,
+    NgramWeightSpec,
     PrefixRetrieverSpec,
+    PrefixWeightSpec,
     SAYTSuggester,
     SemanticRetrieverSpec,
+    SemanticWeightSpec,
+    WeightSpecs,
 )
 from survey_assist_utils.logging import get_logger
 
@@ -31,26 +35,79 @@ logger = get_logger(__name__)
 def build_lookup_suggester(
     corpus: list[tuple[str, str]],
     *,
-    retrievers: list | None = None,
-    semantic_weight: float | None = None,
+    prefix_weights: int | float | dict[int, float] = 1.0,
+    ngram_weights: int | float | dict[int, float] = 1.0,
+    semantic_weights: int | float | dict[int, float] = 1.0,
 ) -> SAYTSuggester:
     """Build a lookup suggester using the explicit retriever-spec API.
 
     Args:
         corpus: Search corpus as (search_text, display_text) tuples.
-        semantic_weight: Weight for semantic retrieval. If None, semantic retrieval
-            is not included.
-        retrievers: list of retrievers to be used.
+        prefix_weights: Weight for the prefix retriever. Pass 0 to exclude,
+            or a non-zero value to include. Defaults to 1.0.
+        ngram_weights: Weight for the ngram retriever. Pass 0 to exclude,
+            or a non-zero value to include. Defaults to 1.0.
+        semantic_weights: Weight for the semantic retriever. Pass 0 to exclude,
+            or a non-zero value to include. Defaults to 1.0.
 
     Returns:
         SAYTSuggester: Configured suggester instance.
+            Defaults to using all retrievers with weight 1.0.
     """
-    if retrievers is None:
-        retrievers = [PrefixRetrieverSpec(weight=1.0), NgramRetrieverSpec(weight=1.0)]
+    retrievers = []
+    weight_spec = []
+    if prefix_weights != 0:
+        retrievers.append(PrefixRetrieverSpec())
+        weight_spec.append(PrefixWeightSpec(weights=prefix_weights))
 
-    if semantic_weight is not None:
-        retrievers.append(SemanticRetrieverSpec(weight=semantic_weight))
-    return SAYTSuggester(corpus, retrievers=retrievers)
+    if ngram_weights != 0:
+        retrievers.append(NgramRetrieverSpec())
+        weight_spec.append(NgramWeightSpec(weights=ngram_weights))
+
+    if semantic_weights != 0:
+        retrievers.append(SemanticRetrieverSpec())
+        weight_spec.append(SemanticWeightSpec(weights=semantic_weights))
+
+    if not retrievers:
+        raise ValueError("At least one retriever must be included.")
+
+    return SAYTSuggester(
+        corpus, retrievers=retrievers, weights=WeightSpecs(specs=weight_spec)
+    )
+
+
+def update_suggester_weights(
+    suggester: SAYTSuggester,
+    *,
+    prefix_weights: int | float | dict[int, float] = 1.0,
+    ngram_weights: int | float | dict[int, float] = 1.0,
+    semantic_weights: int | float | dict[int, float] = 1.0,
+) -> SAYTSuggester:
+    """Update the weights of an existing SAYTSuggester instance.
+
+    Args:
+        suggester: The SAYTSuggester instance to update.
+        prefix_weights: New weight for the prefix retriever. Pass 0 to exclude,
+            or a non-zero value to include. Defaults to 1.0.
+        ngram_weights: New weight for the ngram retriever. Pass 0 to exclude,
+            or a non-zero value to include. Defaults to 1.0.
+        semantic_weights: New weight for the semantic retriever. Pass 0 to exclude,
+            or a non-zero value to include. Defaults to 1.0.
+
+    Returns:
+        SAYTSuggester: The updated suggester instance.
+    """
+    suggester.update_weights(
+        weights=WeightSpecs(
+            specs=[
+                PrefixWeightSpec(weights=prefix_weights),
+                NgramWeightSpec(weights=ngram_weights),
+                SemanticWeightSpec(weights=semantic_weights),
+            ]
+        )
+    )
+
+    return suggester
 
 
 def validate_one_code(code: str, code_length=5) -> bool:
@@ -286,7 +343,7 @@ def get_suggestions_by_chars(  # noqa: PLR0913 pylint: disable=R0917,R0913,R0914
             else:
                 df[suggestions_col] = suggestions_result
 
-            logger.info("  -> suggestions done", elapsed_sec=avg_ms)
+            logger.info("  -> suggestions done", avg_time_in_ms_per_suggestion=avg_ms)
 
             df[retrieved_codes_col] = df.apply(
                 get_codes_from_suggestions,

@@ -10,20 +10,17 @@ The variables are loaded from the ".env" file.
 
 # %%
 import os
+from copy import copy
 
 import numpy as np
 import pandas as pd
 from dotenv import load_dotenv
-from survey_assist_embed_core.sayt import (
-    NgramRetrieverSpec,
-    PrefixRetrieverSpec,
-    SemanticRetrieverSpec,
-)
 from survey_assist_utils.logging import get_logger
 
 from notebooks.sayt.sayt_utils import (
     build_lookup_suggester,
     build_sayt_corpus_from_df,
+    update_suggester_weights,
 )
 from notebooks.sayt.suggester_eval import run_eval_for_suggesters
 
@@ -88,18 +85,33 @@ _, sayt2_corpus = build_sayt_corpus_from_df(
 )
 
 # %%
+# define a base suggester
+suggester_sayt2_corpus = build_lookup_suggester(
+    sayt2_corpus, prefix_weights=1.0, ngram_weights=1.0, semantic_weights=1.0
+)
 # define bunch of different suggesters to evaluate
 suggesters = {
-    "Ngrams only": build_lookup_suggester(
-        sayt2_corpus, retrievers=[NgramRetrieverSpec()]
+    "Default": suggester_sayt2_corpus,
+    "Ngrams only": update_suggester_weights(
+        suggester=copy(suggester_sayt2_corpus),
+        prefix_weights=0.0,
+        ngram_weights=1.0,
+        semantic_weights=0.0,
     ),
-    "Prefix only": build_lookup_suggester(
-        sayt2_corpus, retrievers=[PrefixRetrieverSpec()]
+    "Prefix only": update_suggester_weights(
+        suggester=copy(suggester_sayt2_corpus),
+        prefix_weights=1.0,
+        ngram_weights=0.0,
+        semantic_weights=0.0,
     ),
-    "Semantic only": build_lookup_suggester(
-        sayt2_corpus, retrievers=[SemanticRetrieverSpec()]
+    "Semantic only": update_suggester_weights(
+        suggester=copy(suggester_sayt2_corpus),
+        prefix_weights=0.0,
+        ngram_weights=0.0,
+        semantic_weights=1.0,
     ),
 }
+
 
 # %%
 suggestions_df, fig, metrics_table = run_eval_for_suggesters(
