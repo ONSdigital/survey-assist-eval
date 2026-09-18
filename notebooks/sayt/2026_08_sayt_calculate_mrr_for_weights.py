@@ -39,6 +39,15 @@ GRID_GRANULARITY = 10
 OUTPUT_DIR = "data/sayt/"
 FOLDER_PREFIX = f"weights_grid_{GRID_GRANULARITY}"
 
+KEYS_TO_DELETE = [
+    "suggestions_col",
+    "total_queries",
+    "queries_with_ground_truth",
+    "queries_missing_ground_truth",
+    "unmatched_query_count",
+    "code_digit_match_length",
+]
+
 # %%
 load_dotenv()
 bucket_name = os.getenv("EVALUATION_BUCKET_NAME")
@@ -138,8 +147,8 @@ blob_name = f"evaluation-pipeline/SAYT/weights_by_character/{save_folder}/"
 if not os.path.exists(OUTPUT_DIR + save_folder):
     os.makedirs(OUTPUT_DIR + save_folder)
     print(f"Created folder: {OUTPUT_DIR + save_folder}")
-# %%
 
+# %%
 characters_to_run = NUM_CHARACTERS_LIST.copy()
 for characters in NUM_CHARACTERS_LIST.copy():
 
@@ -213,19 +222,19 @@ with ngram={ngram}, prefix={prefix}, semantic={semantic}."""
                 correct_codes_col=CORRECT_CODE_COL,
                 suggestions_col=suggestions_col_to_compare,
                 ave_time_per_query=avg_ms_dict[suggestions_col_to_compare],
-                k_values=[characters],
+                k_values=list(range(1, MAX_SUGGESTIONS + 1)),
             )
 
             data = {
                 "Ngram_weight": ngram,
                 "Prefix_weight": prefix,
                 "Semantic_weight": semantic,
-                "MRR": compare_performance_metrics.mrr,
-                "avg_time": compare_performance_metrics.ave_time_per_query_ms,
-                "mean_rank": compare_performance_metrics.mean_rank,
-                "precision": compare_performance_metrics.precision_at_k[characters],
-                "recall": compare_performance_metrics.recall_at_k[characters],
+                **compare_performance_metrics.__dict__,
             }
+
+            for key in KEYS_TO_DELETE:
+                data.pop(key, None)
+
             print(data)
 
             with open(sub_file_name, "w", encoding="utf-8") as f:
@@ -233,7 +242,7 @@ with ngram={ngram}, prefix={prefix}, semantic={semantic}."""
 
 # %%
 # combine separate test results into one file
-remove_files = False  # set to True to remove the individual test files after combining
+remove_files = True  # set to True to remove the individual test files after combining
 save_to_bucket = True  # set to True to save the combined file to the GCS bucket
 
 for character_file in NUM_CHARACTERS_LIST:
