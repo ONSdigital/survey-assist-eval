@@ -26,7 +26,7 @@ load_dotenv()
 bucket_name = os.getenv("EVALUATION_BUCKET_NAME")
 if not bucket_name:
     raise ValueError("EVALUATION_BUCKET_NAME environment variable not set")
-BLOB_NAME = f"evaluation-pipeline/SAYT/weights_by_character/{TEST_FOLDER}/"
+blob_name = f"evaluation-pipeline/SAYT/weights_by_character/{TEST_FOLDER}/"
 
 
 # %%
@@ -215,7 +215,7 @@ def _build_faceted_heatmap_matrices(
             _pivot_weight_matrix(
                 weight_results_df,
                 character,
-                "Mean_rank",
+                "mean_rank",
                 weight_orders,
             )
             .map(lambda value: f"{value:.1f}" if pd.notna(value) else "")
@@ -225,7 +225,7 @@ def _build_faceted_heatmap_matrices(
             _pivot_weight_matrix(
                 weight_results_df,
                 character,
-                "Precision",
+                "precision_at_k",
                 weight_orders,
             )
             .map(lambda value: f"{value:.1f}" if pd.notna(value) else "")
@@ -235,7 +235,7 @@ def _build_faceted_heatmap_matrices(
             _pivot_weight_matrix(
                 weight_results_df,
                 character,
-                "Recall",
+                "recall_at_k",
                 weight_orders,
             )
             .map(lambda value: f"{value:.1f}" if pd.notna(value) else "")
@@ -292,9 +292,6 @@ def _prepare_faceted_heatmap_data(character_weight_results: dict[int, dict]):
         Semantic_weight=weight_results_df["Semantic_weight"] / 10,
         Prefix_weight=weight_results_df["Prefix_weight"] / 10,
         MRR_percent=weight_results_df["MRR"] * 100,
-        Mean_rank=weight_results_df["mean_rank"],
-        Precision=weight_results_df["precision_at_k"],
-        Recall=weight_results_df["recall_at_k"],
     )
     weight_results_df = weight_results_df.assign(
         Ngram_weight_label=weight_results_df["Ngram_weight"].map(
@@ -436,7 +433,7 @@ for char in characters_list:
     data_weights = get_weight_by_char_dicts(
         characters=char,
         use_bucket=USE_BUCKET,
-        bucket_path=f"gs://{bucket_name}/{BLOB_NAME}",
+        bucket_path=f"gs://{bucket_name}/{blob_name}",
         local_path=LOCAL_DIR,
     )
 
@@ -451,7 +448,7 @@ char = 9
 data_weights = get_weight_by_char_dicts(
     characters=char,
     use_bucket=USE_BUCKET,
-    bucket_path=f"gs://{bucket_name}/{BLOB_NAME}",
+    bucket_path=f"gs://{bucket_name}/{blob_name}",
     local_path=LOCAL_DIR,
 )
 
@@ -470,7 +467,7 @@ for char in characters_list:
     data_weights = get_weight_by_char_dicts(
         characters=char,
         use_bucket=USE_BUCKET,
-        bucket_path=f"gs://{bucket_name}/{BLOB_NAME}",
+        bucket_path=f"gs://{bucket_name}/{blob_name}",
         local_path=LOCAL_DIR,
     )
     data_by_character[char] = data_weights
