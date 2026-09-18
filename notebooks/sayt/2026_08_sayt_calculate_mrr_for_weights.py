@@ -28,7 +28,6 @@ from survey_assist_eval.evaluation.sayt.performance_metrics_functions import (
 )
 
 # %%
-SIC_CODE_LENGTH = 5
 MAX_SUGGESTIONS = 9
 CORRECT_CODE_COL = "correct_sic_code"
 SUGGESTERS_NAME = "ngram_prefix_semantic"
@@ -54,7 +53,6 @@ client = gcs.Client()
 
 # %%
 # access data for evaluation
-# use either 100 or 2k dataset
 if USE_2K:
     df_size = "_2k"
     test_df = pd.read_parquet(
@@ -108,15 +106,18 @@ LOOKUP_FILE_NAME = f"gs://{BUCKET_NAME}/sic_knowledgebase/sic_kb_for_sayt.csv"
 sayt_df = pd.read_csv(LOOKUP_FILE_NAME, dtype=str)
 if LOOKUP_FILE_NAME.endswith("sic_kb_for_sayt.csv"):
     kb = "_sic_kb"
+
+    search_text_col = "search_text"
     display_text_col = "display_text"
+    code_col = "code"
 
 elif LOOKUP_FILE_NAME.endswith("Lookup_IT3_Final.csv"):
     kb = "_lookup_it3"
-    sayt_df["code"] = sayt_df["SIC07"].apply(
-        lambda x: x if len(x) == SIC_CODE_LENGTH else f"0{x}"
-    )
-    sayt_df = sayt_df.rename(columns={"SIC_lookup": "search_text"})
-    display_text_col = "search_text"
+
+    search_text_col = "SIC_lookup"
+    display_text_col = "SIC_lookup"
+    code_col = "SIC07"
+
 else:
     raise ValueError(
         f"LOOKUP_FILE_NAME {LOOKUP_FILE_NAME} does not match expected file names."
@@ -124,9 +125,9 @@ else:
 
 sayt_corpus = build_sayt_corpus_from_df(
     df=sayt_df,
-    search_text_col="search_text",
+    search_text_col=search_text_col,
     display_text_col=display_text_col,
-    code_col="code",
+    code_col=code_col,
 )[1]
 
 SAVE_FOLDER = FOLDER_PREFIX + df_size + kb
