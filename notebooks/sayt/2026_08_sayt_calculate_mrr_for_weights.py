@@ -24,7 +24,7 @@ from notebooks.sayt.sayt_utils import (
 )
 from src.survey_assist_eval.pipeline.shared_components import _write_json
 from survey_assist_eval.evaluation.sayt.performance_metrics_functions import (
-    build_sayt_metrics_comparison_table,
+    compute_performance_metrics_from_suggestions,
 )
 
 # %%
@@ -212,29 +212,27 @@ with ngram={ngram}, prefix={prefix}, semantic={semantic}."""
                 hard_suggestions_limit=HARD_LIMIT,
             )
 
-            suggestions_cols_to_compare = [
+            suggestions_col_to_compare = (
                 f"suggestions_{characters}chars_{SUGGESTERS_NAME}"
-            ]
+            )
 
-            compare_performance_metrics = build_sayt_metrics_comparison_table(
-                suggestions_df,
-                suggestions_cols_to_compare=suggestions_cols_to_compare,
+            compare_performance_metrics = compute_performance_metrics_from_suggestions(
+                df=suggestions_df,
                 correct_codes_col=CORRECT_CODE_COL,
+                suggestions_col=suggestions_col_to_compare,
+                ave_time_per_query=avg_ms_dict[suggestions_col_to_compare],
                 k_values=[characters],
-                ave_time_per_query_dict=avg_ms_dict,
             )
 
             data = {
                 "Ngram_weight": ngram,
                 "Prefix_weight": prefix,
                 "Semantic_weight": semantic,
-                "MRR": compare_performance_metrics["mrr"][0],
-                "avg_time": compare_performance_metrics["ave_time_per_query_ms"][0],
-                "mean_rank": compare_performance_metrics["mean_rank"][0],
-                "precision": compare_performance_metrics["precision_at_k"][0][
-                    characters
-                ],
-                "recall": compare_performance_metrics["recall_at_k"][0][characters],
+                "MRR": compare_performance_metrics.mrr,
+                "avg_time": compare_performance_metrics.ave_time_per_query_ms,
+                "mean_rank": compare_performance_metrics.mean_rank,
+                "precision": compare_performance_metrics.precision_at_k[characters],
+                "recall": compare_performance_metrics.recall_at_k[characters],
             }
             print(data)
 
