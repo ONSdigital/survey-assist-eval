@@ -242,8 +242,8 @@ with ngram={ngram}, prefix={prefix}, semantic={semantic}."""
 
 # %%
 # combine separate test results into one file
-remove_files = True  # set to True to remove the individual test files after combining
-save_to_bucket = True  # set to True to save the combined file to the GCS bucket
+REMOVE_FILES = False  # set to True to remove the individual test files after combining
+SAVE_TO_BUCKET = True  # set to True to save the combined file to the GCS bucket
 
 for character_file in NUM_CHARACTERS_LIST:
     master_dict = {}
@@ -275,12 +275,12 @@ for character_file in NUM_CHARACTERS_LIST:
         print(f"File {final_file_name} saved.")
 
         # Save to the bucket
-        if save_to_bucket:
+        if SAVE_TO_BUCKET:
             bucket_path = "gs://" + bucket_name + "/" + blob_name + final_file_name
             _write_json(master_dict, bucket_path)
 
         # remove files
-        if remove_files:
+        if REMOVE_FILES:
             for file_path in files_to_delete:
                 os.remove(file_path)
             print("Source files removed.")
