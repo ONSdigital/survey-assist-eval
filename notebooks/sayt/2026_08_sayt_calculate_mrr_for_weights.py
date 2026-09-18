@@ -41,13 +41,13 @@ FOLDER_PREFIX = f"weights_grid_{GRID_GRANULARITY}"
 
 # %%
 load_dotenv()
-BUCKET_NAME = os.getenv("EVALUATION_BUCKET_NAME")
-if not BUCKET_NAME:
+bucket_name = os.getenv("EVALUATION_BUCKET_NAME")
+if not bucket_name:
     raise ValueError("EVALUATION_BUCKET_NAME environment variable not set")
 
 
 logger = get_logger(__name__)
-logger.info("Location specs", BUCKET_NAME=BUCKET_NAME, output_dir=OUTPUT_DIR)
+logger.info("Location specs", bucket_name=bucket_name, output_dir=OUTPUT_DIR)
 
 client = gcs.Client()
 
@@ -56,7 +56,7 @@ client = gcs.Client()
 if USE_2K:
     df_size = "_2k"
     test_df = pd.read_parquet(
-        f"gs://{BUCKET_NAME}/evaluation-pipeline/original_datasets/sic_2k/sic_2k_test_data.parquet"
+        f"gs://{bucket_name}/evaluation-pipeline/original_datasets/sic_2k/sic_2k_test_data.parquet"
     )
 
     is_self_employed = test_df["sic2007_employee"] == "-9"
@@ -75,7 +75,7 @@ if USE_2K:
 else:
     df_size = "_100"
     test_df = pd.read_excel(
-        f"gs://{BUCKET_NAME}/evaluation-pipeline/SAYT/SAYT matching.xlsx",
+        f"gs://{bucket_name}/evaluation-pipeline/SAYT/SAYT matching.xlsx",
         dtype=str,
         nrows=100,  # Excel formatting causes 10s of thousands of blank input rows after the real 100
         header=1,  # first row is header
@@ -100,18 +100,18 @@ else:
         )
 
 # %%
-# LOOKUP_FILE_NAME = f"gs://{BUCKET_NAME}/evaluation-pipeline/SAYT/Lookup_IT3_Final.csv"
-LOOKUP_FILE_NAME = f"gs://{BUCKET_NAME}/sic_knowledgebase/sic_kb_for_sayt.csv"
+# lookup_file_name = f"gs://{bucket_name}/evaluation-pipeline/SAYT/Lookup_IT3_Final.csv"
+lookup_file_name = f"gs://{bucket_name}/sic_knowledgebase/sic_kb_for_sayt.csv"
 
-sayt_df = pd.read_csv(LOOKUP_FILE_NAME, dtype=str)
-if LOOKUP_FILE_NAME.endswith("sic_kb_for_sayt.csv"):
+sayt_df = pd.read_csv(lookup_file_name, dtype=str)
+if lookup_file_name.endswith("sic_kb_for_sayt.csv"):
     kb = "_sic_kb"
 
     search_text_col = "search_text"
     display_text_col = "display_text"
     code_col = "code"
 
-elif LOOKUP_FILE_NAME.endswith("Lookup_IT3_Final.csv"):
+elif lookup_file_name.endswith("Lookup_IT3_Final.csv"):
     kb = "_lookup_it3"
 
     search_text_col = "SIC_lookup"
@@ -120,7 +120,7 @@ elif LOOKUP_FILE_NAME.endswith("Lookup_IT3_Final.csv"):
 
 else:
     raise ValueError(
-        f"LOOKUP_FILE_NAME {LOOKUP_FILE_NAME} does not match expected file names."
+        f"lookup_file_name {lookup_file_name} does not match expected file names."
     )
 
 sayt_corpus = build_sayt_corpus_from_df(
@@ -130,21 +130,21 @@ sayt_corpus = build_sayt_corpus_from_df(
     code_col=code_col,
 )[1]
 
-SAVE_FOLDER = FOLDER_PREFIX + df_size + kb
-BLOB_NAME = f"evaluation-pipeline/SAYT/weights_by_character/{SAVE_FOLDER}/"
+save_folder = FOLDER_PREFIX + df_size + kb
+blob_name = f"evaluation-pipeline/SAYT/weights_by_character/{save_folder}/"
 
 
 # %%
-if not os.path.exists(OUTPUT_DIR + SAVE_FOLDER):
-    os.makedirs(OUTPUT_DIR + SAVE_FOLDER)
-    print(f"Created folder: {OUTPUT_DIR + SAVE_FOLDER}")
+if not os.path.exists(OUTPUT_DIR + save_folder):
+    os.makedirs(OUTPUT_DIR + save_folder)
+    print(f"Created folder: {OUTPUT_DIR + save_folder}")
 # %%
 
 characters_to_run = NUM_CHARACTERS_LIST.copy()
 for characters in NUM_CHARACTERS_LIST.copy():
 
     main_file_name = (
-        f"{OUTPUT_DIR}{SAVE_FOLDER}/weight_test_{characters}chars_n_p_s.json"
+        f"{OUTPUT_DIR}{save_folder}/weight_test_{characters}chars_n_p_s.json"
     )
 
     if os.path.exists(main_file_name):
@@ -160,7 +160,7 @@ for ngram in range(0, GRID_GRANULARITY + 1):
         characters_to_run2 = characters_to_run.copy()
         for characters in characters_to_run2.copy():
 
-            sub_file_name = f"{OUTPUT_DIR}{SAVE_FOLDER}/w_{characters}_n{ngram}_p{prefix}_s{semantic}.json"
+            sub_file_name = f"{OUTPUT_DIR}{save_folder}/w_{characters}_n{ngram}_p{prefix}_s{semantic}.json"
             if os.path.exists(sub_file_name):
                 print(
                     f"File already exists, no need to run for {characters} characters."
@@ -193,7 +193,7 @@ for ngram in range(0, GRID_GRANULARITY + 1):
                 f"""Running evaluation for {characters} characters,
 with ngram={ngram}, prefix={prefix}, semantic={semantic}."""
             )
-            sub_file_name = f"{OUTPUT_DIR}{SAVE_FOLDER}/w_{characters}_n{ngram}_p{prefix}_s{semantic}.json"
+            sub_file_name = f"{OUTPUT_DIR}{save_folder}/w_{characters}_n{ngram}_p{prefix}_s{semantic}.json"
 
             suggestions_df, avg_ms_dict = get_suggestions_by_chars(
                 df=test_df,
@@ -240,16 +240,16 @@ for character_file in NUM_CHARACTERS_LIST:
     master_dict = {}
     files_to_delete = []
     final_file_name = f"weight_test_{character_file}chars_n_p_s.json"
-    main_file_name = f"{OUTPUT_DIR}{SAVE_FOLDER}/{final_file_name}"
+    main_file_name = f"{OUTPUT_DIR}{save_folder}/{final_file_name}"
 
     if os.path.exists(main_file_name):
         print("Final file already exists.")
     else:
-        for filename in sorted(os.listdir(OUTPUT_DIR + SAVE_FOLDER)):
+        for filename in sorted(os.listdir(OUTPUT_DIR + save_folder)):
             if filename.startswith(f"w_{character_file}_n") and filename.endswith(
                 ".json"
             ):
-                full_path = os.path.join(OUTPUT_DIR + SAVE_FOLDER, filename)
+                full_path = os.path.join(OUTPUT_DIR + save_folder, filename)
                 key_name = filename[:-5]  # remove .json from the file name
                 test_name = key_name.lstrip(f"w_{character_file}")
                 with open(full_path, encoding="utf-8") as f:
@@ -257,7 +257,7 @@ for character_file in NUM_CHARACTERS_LIST:
                 files_to_delete.append(full_path)
         # Save locally
         with open(
-            os.path.join(OUTPUT_DIR + SAVE_FOLDER, final_file_name),
+            os.path.join(OUTPUT_DIR + save_folder, final_file_name),
             "w",
             encoding="utf-8",
         ) as f:
@@ -267,7 +267,7 @@ for character_file in NUM_CHARACTERS_LIST:
 
         # Save to the bucket
         if save_to_bucket:
-            bucket_path = "gs://" + BUCKET_NAME + "/" + BLOB_NAME + final_file_name
+            bucket_path = "gs://" + bucket_name + "/" + blob_name + final_file_name
             _write_json(master_dict, bucket_path)
 
         # remove files
