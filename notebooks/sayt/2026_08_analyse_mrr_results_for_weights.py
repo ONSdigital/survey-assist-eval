@@ -103,22 +103,17 @@ def get_ranked_setups(data: dict):
 # %%
 def _pivot_weight_matrix(
     data: pd.DataFrame,
-    character: str,
     value_col: str,
     weight_orders: tuple[list[str], list[str]],
     aggfunc: str = "first",
 ):
     ngram_weight_order, semantic_weight_order = weight_orders
-    return (
-        data[data["Characters"] == character]
-        .pivot_table(
-            index="Ngram_weight_label",
-            columns="Semantic_weight_label",
-            values=value_col,
-            aggfunc=aggfunc,
-        )
-        .reindex(index=ngram_weight_order, columns=semantic_weight_order)
-    )
+    return data.pivot_table(
+        index="Ngram_weight_label",
+        columns="Semantic_weight_label",
+        values=value_col,
+        aggfunc=aggfunc,
+    ).reindex(index=ngram_weight_order, columns=semantic_weight_order)
 
 
 def _underline_max_labels(mrr_matrix: pd.DataFrame, label_matrix: pd.DataFrame):
@@ -183,15 +178,14 @@ def _build_faceted_heatmap_matrices(
     recall_matrices = []
 
     for character in character_order:
+        data = weight_results_df[weight_results_df["Characters"] == character]
         mrr_matrix = _pivot_weight_matrix(
-            weight_results_df,
-            character,
+            data,
             "MRR_percent",
             weight_orders,
         )
         label_matrix = _pivot_weight_matrix(
-            weight_results_df,
-            character,
+            data,
             "MRR_text",
             weight_orders,
         ).fillna("")
@@ -202,8 +196,7 @@ def _build_faceted_heatmap_matrices(
         )
         prefix_matrices.append(
             _pivot_weight_matrix(
-                weight_results_df,
-                character,
+                data,
                 "Prefix_weight",
                 weight_orders,
             )
@@ -212,8 +205,7 @@ def _build_faceted_heatmap_matrices(
         )
         mean_rank_matrices.append(
             _pivot_weight_matrix(
-                weight_results_df,
-                character,
+                data,
                 "mean_rank",
                 weight_orders,
             )
@@ -222,8 +214,7 @@ def _build_faceted_heatmap_matrices(
         )
         precision_matrices.append(
             _pivot_weight_matrix(
-                weight_results_df,
-                character,
+                data,
                 "precision_at_k",
                 weight_orders,
             )
@@ -238,8 +229,7 @@ def _build_faceted_heatmap_matrices(
         )
         recall_matrices.append(
             _pivot_weight_matrix(
-                weight_results_df,
-                character,
+                data,
                 "recall_at_k",
                 weight_orders,
             )
