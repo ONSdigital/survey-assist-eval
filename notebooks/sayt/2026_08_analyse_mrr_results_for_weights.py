@@ -111,7 +111,7 @@ def _pivot_weight_matrix(
     character: str,
     value_col: str,
     weight_orders: tuple[list[str], list[str]],
-    aggfunc: str = "mean",
+    aggfunc: str = "first",
 ):
     ngram_weight_order, semantic_weight_order = weight_orders
     return (
@@ -199,7 +199,6 @@ def _build_faceted_heatmap_matrices(
             character,
             "MRR_text",
             weight_orders,
-            aggfunc="first",
         ).fillna("")
 
         mrr_matrices.append(mrr_matrix.to_numpy())
