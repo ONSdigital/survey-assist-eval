@@ -73,8 +73,8 @@ def find_best_performing_setup(data: dict):
         best_dict (dict): a dictionary with those entries that achieved highest MRR.
     """
     # find best score and those tests that achieved that score
-    max_score = max(d["MRR"] for d in data.values())
-    best_dics = {k: v for k, v in data.items() if v["MRR"] == max_score}
+    max_score = max(d["mrr"] for d in data.values())
+    best_dics = {k: v for k, v in data.items() if v["mrr"] == max_score}
     return max_score, best_dics
 
 
@@ -89,18 +89,23 @@ def get_ranked_setups(data: dict):
         dict: A dictionary of tests, ordered by their MRR scores.
     """
     # Sort by MRR descending
-    sorted_items = sorted(data.items(), key=lambda x: x[1]["MRR"], reverse=True)
+    sorted_items = sorted(data.items(), key=lambda x: x[1]["mrr"], reverse=True)
 
     rankings = {}
 
     for key, value in sorted_items:
-        score = value["MRR"]
+        score = value["mrr"]
         rankings.setdefault(score, {})[key] = value
 
     return rankings
 
 
 # %%
+def _mean_for_k(series):
+    keys = series.iloc[0].keys()
+    return {k: sum(d[k] for d in series) / len(series) for k in keys}
+
+
 def _pivot_weight_matrix(
     data: pd.DataFrame,
     character: str,
@@ -227,8 +232,15 @@ def _build_faceted_heatmap_matrices(
                 character,
                 "precision_at_k",
                 weight_orders,
+                aggfunc=_mean_for_k,
             )
-            .map(lambda value: f"{value:.1f}" if pd.notna(value) else "")
+            .map(
+                lambda d: (
+                    {k: f"{v:.2f}" if pd.notna(v) else "" for k, v in d.items()}
+                    if isinstance(d, dict)
+                    else np.nan
+                )
+            )
             .to_numpy()
         )
         recall_matrices.append(
@@ -237,8 +249,15 @@ def _build_faceted_heatmap_matrices(
                 character,
                 "recall_at_k",
                 weight_orders,
+                aggfunc=_mean_for_k,
             )
-            .map(lambda value: f"{value:.1f}" if pd.notna(value) else "")
+            .map(
+                lambda d: (
+                    {k: f"{v:.2f}" if pd.notna(v) else "" for k, v in d.items()}
+                    if isinstance(d, dict)
+                    else np.nan
+                )
+            )
             .to_numpy()
         )
 
@@ -291,7 +310,7 @@ def _prepare_faceted_heatmap_data(character_weight_results: dict[int, dict]):
         Ngram_weight=weight_results_df["Ngram_weight"] / 10,
         Semantic_weight=weight_results_df["Semantic_weight"] / 10,
         Prefix_weight=weight_results_df["Prefix_weight"] / 10,
-        MRR_percent=weight_results_df["MRR"] * 100,
+        MRR_percent=weight_results_df["mrr"] * 100,
     )
     weight_results_df = weight_results_df.assign(
         Ngram_weight_label=weight_results_df["Ngram_weight"].map(
@@ -336,7 +355,7 @@ def _add_faceted_heatmap_text(  # noqa: PLR0913, pylint: disable=R0913,R0917
     ):
         hover_matrix = [
             [
-                f"Prefix Weight: {pw}<br>Mean Rank: {mr}<br>Precision:{pr}<br>Recall: {re}"
+                f"Prefix Weight: {pw}<br>Mean Rank: {mr}<br>Precision at: {pr}<br>Recall at: {re}"
                 for pw, mr, pr, re in zip(row_pw, row_mr, row_pr, row_re, strict=False)
             ]
             for row_pw, row_mr, row_pr, row_re in zip(
