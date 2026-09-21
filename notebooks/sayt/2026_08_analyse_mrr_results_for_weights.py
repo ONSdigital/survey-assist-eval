@@ -101,11 +101,6 @@ def get_ranked_setups(data: dict):
 
 
 # %%
-def _mean_for_k(series):
-    keys = series.iloc[0].keys()
-    return {k: sum(d[k] for d in series) / len(series) for k in keys}
-
-
 def _pivot_weight_matrix(
     data: pd.DataFrame,
     character: str,
@@ -231,11 +226,11 @@ def _build_faceted_heatmap_matrices(
                 character,
                 "precision_at_k",
                 weight_orders,
-                aggfunc=_mean_for_k,
+                aggfunc="first",
             )
             .map(
                 lambda d: (
-                    {k: f"{v:.2f}" if pd.notna(v) else "" for k, v in d.items()}
+                    {k: round(v, 2) if pd.notna(v) else "" for k, v in d.items()}
                     if isinstance(d, dict)
                     else np.nan
                 )
@@ -248,11 +243,11 @@ def _build_faceted_heatmap_matrices(
                 character,
                 "recall_at_k",
                 weight_orders,
-                aggfunc=_mean_for_k,
+                aggfunc="first",
             )
             .map(
                 lambda d: (
-                    {k: f"{v:.2f}" if pd.notna(v) else "" for k, v in d.items()}
+                    {k: round(v, 2) if pd.notna(v) else "" for k, v in d.items()}
                     if isinstance(d, dict)
                     else np.nan
                 )
