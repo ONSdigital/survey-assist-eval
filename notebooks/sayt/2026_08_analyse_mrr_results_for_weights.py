@@ -226,7 +226,6 @@ def _build_faceted_heatmap_matrices(
                 character,
                 "precision_at_k",
                 weight_orders,
-                aggfunc="first",
             )
             .map(
                 lambda d: (
@@ -243,7 +242,6 @@ def _build_faceted_heatmap_matrices(
                 character,
                 "recall_at_k",
                 weight_orders,
-                aggfunc="first",
             )
             .map(
                 lambda d: (
