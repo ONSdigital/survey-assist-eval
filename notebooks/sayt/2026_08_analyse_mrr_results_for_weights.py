@@ -253,14 +253,24 @@ def _build_faceted_heatmap_matrices(
             .to_numpy()
         )
 
-    return (
-        mrr_matrices,
-        label_matrices,
-        prefix_matrices,
-        mean_rank_matrices,
-        precision_matrices,
-        recall_matrices,
-    )
+    matrices = {
+        "MRR": mrr_matrices,
+        "Label": label_matrices,
+        "Prefix": prefix_matrices,
+        "Mean_Rank": mean_rank_matrices,
+        "Precision": prefix_matrices,
+        "Recall": recall_matrices,
+    }
+
+    return matrices
+    # return (
+    #     mrr_matrices,
+    #     label_matrices,
+    #     prefix_matrices,
+    #     mean_rank_matrices,
+    #     precision_matrices,
+    #     recall_matrices,
+    # )
 
 
 def _create_faceted_imshow(
@@ -408,7 +418,7 @@ def generate_faceted_heatmap(character_weight_results: dict[int, dict]):
         weight_orders,
     )
     fig = _create_faceted_imshow(
-        matrices[0],
+        matrices["MRR"],
         semantic_weight_order,
         ngram_weight_order,
         facet_col_wrap,
@@ -416,11 +426,11 @@ def generate_faceted_heatmap(character_weight_results: dict[int, dict]):
     _add_faceted_heatmap_text(
         fig,
         character_order,
-        matrices[1],
-        matrices[2],
-        matrices[3],
-        matrices[4],
-        matrices[5],
+        matrices["Label"],
+        matrices["Prefix"],
+        matrices["Mean_Rank"],
+        matrices["Precision"],
+        matrices["Recall"],
     )
     _rename_facet_titles(fig, character_order)
 
