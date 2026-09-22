@@ -111,10 +111,7 @@ if empty_cols:
     print(f"Dropping empty column(s) from {NEW_DATA_SHEET}: {empty_cols}")
     new_data_df = new_data_df.drop(columns=empty_cols)
 
-# Anonymise the two clerical coders immediately on load - this is the only
-# place their real names (as they appear in the source spreadsheet) are
-# referenced, so neither name can leak into any print, column listing, or
-# example table produced later in this script.
+# Anonymise the two clerical coders immediately on load
 new_data_df = new_data_df.rename(columns={
     "Carol": "Coder1",
     "Carol_Comments": "Coder1_Comments",
