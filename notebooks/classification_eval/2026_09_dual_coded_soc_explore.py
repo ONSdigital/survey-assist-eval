@@ -163,7 +163,6 @@ print(f"\n{'='*70}")
 print("NEW DATA CODE VALUES")
 print(f"{'='*70}")
 
-# The new-data SIC column is the adjudicated "Final code" column in the Comparisons sheet.
 show_value_counts(new_data_df, NEW_DATA_CODER1_COL, f"new_data :: Coder 1 (Carol)", top_n=15)
 show_value_counts(new_data_df, NEW_DATA_CODER2_COL, f"new_data :: Coder 2 (Lynne)", top_n=15)
 
@@ -539,15 +538,17 @@ else:
     print("SURVEY ASSIST PERFORMANCE COMPARISON")
     print(f"{'='*70}")
 
-    sa_df = pd.read_parquet(SA_DATA_PATH)
+    sa_df = pd.read_parquet(SA_DATA_PATH, dtype_backend='numpy_nullable')
     if SA_ID_COL != "unique_id":
         sa_df = sa_df.rename(columns={SA_ID_COL: "unique_id"})
+    sa_df["unique_id"] = sa_df["unique_id"].astype(str)
 
     # ========================================================================
     # Run performance evaluation with INITIAL_CODE only
     # ========================================================================
 
     truth_input_df = merged[["unique_id"]].copy()
+    truth_input_df["unique_id"] = truth_input_df["unique_id"].astype(str)
     truth_input_df["consensus_code"] = merged.apply(primary_soc_code, axis=1)
 
     _code_standard_logger.setLevel(logging.ERROR)
@@ -670,3 +671,4 @@ else:
         _code_standard_logger.setLevel(_previous_log_level)
 
 print("\n✓ Analysis complete!")
+
