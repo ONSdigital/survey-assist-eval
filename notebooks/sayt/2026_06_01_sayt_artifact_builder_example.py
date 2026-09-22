@@ -5,6 +5,9 @@ The SAYT functionality has since been migrated to the
 `survey-assist-embed-core` repository. This script is retained for
 reference purposes only and may not reflect the latest implementation.
 
+For an up-to-date example using the new repository, see:
+`notebooks/sayt/2026_09_sayt_artifactor_builder_example.py`
+
 Build a SAYT artifact from the IT3 lookup for later notebook loading.
 
 Run this notebook before ``2026_06_02_sayt_artifact_loader_example.py``.
