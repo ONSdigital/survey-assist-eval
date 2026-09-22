@@ -406,9 +406,7 @@ merged = new_data_df.merge(
 )
 n_unmatched = merged["sic_codability_level"].isna().sum()
 if n_unmatched:
-    print(
-        f"⚠️  {n_unmatched} rows failed to join to the 2k parquet - check ID formats."
-    )
+    print(f"⚠️  {n_unmatched} rows failed to join to the 2k parquet - check ID formats.")
 
 print(f"\n{'='*70}")
 print("SIC vs SOC CODABILITY")
