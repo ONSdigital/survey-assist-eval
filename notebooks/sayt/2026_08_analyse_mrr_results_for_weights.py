@@ -253,14 +253,6 @@ def _build_faceted_heatmap_matrices(
     }
 
     return matrices
-    # return (
-    #     mrr_matrices,
-    #     label_matrices,
-    #     prefix_matrices,
-    #     mean_rank_matrices,
-    #     precision_matrices,
-    #     recall_matrices,
-    # )
 
 
 def _create_faceted_imshow(
