@@ -31,13 +31,19 @@ pd.set_option("display.max_rows", 10)
 
 # File paths
 DATA_DIR = Path("data")
-NEW_DATA_PATH = DATA_DIR / "evaluation-pipeline_original_datasets_sic_2k_comparison_soc_2k.xlsx"
-TWO_K_PATH = DATA_DIR / "evaluation-pipeline_original_datasets_sic_2k_sic_2k_test_data.parquet"
+NEW_DATA_PATH = (
+    DATA_DIR / "evaluation-pipeline_original_datasets_sic_2k_comparison_soc_2k.xlsx"
+)
+TWO_K_PATH = (
+    DATA_DIR / "evaluation-pipeline_original_datasets_sic_2k_sic_2k_test_data.parquet"
+)
 
-TWO_K_CLERICAL_CODES = "clerical_codes"        # List of candidate codes
+TWO_K_CLERICAL_CODES = "clerical_codes"  # List of candidate codes
 
 # Survey Assist's own SOC output for this same subset
-SA_DATA_PATH = DATA_DIR / "evaluation-pipeline_yavuz_soc_STG2.parquet" # Pipeline run by Peter
+SA_DATA_PATH = (
+    DATA_DIR / "evaluation-pipeline_yavuz_soc_STG2.parquet"
+)  # Pipeline run by Peter
 SA_ID_COL = "Unique_identifier"
 SA_CODES_COL = "initial_code"
 SA_ALT_CODES_COL = "alt_soc_candidates"
@@ -57,7 +63,9 @@ def show_value_counts(df: pd.DataFrame, col: str, label: str, top_n: int = 10) -
         print(counts.to_string())
     except TypeError:
         # Handle unhashable types (lists, arrays, etc.)
-        print("Column contains unhashable values (lists/arrays). Flattening and showing unique codes:")
+        print(
+            "Column contains unhashable values (lists/arrays). Flattening and showing unique codes:"
+        )
         all_codes = []
         for item in df[col].dropna():
             if isinstance(item, list | tuple):
@@ -106,6 +114,7 @@ def check_id_overlap(dataset_a: tuple, dataset_b: tuple) -> None:
     overlap_pct = 100 * len(common) / max(len(ids_a), len(ids_b))
     print(f"\n✓ Overlap: {overlap_pct:.1f}%")
 
+
 # %%
 # ============================================================================
 # DATA LOADING
@@ -119,7 +128,7 @@ print(f"✓ Loaded {len(new_data_sheets)} sheet(s): {list(new_data_sheets.keys()
 # Define the sheet name explicitly from the workbook
 NEW_DATA_SHEET = "Comparisons"  # matches the key in new_data_sheets
 new_data_df = new_data_sheets[NEW_DATA_SHEET]
-two_k_df = pd.read_parquet(TWO_K_PATH, dtype_backend='numpy_nullable')
+two_k_df = pd.read_parquet(TWO_K_PATH, dtype_backend="numpy_nullable")
 
 # Drop fully-empty junk columns left over from the Excel export (e.g. "Unnamed: 10").
 empty_cols = [col for col in new_data_df.columns if new_data_df[col].isna().all()]
@@ -128,12 +137,14 @@ if empty_cols:
     new_data_df = new_data_df.drop(columns=empty_cols)
 
 # Anonymise the two clerical coders immediately on load
-new_data_df = new_data_df.rename(columns={
-    "Carol": "Coder1",
-    "Carol_Comments": "Coder1_Comments",
-    "Lynne": "Coder2",
-    "Lynne_Comments": "Coder2_Comments",
-})
+new_data_df = new_data_df.rename(
+    columns={
+        "Carol": "Coder1",
+        "Carol_Comments": "Coder1_Comments",
+        "Lynne": "Coder2",
+        "Lynne_Comments": "Coder2_Comments",
+    }
+)
 
 # %%
 # ============================================================================
@@ -164,7 +175,6 @@ for i, col in enumerate(two_k_df.columns, 1):
 
 print(f"\n📊 Shape: {two_k_df.shape[0]} rows x {two_k_df.shape[1]} columns")
 # print(two_k_df.head(3).to_string())
-
 
 
 # %%
@@ -201,7 +211,9 @@ print(f"{'='*70}")
 
 show_value_counts(two_k_df, TWO_K_SIC_COL, "2k.parquet :: SIC codes", top_n=15)
 # show_value_counts(two_k_df, TWO_K_SIC_IND_COL, "2k.parquet :: SIC indicators", top_n=15)
-show_value_counts(two_k_df, TWO_K_CLERICAL_CODES, "2k.parquet :: Clerical codes", top_n=10)
+show_value_counts(
+    two_k_df, TWO_K_CLERICAL_CODES, "2k.parquet :: Clerical codes", top_n=10
+)
 
 # %%
 # ============================================================================
@@ -213,7 +225,9 @@ show_value_counts(two_k_df, TWO_K_CLERICAL_CODES, "2k.parquet :: Clerical codes"
 
 
 UNCODEABLE_LABEL = "Uncodable"
-SOC_DIGIT_LEVELS = sorted({digits for digits, _label in SOC_CODABILITY_LEVELS if digits > 0})
+SOC_DIGIT_LEVELS = sorted(
+    {digits for digits, _label in SOC_CODABILITY_LEVELS if digits > 0}
+)
 
 # get_clean_n_digit_codes logs a warning for every cell it can't parse as a
 # code (e.g. "uncodeable" itself) - that's expected here and would be very
@@ -225,6 +239,7 @@ _previous_log_level = _code_standard_logger.level
 _code_standard_logger.setLevel(logging.ERROR)
 
 try:
+
     def soc_label_at_digits(raw: object, n: int, unrecognised: set) -> str:
         """Return the n-digit SOC code for a single coder's cell, or the
         Uncodeable sentinel if the cell is blank, 'uncodeable', or otherwise
@@ -298,8 +313,12 @@ try:
     # Cross-check against the clerical team's own row-level "Agree" flag, if present.
     if "Agree" in new_data_df.columns:
         our_agree = coder1_full == coder2_full
-        their_agree = new_data_df["Agree"].astype(str).str.strip().str.lower().isin(
-            {"true", "1", "yes", "y"}
+        their_agree = (
+            new_data_df["Agree"]
+            .astype(str)
+            .str.strip()
+            .str.lower()
+            .isin({"true", "1", "yes", "y"})
         )
         mismatches = (our_agree != their_agree).sum()
         print(
@@ -317,8 +336,12 @@ finally:
 # Check if both files cover the same records.
 
 check_id_overlap(
-    new_data_df, NEW_DATA_ID_COL, f"new_data :: {NEW_DATA_SHEET}",
-    two_k_df, TWO_K_ID_COL, "2k.parquet"
+    new_data_df,
+    NEW_DATA_ID_COL,
+    f"new_data :: {NEW_DATA_SHEET}",
+    two_k_df,
+    TWO_K_ID_COL,
+    "2k.parquet",
 )
 
 # %%
@@ -346,7 +369,9 @@ def clerical_codes_to_set(raw: object) -> set:
 _code_standard_logger.setLevel(logging.ERROR)
 try:
     two_k_df["sic_codability_level"] = two_k_df[TWO_K_CLERICAL_CODES].apply(
-        lambda codes: get_codability_level(clerical_codes_to_set(codes), code_type="SIC")
+        lambda codes: get_codability_level(
+            clerical_codes_to_set(codes), code_type="SIC"
+        )
     )
 
     # Finest SOC digit level at which Coder1 and Coder2 agree, per row.
@@ -363,7 +388,9 @@ try:
             coder2_labels == UNCODEABLE_LABEL
         )
         agree = (coder1_labels == coder2_labels) & ~either_uncodeable
-        level_label = next(label for digits, label in SOC_CODABILITY_LEVELS if digits == n)
+        level_label = next(
+            label for digits, label in SOC_CODABILITY_LEVELS if digits == n
+        )
         newly_resolved = agree & ~already_resolved
         soc_codability[newly_resolved] = level_label
         already_resolved = already_resolved | newly_resolved
@@ -379,7 +406,9 @@ merged = new_data_df.merge(
 )
 n_unmatched = merged["sic_codability_level"].isna().sum()
 if n_unmatched:
-    print(f"⚠️  {n_unmatched} rows failed to join to the 2k parquet - check ID formats.")
+    print(
+        f"⚠️  {n_unmatched} rows failed to join to the 2k parquet - check ID formats."
+    )
 
 print(f"\n{'='*70}")
 print("SIC vs SOC CODABILITY")
@@ -399,7 +428,9 @@ print(codability_crosstab.to_string())
 
 sic_uncodable = merged["sic_codability_level"] == "Uncodable"
 soc_uncodable = merged["soc_codability_level"] == "Uncodable"
-print(f"\nSIC uncodable: {sic_uncodable.mean():.1%} ({sic_uncodable.sum()} of {len(merged)})")
+print(
+    f"\nSIC uncodable: {sic_uncodable.mean():.1%} ({sic_uncodable.sum()} of {len(merged)})"
+)
 print(
     f"SOC uncodable (dual-coding proxy): {soc_uncodable.mean():.1%} "
     f"({soc_uncodable.sum()} of {len(merged)})"
@@ -408,8 +439,12 @@ print(
     f"Both uncodable: {(sic_uncodable & soc_uncodable).mean():.1%} "
     f"({(sic_uncodable & soc_uncodable).sum()})"
 )
-print(f"SIC uncodable only (SOC still codable): {(sic_uncodable & ~soc_uncodable).sum()}")
-print(f"SOC uncodable only (SIC still codable): {(~sic_uncodable & soc_uncodable).sum()}")
+print(
+    f"SIC uncodable only (SOC still codable): {(sic_uncodable & ~soc_uncodable).sum()}"
+)
+print(
+    f"SOC uncodable only (SIC still codable): {(~sic_uncodable & soc_uncodable).sum()}"
+)
 
 non_empty_rows = codability_crosstab.sum(axis=1) > 0
 non_empty_cols = codability_crosstab.sum(axis=0) > 0
@@ -430,7 +465,9 @@ if contingency.shape[0] > 1 and contingency.shape[1] > 1:
             "codability at the 5% level."
         )
 else:
-    print("\nNot enough variation in one of the two codability levels to run a chi-square test.")
+    print(
+        "\nNot enough variation in one of the two codability levels to run a chi-square test."
+    )
 
 # %%
 # ============================================================================
@@ -445,6 +482,7 @@ SECTION_MIN_N = 15  # groups smaller than this are noisy - shown but flagged
 
 _code_standard_logger.setLevel(logging.ERROR)
 try:
+
     def primary_soc_code(row: pd.Series) -> object:
         """Best single SOC code for a row: the adjudicated Final code where
         available (i.e. where the coders disagreed), otherwise Coder1's code
@@ -473,8 +511,8 @@ SOC_MAJOR_GROUP_TITLES = {
     "8": "8 Process, Plant and Machine Operatives",
     "9": "9 Elementary Occupations",
 }
-merged["soc_major_group"] = merged["soc_major_group_digit"].map(SOC_MAJOR_GROUP_TITLES).fillna(
-    "Uncodable"
+merged["soc_major_group"] = (
+    merged["soc_major_group_digit"].map(SOC_MAJOR_GROUP_TITLES).fillna("Uncodable")
 )
 
 merged["disagree"] = merged["soc_codability_level"] != "Unit group (4-digits)"
@@ -545,7 +583,9 @@ if not eligible_sections.empty:
     worst_section = eligible_sections.index[0]
     print(f"\nExample disagreements in worst SIC section ({worst_section}):")
     print(
-        merged[(merged["sic_section"] == worst_section) & merged["disagree"]][EXAMPLE_COLS]
+        merged[(merged["sic_section"] == worst_section) & merged["disagree"]][
+            EXAMPLE_COLS
+        ]
         .head(5)
         .to_string(index=False)
     )
@@ -555,7 +595,9 @@ if not eligible_groups.empty:
     worst_group = eligible_groups.index[0]
     print(f"\nExample disagreements in worst SOC major group ({worst_group}):")
     print(
-        merged[(merged["soc_major_group"] == worst_group) & merged["disagree"]][EXAMPLE_COLS]
+        merged[(merged["soc_major_group"] == worst_group) & merged["disagree"]][
+            EXAMPLE_COLS
+        ]
         .head(5)
         .to_string(index=False)
     )
@@ -585,7 +627,7 @@ else:
     print("SURVEY ASSIST PERFORMANCE COMPARISON")
     print(f"{'='*70}")
 
-    sa_df = pd.read_parquet(SA_DATA_PATH, dtype_backend='numpy_nullable')
+    sa_df = pd.read_parquet(SA_DATA_PATH, dtype_backend="numpy_nullable")
     if SA_ID_COL != "unique_id":
         sa_df = sa_df.rename(columns={SA_ID_COL: "unique_id"})
     # Match dtype with truth_input_df's "unique_id" (built from two_k_df, also
@@ -683,8 +725,12 @@ else:
         )
 
         print("\nModel's initial_code vs clerical truth:")
-        print(f"  Model pick matches clerical truth: {comparison['model_pick_matches_truth'].sum()} of {len(comparison)} ({100*comparison['model_pick_matches_truth'].mean():.1f}%)")
-        print(f"  Model pick does not match: {(~comparison['model_pick_matches_truth']).sum()}")
+        print(
+            f"  Model pick matches clerical truth: {comparison['model_pick_matches_truth'].sum()} of {len(comparison)} ({100*comparison['model_pick_matches_truth'].mean():.1f}%)"
+        )
+        print(
+            f"  Model pick does not match: {(~comparison['model_pick_matches_truth']).sum()}"
+        )
 
         # Distribution comparison
         def _major_group_label(code_set: set) -> str:
@@ -693,14 +739,14 @@ else:
             return SOC_MAJOR_GROUP_TITLES.get(next(iter(code_set))[:1], "Uncodable")
 
         truth_major_dist = (
-            full_digit_combined["clerical_codes"].apply(_major_group_label).value_counts(
-                normalize=True
-            )
+            full_digit_combined["clerical_codes"]
+            .apply(_major_group_label)
+            .value_counts(normalize=True)
         )
         sa_major_dist = (
-            full_digit_combined["model_codes"].apply(_major_group_label).value_counts(
-                normalize=True
-            )
+            full_digit_combined["model_codes"]
+            .apply(_major_group_label)
+            .value_counts(normalize=True)
         )
         dist_compare = (
             pd.concat(
