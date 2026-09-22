@@ -248,7 +248,7 @@ def _build_faceted_heatmap_matrices(
         "Label": label_matrices,
         "Prefix": prefix_matrices,
         "Mean_Rank": mean_rank_matrices,
-        "Precision": prefix_matrices,
+        "Precision": precision_matrices,
         "Recall": recall_matrices,
     }
 
@@ -310,41 +310,29 @@ def _prepare_faceted_heatmap_data(character_weight_results: dict[int, dict]):
     return weight_results_df
 
 
-def _add_faceted_heatmap_text(  # noqa: PLR0913, pylint: disable=R0913,R0917
+def _add_faceted_heatmap_text(
     fig,
     character_order,
     label_matrices,
-    prefix_matrices,
-    mean_ranks_matrices,
-    precision_matrices,
-    recall_matrices,
+    metrics_matrices,
 ):
-    for (
-        character,
-        trace,
-        labels,
-        prefix_weights,
-        mean_ranks,
-        precisions,
-        recalls,
-    ) in zip(
+    metric_names = list(metrics_matrices)
+    for character, trace, labels, *metric_matrices in zip(
         character_order,
         fig.data,
         label_matrices,
-        prefix_matrices,
-        mean_ranks_matrices,
-        precision_matrices,
-        recall_matrices,
+        *metrics_matrices.values(),
         strict=True,
     ):
         hover_matrix = [
             [
-                f"Prefix Weight: {pw}<br>Mean Rank: {mr}<br>Precision at: {pr}<br>Recall at: {re}"
-                for pw, mr, pr, re in zip(row_pw, row_mr, row_pr, row_re, strict=False)
+                "".join(
+                    f"{metric}: {value}<br>"
+                    for metric, value in zip(metric_names, cell_values, strict=True)
+                )
+                for cell_values in zip(*rows, strict=True)
             ]
-            for row_pw, row_mr, row_pr, row_re in zip(
-                prefix_weights, mean_ranks, precisions, recalls, strict=False
-            )
+            for rows in zip(*metric_matrices, strict=True)
         ]
         trace.update(
             hovertext=hover_matrix,
@@ -355,7 +343,7 @@ def _add_faceted_heatmap_text(  # noqa: PLR0913, pylint: disable=R0913,R0917
                 f"Characters: {character}<br>"
                 "Ngram Weight: %{y}<br>"
                 "Semantic Weight: %{x}<br>"
-                "%{hovertext}<br>"
+                "%{hovertext}"
                 "MRR (%): %{z:.3f}<extra></extra>"
             ),
         )
@@ -404,14 +392,20 @@ def generate_faceted_heatmap(character_weight_results: dict[int, dict]):
         ngram_weight_order,
         facet_col_wrap,
     )
+
+    excluded_hover_metrics = {"MRR", "Label"}
+
+    hover_metrics_dict = {
+        metric: result
+        for metric, result in matrices.items()
+        if metric not in excluded_hover_metrics
+    }
+
     _add_faceted_heatmap_text(
         fig,
         character_order,
         matrices["Label"],
-        matrices["Prefix"],
-        matrices["Mean_Rank"],
-        matrices["Precision"],
-        matrices["Recall"],
+        hover_metrics_dict,
     )
     _rename_facet_titles(fig, character_order)
 
