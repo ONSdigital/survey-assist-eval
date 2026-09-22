@@ -347,7 +347,6 @@ def _add_faceted_heatmap_text(  # noqa: PLR0913, pylint: disable=R0913,R0917
             )
         ]
         trace.update(
-            # customdata=customdata
             hovertext=hover_matrix,
             text=labels,
             texttemplate="%{text}",
