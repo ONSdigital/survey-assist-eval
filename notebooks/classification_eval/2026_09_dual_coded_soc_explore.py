@@ -3,6 +3,8 @@
 Convert occupation and industry classifications from dual-coded datasets.
 """
 
+# pylint: disable=invalid-name
+
 # %%
 import logging
 from pathlib import Path
@@ -51,23 +53,26 @@ SA_ALT_CODES_COL = "alt_soc_candidates"
 SIGNIFICANCE_LEVEL = 0.05
 
 
-def show_value_counts(df: pd.DataFrame, col: str, label: str, top_n: int = 10) -> None:
+def show_value_counts(
+    df: pd.DataFrame, column: str, label: str, top_n: int = 10
+) -> None:
     """Show top N value counts for a column."""
-    if col not in df.columns:
-        print(f"⚠️  Column '{col}' not found in {label}")
+    if column not in df.columns:
+        print(f"⚠️  Column '{column}' not found in {label}")
         return
 
-    print(f"\n{label} :: '{col}' (top {top_n} values):")
+    print(f"\n{label} :: '{column}' (top {top_n} values):")
     try:
-        counts = df[col].value_counts(dropna=False).head(top_n)
+        counts = df[column].value_counts(dropna=False).head(top_n)
         print(counts.to_string())
     except TypeError:
         # Handle unhashable types (lists, arrays, etc.)
         print(
-            "Column contains unhashable values (lists/arrays). Flattening and showing unique codes:"
+            "Column contains unhashable values (lists/arrays). "
+            "Flattening and showing unique codes:"
         )
         all_codes = []
-        for item in df[col].dropna():
+        for item in df[column].dropna():
             if isinstance(item, list | tuple):
                 all_codes.extend(item)
             else:
@@ -240,7 +245,7 @@ _code_standard_logger.setLevel(logging.ERROR)
 
 try:
 
-    def soc_label_at_digits(raw: object, n: int, unrecognised: set) -> str:
+    def soc_label_at_digits(raw: object, n_digits: int, unrecognised: set) -> str:
         """Return the n-digit SOC code for a single coder's cell, or the
         Uncodeable sentinel if the cell is blank, 'uncodeable', or otherwise
         not a valid SOC code (any such value is also recorded in
@@ -253,7 +258,9 @@ try:
         if not raw_str:
             return UNCODEABLE_LABEL
 
-        cleaned, invalid = get_clean_n_digit_codes([raw_str], n=n, code_type="SOC")
+        cleaned, invalid = get_clean_n_digit_codes(
+            [raw_str], n=n_digits, code_type="SOC"
+        )
         if invalid and raw_str.lower() not in {"uncodeable", "uncodable"}:
             unrecognised.add(raw_str)
         if len(cleaned) == 1:
@@ -268,13 +275,15 @@ try:
 
     digit_level_summary = []
     unrecognised_values: set = set()
+    coder1_full = pd.Series(dtype=object)
+    coder2_full = pd.Series(dtype=object)
 
     for n in SOC_DIGIT_LEVELS:
         coder1_labels = new_data_df[NEW_DATA_CODER1_COL].apply(
-            soc_label_at_digits, n=n, unrecognised=unrecognised_values
+            soc_label_at_digits, n_digits=n, unrecognised=unrecognised_values
         )
         coder2_labels = new_data_df[NEW_DATA_CODER2_COL].apply(
-            soc_label_at_digits, n=n, unrecognised=unrecognised_values
+            soc_label_at_digits, n_digits=n, unrecognised=unrecognised_values
         )
 
         n_agree = (coder1_labels == coder2_labels).sum()
@@ -336,12 +345,8 @@ finally:
 # Check if both files cover the same records.
 
 check_id_overlap(
-    new_data_df,
-    NEW_DATA_ID_COL,
-    f"new_data :: {NEW_DATA_SHEET}",
-    two_k_df,
-    TWO_K_ID_COL,
-    "2k.parquet",
+    (new_data_df, NEW_DATA_ID_COL, f"new_data :: {NEW_DATA_SHEET}"),
+    (two_k_df, TWO_K_ID_COL, "2k.parquet"),
 )
 
 # %%
@@ -534,11 +539,16 @@ if section_ct.shape[0] > 1:
         f"\nChi-square test (disagreement rate vs SIC section): "
         f"chi2={chi2:.2f}, dof={dof}, p={p_value:.4g}"
     )
-    print(
-        f"=> Disagreement rate varies significantly by industry (p<{SIGNIFICANCE_LEVEL})."
-        if p_value < SIGNIFICANCE_LEVEL
-        else f"=> No significant evidence that disagreement rate varies by industry (p>={SIGNIFICANCE_LEVEL})."
-    )
+    if p_value < SIGNIFICANCE_LEVEL:
+        print(
+            "=> Disagreement rate varies significantly by industry "
+            f"(p<{SIGNIFICANCE_LEVEL})."
+        )
+    else:
+        print(
+            "=> No significant evidence that disagreement rate varies by industry "
+            f"(p>={SIGNIFICANCE_LEVEL})."
+        )
 
 print(f"\n{'='*70}")
 print("DISAGREEMENT BY OCCUPATION (SOC MAJOR GROUP)")
@@ -559,12 +569,16 @@ if major_group_ct.shape[0] > 1:
         f"\nChi-square test (disagreement rate vs SOC major group): "
         f"chi2={chi2:.2f}, dof={dof}, p={p_value:.4g}"
     )
-    print(
-        f"=> Disagreement rate varies significantly by occupation group (p<{SIGNIFICANCE_LEVEL})."
-        if p_value < SIGNIFICANCE_LEVEL
-        else f"=> No significant evidence that disagreement rate varies by occupation group (p>={SIGNIFICANCE_LEVEL})."
-    )
-
+    if p_value < SIGNIFICANCE_LEVEL:
+        print(
+            "=> Disagreement rate varies significantly by industry "
+            f"(p<{SIGNIFICANCE_LEVEL})."
+        )
+    else:
+        print(
+            "=> No significant evidence that disagreement rate varies by industry "
+            f"(p>={SIGNIFICANCE_LEVEL})."
+        )
 # A handful of concrete example disagreements from the worst-performing
 # section and major group, so the numbers above can be read alongside what
 # the actual job titles/descriptions/comments look like.
@@ -644,6 +658,7 @@ else:
     _code_standard_logger.setLevel(logging.ERROR)
     try:
         digit_perf_summary = []
+        full_digit_combined = pd.DataFrame()
         for n in sorted(SOC_DIGIT_LEVELS, reverse=True):
             truth_codes_df = prep_clerical_codes(
                 truth_input_df,
@@ -723,8 +738,11 @@ else:
         )
 
         print("\nModel's initial_code vs clerical truth:")
+        n_match = comparison["model_pick_matches_truth"].sum()
+        pct_match = 100 * comparison["model_pick_matches_truth"].mean()
         print(
-            f"  Model pick matches clerical truth: {comparison['model_pick_matches_truth'].sum()} of {len(comparison)} ({100*comparison['model_pick_matches_truth'].mean():.1f}%)"
+            f"  Model pick matches clerical truth: {n_match} of {len(comparison)} "
+            f"({pct_match:.1f}%)"
         )
         print(
             f"  Model pick does not match: {(~comparison['model_pick_matches_truth']).sum()}"
