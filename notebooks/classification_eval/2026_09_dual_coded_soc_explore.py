@@ -111,6 +111,17 @@ if empty_cols:
     print(f"Dropping empty column(s) from {NEW_DATA_SHEET}: {empty_cols}")
     new_data_df = new_data_df.drop(columns=empty_cols)
 
+# Anonymise the two clerical coders immediately on load - this is the only
+# place their real names (as they appear in the source spreadsheet) are
+# referenced, so neither name can leak into any print, column listing, or
+# example table produced later in this script.
+new_data_df = new_data_df.rename(columns={
+    "Carol": "Coder1",
+    "Carol_Comments": "Coder1_Comments",
+    "Lynne": "Coder2",
+    "Lynne_Comments": "Coder2_Comments",
+})
+
 # %%
 # ============================================================================
 # NEW DATA PREVIEW & PROFILE
@@ -151,8 +162,8 @@ print(f"\n📊 Shape: {two_k_df.shape[0]} rows × {two_k_df.shape[1]} columns")
 
 # Match the actual column names in the Comparisons sheet
 NEW_DATA_ID_COL = "Unique_identifier"
-NEW_DATA_CODER1_COL = "Carol"
-NEW_DATA_CODER2_COL = "Lynne"
+NEW_DATA_CODER1_COL = "Coder1"
+NEW_DATA_CODER2_COL = "Coder2"
 
 # Also used in later cells
 TWO_K_ID_COL = "unique_id"
@@ -163,8 +174,8 @@ print(f"\n{'='*70}")
 print("NEW DATA CODE VALUES")
 print(f"{'='*70}")
 
-show_value_counts(new_data_df, NEW_DATA_CODER1_COL, f"new_data :: Coder 1 (Carol)", top_n=15)
-show_value_counts(new_data_df, NEW_DATA_CODER2_COL, f"new_data :: Coder 2 (Lynne)", top_n=15)
+show_value_counts(new_data_df, NEW_DATA_CODER1_COL, "new_data :: Coder 1", top_n=15)
+show_value_counts(new_data_df, NEW_DATA_CODER2_COL, "new_data :: Coder 2", top_n=15)
 
 # Check ID matching
 mask = new_data_df.Unique_identifier.isin(two_k_df.unique_id)
@@ -229,7 +240,7 @@ try:
         return UNCODEABLE_LABEL
 
     print(f"\n{'='*70}")
-    print("INTER-RATER RELIABILITY: Carol vs Lynne (by SOC digit level)")
+    print("INTER-RATER RELIABILITY: Coder1 vs Coder2 (by SOC digit level)")
     print(f"{'='*70}")
     print(f"Total records: {len(new_data_df)}")
 
@@ -337,7 +348,7 @@ try:
         lambda codes: get_codability_level(clerical_codes_to_set(codes), code_type="SIC")
     )
 
-    # Finest SOC digit level at which Carol and Lynne agree, per row.
+    # Finest SOC digit level at which Coder1 and Coder2 agree, per row.
     soc_codability = pd.Series(UNCODEABLE_LABEL, index=new_data_df.index)
     already_resolved = pd.Series(False, index=new_data_df.index)
     for n in sorted(SOC_DIGIT_LEVELS, reverse=True):
@@ -424,6 +435,10 @@ else:
 # ============================================================================
 # PATTERN INSIGHTS: DISAGREEMENT BY INDUSTRY (SIC SECTION) AND OCCUPATION
 # ============================================================================
+# Where does Coder1/Coder2 disagreement concentrate? "Disagree" here means
+# the two coders did not land on the exact same 4-digit SOC unit group
+# (i.e. soc_codability_level is anything other than "Unit group (4-digits)"),
+# the same criterion used for the digit=4 row in the reliability table above.
 
 SECTION_MIN_N = 15  # groups smaller than this are noisy - shown but flagged
 
@@ -431,8 +446,8 @@ _code_standard_logger.setLevel(logging.ERROR)
 try:
     def primary_soc_code(row: pd.Series) -> object:
         """Best single SOC code for a row: the adjudicated Final code where
-        available (i.e. where the coders disagreed), otherwise Carol's code
-        (arbitrary - Carol and Lynne agree on ~97% of rows so it barely
+        available (i.e. where the coders disagreed), otherwise Coder1's code
+        (arbitrary - Coder1 and Coder2 agree on ~97% of rows so it barely
         matters which one is used as the "primary" occupation label).
         """
         final = row.get("Final code")
@@ -513,6 +528,37 @@ if major_group_ct.shape[0] > 1:
         else "=> No significant evidence that disagreement rate varies by occupation group (p>=0.05)."
     )
 
+# A handful of concrete example disagreements from the worst-performing
+# section and major group, so the numbers above can be read alongside what
+# the actual job titles/descriptions/comments look like.
+EXAMPLE_COLS = [
+    NEW_DATA_ID_COL,
+    "soc2020_job_title_main_job",
+    "soc2020_job_description_main_job",
+    NEW_DATA_CODER1_COL,
+    NEW_DATA_CODER2_COL,
+    "Final code",
+]
+eligible_sections = section_stats[~section_stats["low_sample_lt_15"]]
+if not eligible_sections.empty:
+    worst_section = eligible_sections.index[0]
+    print(f"\nExample disagreements in worst SIC section ({worst_section}):")
+    print(
+        merged[(merged["sic_section"] == worst_section) & merged["disagree"]][EXAMPLE_COLS]
+        .head(5)
+        .to_string(index=False)
+    )
+
+eligible_groups = major_group_stats[~major_group_stats["low_sample_lt_15"]]
+if not eligible_groups.empty:
+    worst_group = eligible_groups.index[0]
+    print(f"\nExample disagreements in worst SOC major group ({worst_group}):")
+    print(
+        merged[(merged["soc_major_group"] == worst_group) & merged["disagree"]][EXAMPLE_COLS]
+        .head(5)
+        .to_string(index=False)
+    )
+
 # %%
 # ============================================================================
 # SURVEY ASSIST PERFORMANCE COMPARISON
@@ -541,6 +587,9 @@ else:
     sa_df = pd.read_parquet(SA_DATA_PATH, dtype_backend='numpy_nullable')
     if SA_ID_COL != "unique_id":
         sa_df = sa_df.rename(columns={SA_ID_COL: "unique_id"})
+    # Match dtype with truth_input_df's "unique_id" (built from two_k_df, also
+    # read with dtype_backend='numpy_nullable') so the merge below can't
+    # silently under-match on a string-dtype mismatch between the two files.
     sa_df["unique_id"] = sa_df["unique_id"].astype(str)
 
     # ========================================================================
@@ -617,7 +666,7 @@ else:
         # comparison as the "OO_accuracy"/"MM_accuracy" columns in the
         # digits=4 row of the table above, just shown here as raw counts
         # instead of a rate - there is no separate SOC "shortlist" to check
-        # against, since Carol/Lynne each record a single code, not a list
+        # against, since Coder1/Coder2 each record a single code, not a list
         # of candidates (unlike the 2k parquet's SIC clerical_codes).
         # ====================================================================
 
@@ -671,4 +720,3 @@ else:
         _code_standard_logger.setLevel(_previous_log_level)
 
 print("\n✓ Analysis complete!")
-
