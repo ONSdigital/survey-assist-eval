@@ -7,7 +7,6 @@ Convert occupation and industry classifications from dual-coded datasets
 # %%
 from pathlib import Path
 import pandas as pd
-import numpy as np
 from sklearn.metrics import cohen_kappa_score
 
 # ============================================================================
@@ -33,40 +32,6 @@ SA_DATA_PATH = DATA_DIR / "evaluation-pipeline_yavuz_soc_STG2.parquet" # Pipelin
 SA_ID_COL = "Unique_identifier"
 SA_CODES_COL = "initial_code"
 SA_ALT_CODES_COL = "alt_soc_candidates"
-
-
-def safe_nunique(s: pd.Series):
-    """Count unique values even when some entries are lists/arrays."""
-    try:
-        return s.nunique(dropna=True)
-    except TypeError:
-        normalized = []
-        for v in s.dropna():
-            if isinstance(v, np.ndarray):
-                normalized.append(tuple(v.tolist()))
-            elif isinstance(v, (list, tuple)):
-                normalized.append(tuple(v))
-            else:
-                normalized.append(v)
-        return pd.Series(normalized).nunique(dropna=True)
-
-
-def _hashable_value(value):
-    """Convert list/array-like values to hashable tuples for pandas operations."""
-    if isinstance(value, np.ndarray):
-        return tuple(value.tolist())
-    if isinstance(value, (list, tuple, set)):
-        return tuple(value)
-    return value
-
-
-def safe_duplicated(df: pd.DataFrame) -> int:
-    """Count duplicate rows even when some cells contain arrays/lists."""
-    try:
-        return int(df.duplicated().sum())
-    except TypeError:
-        normalized = df.map(_hashable_value)
-        return int(normalized.duplicated().sum())
 
 
 def show_value_counts(df: pd.DataFrame, col: str, label: str, top_n: int = 10) -> None:
@@ -524,6 +489,31 @@ if section_ct.shape[0] > 1:
         else "=> No significant evidence that disagreement rate varies by industry (p>=0.05)."
     )
 
+print(f"\n{'='*70}")
+print("DISAGREEMENT BY OCCUPATION (SOC MAJOR GROUP)")
+print(f"{'='*70}")
+major_group_stats = (
+    merged.groupby("soc_major_group")["disagree"]
+    .agg(n="size", n_disagree="sum")
+    .assign(disagree_rate=lambda d: (d["n_disagree"] / d["n"]).round(3))
+    .sort_values("disagree_rate", ascending=False)
+)
+major_group_stats["low_sample_lt_15"] = major_group_stats["n"] < SECTION_MIN_N
+print(major_group_stats.to_string())
+
+major_group_ct = pd.crosstab(merged["soc_major_group"], merged["disagree"])
+if major_group_ct.shape[0] > 1:
+    chi2, p_value, dof, _expected = chi2_contingency(major_group_ct)
+    print(
+        f"\nChi-square test (disagreement rate vs SOC major group): "
+        f"chi2={chi2:.2f}, dof={dof}, p={p_value:.4g}"
+    )
+    print(
+        "=> Disagreement rate varies significantly by occupation group (p<0.05)."
+        if p_value < 0.05
+        else "=> No significant evidence that disagreement rate varies by occupation group (p>=0.05)."
+    )
+
 # %%
 # ============================================================================
 # SURVEY ASSIST PERFORMANCE COMPARISON
@@ -544,7 +534,6 @@ else:
         prep_model_codes,
     )
     from survey_assist_eval.evaluation.metrics import calc_simple_metrics
-    import re
 
     print(f"\n{'='*70}")
     print("SURVEY ASSIST PERFORMANCE COMPARISON")
@@ -557,7 +546,7 @@ else:
     # ========================================================================
     # Run performance evaluation with INITIAL_CODE only
     # ========================================================================
-    
+
     truth_input_df = merged[["unique_id"]].copy()
     truth_input_df["consensus_code"] = merged.apply(primary_soc_code, axis=1)
 
@@ -572,7 +561,7 @@ else:
                 digits=n,
                 out_col="clerical_codes",
             )
-            
+
             # STANDARD prep_model_codes
             model_codes_df = prep_model_codes(
                 sa_df,
@@ -582,7 +571,7 @@ else:
                 digits=n,
                 out_col="model_codes",
             )
-            
+
             combined = truth_codes_df.merge(model_codes_df, on="unique_id", how="inner")
             n_unmatched_sa = len(truth_codes_df) - len(combined)
             if n_unmatched_sa:
@@ -621,31 +610,30 @@ else:
         print(pd.DataFrame(digit_perf_summary).to_string(index=False))
 
         # ====================================================================
-        # POST-HOC ANALYSIS: Does model pick overlap with clerical options?
+        # POST-HOC ANALYSIS: Does the model's single pick exactly match the
+        # clerical truth at the 4-digit level? (full_digit_combined is fixed
+        # at the finest digit level, captured above.) Note this is the same
+        # comparison as the "OO_accuracy"/"MM_accuracy" columns in the
+        # digits=4 row of the table above, just shown here as raw counts
+        # instead of a rate - there is no separate SOC "shortlist" to check
+        # against, since Carol/Lynne each record a single code, not a list
+        # of candidates (unlike the 2k parquet's SIC clerical_codes).
         # ====================================================================
-        
+
         print(f"\n{'='*70}")
-        print("POST-HOC ANALYSIS: Model's Pick vs Clerical Shortlist")
+        print("POST-HOC ANALYSIS: Model's Pick vs Clerical Truth (4-digit)")
         print(f"{'='*70}")
-        
-        # Get clerical shortlist (from 2k.parquet)
-        clerical_shorthist = merged[["unique_id", "sic_section"]].copy()
-        clerical_shorthist["clerical_candidates"] = merged["unique_id"].map(
-            two_k_df.set_index(TWO_K_ID_COL)[TWO_K_CLERICAL_CODES]
-        )
-        
-        # Compare: does model's pick match clerical codes?
-        # (This needs the clerical_codes set from above)
+
         comparison = full_digit_combined.copy()
-        comparison["model_pick_in_clerical"] = comparison.apply(
-            lambda row: len(row["model_codes"]) == 1 and 
-                       (row["model_codes"] <= row["clerical_codes"]),
-            axis=1
+        comparison["model_pick_matches_truth"] = comparison.apply(
+            lambda row: len(row["model_codes"]) == 1
+            and (row["model_codes"] <= row["clerical_codes"]),
+            axis=1,
         )
-        
-        print(f"\nModel's initial_code vs clerical's offered codes:")
-        print(f"  Model pick matches clerical options: {comparison['model_pick_in_clerical'].sum()} of {len(comparison)} ({100*comparison['model_pick_in_clerical'].mean():.1f}%)")
-        print(f"  Model pick outside clerical options: {(~comparison['model_pick_in_clerical']).sum()}")
+
+        print("\nModel's initial_code vs clerical truth:")
+        print(f"  Model pick matches clerical truth: {comparison['model_pick_matches_truth'].sum()} of {len(comparison)} ({100*comparison['model_pick_matches_truth'].mean():.1f}%)")
+        print(f"  Model pick does not match: {(~comparison['model_pick_matches_truth']).sum()}")
 
         # Distribution comparison
         def _major_group_label(code_set: set) -> str:
