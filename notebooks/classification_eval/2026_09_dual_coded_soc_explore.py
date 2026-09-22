@@ -1,13 +1,22 @@
 #!/usr/bin/env python3
-"""
-Dual-Coded SOC/SIC Analysis
-Convert occupation and industry classifications from dual-coded datasets
+"""Dual-Coded SOC/SIC Analysis
+Convert occupation and industry classifications from dual-coded datasets.
 """
 
 # %%
+import logging
 from pathlib import Path
+
 import pandas as pd
+from scipy.stats import chi2_contingency
 from sklearn.metrics import cohen_kappa_score
+
+from survey_assist_eval.data_cleaning.code_standard import (
+    SIC_CODABILITY_LEVELS,
+    SOC_CODABILITY_LEVELS,
+    get_clean_n_digit_codes,
+    get_codability_level,
+)
 
 # ============================================================================
 # SETUP: Pandas Display Options
@@ -33,6 +42,8 @@ SA_ID_COL = "Unique_identifier"
 SA_CODES_COL = "initial_code"
 SA_ALT_CODES_COL = "alt_soc_candidates"
 
+SIGNIFICANCE_LEVEL = 0.05
+
 
 def show_value_counts(df: pd.DataFrame, col: str, label: str, top_n: int = 10) -> None:
     """Show top N value counts for a column."""
@@ -46,10 +57,10 @@ def show_value_counts(df: pd.DataFrame, col: str, label: str, top_n: int = 10) -
         print(counts.to_string())
     except TypeError:
         # Handle unhashable types (lists, arrays, etc.)
-        print(f"Column contains unhashable values (lists/arrays). Flattening and showing unique codes:")
+        print("Column contains unhashable values (lists/arrays). Flattening and showing unique codes:")
         all_codes = []
         for item in df[col].dropna():
-            if isinstance(item, (list, tuple)):
+            if isinstance(item, list | tuple):
                 all_codes.extend(item)
             else:
                 all_codes.append(item)
@@ -57,8 +68,14 @@ def show_value_counts(df: pd.DataFrame, col: str, label: str, top_n: int = 10) -
         print(counts.to_string())
 
 
-def check_id_overlap(df_a, id_col_a, name_a, df_b, id_col_b, name_b) -> None:
-    """Compare IDs between two datasets."""
+def check_id_overlap(dataset_a: tuple, dataset_b: tuple) -> None:
+    """Compare IDs between two datasets.
+
+    Each argument is a (df, id_col, name) tuple.
+    """
+    df_a, id_col_a, name_a = dataset_a
+    df_b, id_col_b, name_b = dataset_b
+
     if id_col_a not in df_a.columns:
         print(f"⚠️  Column '{id_col_a}' not found in {name_a}")
         return
@@ -88,7 +105,6 @@ def check_id_overlap(df_a, id_col_a, name_a, df_b, id_col_b, name_b) -> None:
 
     overlap_pct = 100 * len(common) / max(len(ids_a), len(ids_b))
     print(f"\n✓ Overlap: {overlap_pct:.1f}%")
-
 
 # %%
 # ============================================================================
@@ -131,7 +147,7 @@ print(f"\n📋 Columns ({len(new_data_df.columns)} total):")
 for i, col in enumerate(new_data_df.columns, 1):
     print(f"  {i:2}. {col}")
 
-print(f"\n📊 Shape: {new_data_df.shape[0]} rows × {new_data_df.shape[1]} columns")
+print(f"\n📊 Shape: {new_data_df.shape[0]} rows x {new_data_df.shape[1]} columns")
 # print(new_data_df.head(3).to_string())
 
 # %%
@@ -146,7 +162,7 @@ print(f"\n📋 Columns ({len(two_k_df.columns)} total):")
 for i, col in enumerate(two_k_df.columns, 1):
     print(f"  {i:2}. {col}")
 
-print(f"\n📊 Shape: {two_k_df.shape[0]} rows × {two_k_df.shape[1]} columns")
+print(f"\n📊 Shape: {two_k_df.shape[0]} rows x {two_k_df.shape[1]} columns")
 # print(two_k_df.head(3).to_string())
 
 
@@ -195,12 +211,6 @@ show_value_counts(two_k_df, TWO_K_CLERICAL_CODES, "2k.parquet :: Clerical codes"
 # at each SOC digit level (1/2/3/4-digit), treating "uncodeable" as a
 # genuine category rather than missing data.
 
-import logging
-
-from survey_assist_eval.data_cleaning.code_standard import (
-    SOC_CODABILITY_LEVELS,
-    get_clean_n_digit_codes,
-)
 
 UNCODEABLE_LABEL = "Uncodable"
 SOC_DIGIT_LEVELS = sorted({digits for digits, _label in SOC_CODABILITY_LEVELS if digits > 0})
@@ -316,12 +326,6 @@ check_id_overlap(
 # SIC / SOC CODABILITY RELATIONSHIP
 # ============================================================================
 
-from scipy.stats import chi2_contingency
-
-from survey_assist_eval.data_cleaning.code_standard import (
-    SIC_CODABILITY_LEVELS,
-    get_codability_level,
-)
 
 SIC_LEVEL_ORDER = [label for _digits, label in SIC_CODABILITY_LEVELS]
 SOC_LEVEL_ORDER = [label for _digits, label in SOC_CODABILITY_LEVELS]
@@ -415,7 +419,7 @@ if contingency.shape[0] > 1 and contingency.shape[1] > 1:
     print(
         f"\nChi-square test for independence: chi2={chi2:.2f}, dof={dof}, p={p_value:.4g}"
     )
-    if p_value < 0.05:
+    if p_value < SIGNIFICANCE_LEVEL:
         print(
             "=> SIC and SOC codability appear related (reject independence at 5%): "
             "cases that are hard to code for one tend to be hard to code for the other."
@@ -495,9 +499,9 @@ if section_ct.shape[0] > 1:
         f"chi2={chi2:.2f}, dof={dof}, p={p_value:.4g}"
     )
     print(
-        "=> Disagreement rate varies significantly by industry (p<0.05)."
-        if p_value < 0.05
-        else "=> No significant evidence that disagreement rate varies by industry (p>=0.05)."
+        f"=> Disagreement rate varies significantly by industry (p<{SIGNIFICANCE_LEVEL})."
+        if p_value < SIGNIFICANCE_LEVEL
+        else f"=> No significant evidence that disagreement rate varies by industry (p>={SIGNIFICANCE_LEVEL})."
     )
 
 print(f"\n{'='*70}")
@@ -520,9 +524,9 @@ if major_group_ct.shape[0] > 1:
         f"chi2={chi2:.2f}, dof={dof}, p={p_value:.4g}"
     )
     print(
-        "=> Disagreement rate varies significantly by occupation group (p<0.05)."
-        if p_value < 0.05
-        else "=> No significant evidence that disagreement rate varies by occupation group (p>=0.05)."
+        f"=> Disagreement rate varies significantly by occupation group (p<{SIGNIFICANCE_LEVEL})."
+        if p_value < SIGNIFICANCE_LEVEL
+        else f"=> No significant evidence that disagreement rate varies by occupation group (p>={SIGNIFICANCE_LEVEL})."
     )
 
 # A handful of concrete example disagreements from the worst-performing
