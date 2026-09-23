@@ -280,10 +280,14 @@ try:
 
     for n in SOC_DIGIT_LEVELS:
         coder1_labels = new_data_df[NEW_DATA_CODER1_COL].apply(
-            lambda x, n=n: soc_label_at_digits(x, n_digits=n, unrecognised=unrecognised_values)
+            lambda x, n=n: soc_label_at_digits(
+                x, n_digits=n, unrecognised=unrecognised_values
+            )
         )
         coder2_labels = new_data_df[NEW_DATA_CODER2_COL].apply(
-            lambda x, n=n: soc_label_at_digits(x, n_digits=n, unrecognised=unrecognised_values)
+            lambda x, n=n: soc_label_at_digits(
+                x, n_digits=n, unrecognised=unrecognised_values
+            )
         )
 
         n_agree = (coder1_labels == coder2_labels).sum()
@@ -384,10 +388,14 @@ try:
     already_resolved = pd.Series(False, index=new_data_df.index)
     for n in sorted(SOC_DIGIT_LEVELS, reverse=True):
         coder1_labels = new_data_df[NEW_DATA_CODER1_COL].apply(
-            lambda x, n=n: soc_label_at_digits(x, n_digits=n, unrecognised=unrecognised_values)
+            lambda x, n=n: soc_label_at_digits(
+                x, n_digits=n, unrecognised=unrecognised_values
+            )
         )
         coder2_labels = new_data_df[NEW_DATA_CODER2_COL].apply(
-            lambda x, n=n: soc_label_at_digits(x, n_digits=n, unrecognised=unrecognised_values)
+            lambda x, n=n: soc_label_at_digits(
+                x, n_digits=n, unrecognised=unrecognised_values
+            )
         )
         either_uncodeable = (coder1_labels == UNCODEABLE_LABEL) | (
             coder2_labels == UNCODEABLE_LABEL
@@ -498,8 +506,10 @@ try:
         return row[NEW_DATA_CODER1_COL]
 
     merged["soc_major_group_digit"] = merged.apply(
-        lambda row, n=1: soc_label_at_digits(primary_soc_code(row), n_digits=n, unrecognised=set()),
-        axis=1
+        lambda row, n=1: soc_label_at_digits(
+            primary_soc_code(row), n_digits=n, unrecognised=set()
+        ),
+        axis=1,
     )
 finally:
     _code_standard_logger.setLevel(_previous_log_level)
