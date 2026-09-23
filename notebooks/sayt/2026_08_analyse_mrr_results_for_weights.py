@@ -117,16 +117,16 @@ def _pivot_weight_matrix(
 
 
 def _underline_max_min_labels(
-    mrr_matrix: pd.DataFrame, label_matrix: pd.DataFrame, score_metric
+    score_matrix: pd.DataFrame, label_matrix: pd.DataFrame, score_metric
 ):
     best_score = (
-        mrr_matrix.max().max() if score_metric == "mrr" else mrr_matrix.min().min()
+        score_matrix.max().max() if score_metric == "mrr" else score_matrix.min().min()
     )
 
     if pd.isna(best_score) or best_score == 0:
         return label_matrix
 
-    max_cells = (mrr_matrix == best_score).stack()
+    max_cells = (score_matrix == best_score).stack()
     for ngram_weight, semantic_weight in max_cells[max_cells].index:
         label_matrix.loc[ngram_weight, semantic_weight] = (
             "<span style='text-decoration: underline; text-decoration-color: red;'>"
@@ -185,9 +185,9 @@ def _build_faceted_heatmap_matrices(
 
     for character in character_order:
         data = weight_results_df[weight_results_df["Characters"] == character]
-        mrr_matrix = _pivot_weight_matrix(
+        score_matrix = _pivot_weight_matrix(
             data,
-            "label_percent",
+            "label_best",
             weight_orders,
         )
         label_matrix = _pivot_weight_matrix(
@@ -196,10 +196,10 @@ def _build_faceted_heatmap_matrices(
             weight_orders,
         ).fillna("")
 
-        mrr_matrices.append(mrr_matrix.to_numpy())
+        mrr_matrices.append(score_matrix.to_numpy())
         label_matrices.append(
             _underline_max_min_labels(
-                mrr_matrix, label_matrix, score_metric=score_metric
+                score_matrix, label_matrix, score_metric=score_metric
             ).to_numpy()
         )
         prefix_matrices.append(
@@ -310,11 +310,11 @@ def _prepare_faceted_heatmap_data(
     )
     if score_metric == "mrr":
         weight_results_df = weight_results_df.assign(
-            label_percent=weight_results_df[score_metric] * 100,
+            label_best=weight_results_df[score_metric] * 100,
         )
     else:
         weight_results_df = weight_results_df.assign(
-            label_percent=weight_results_df[score_metric],
+            label_best=weight_results_df[score_metric],
         )
 
     weight_results_df = weight_results_df.assign(
@@ -324,7 +324,7 @@ def _prepare_faceted_heatmap_data(
         Semantic_weight_label=weight_results_df["Semantic_weight"].map(
             lambda value: f"{value:.1f}"
         ),
-        label_text=weight_results_df["label_percent"].map(
+        label_text=weight_results_df["label_best"].map(
             lambda value: f"{value:.1f}" if value != 0 else ""
         ),
     )
