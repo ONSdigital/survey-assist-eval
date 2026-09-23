@@ -120,7 +120,9 @@ def _underline_max_min_labels(
     score_matrix: pd.DataFrame, label_matrix: pd.DataFrame, score_metric
 ):
     best_score = (
-        score_matrix.max().max() if score_metric == "mrr" else score_matrix.min().min()
+        score_matrix.min().min()
+        if score_metric == "mean_rank"
+        else score_matrix.max().max()
     )
 
     if pd.isna(best_score) or best_score == 0:
@@ -266,8 +268,8 @@ def _build_faceted_heatmap_matrices(
         "Label": label_matrices,
         "Prefix": prefix_matrices,
         "mean_rank": mean_rank_matrices,
-        "precision": precision_matrices,
-        "recall": recall_matrices,
+        "precision_at_k": precision_matrices,
+        "recall_at_k": recall_matrices,
         "mrr": mrr_matrices,
     }
 
@@ -279,7 +281,7 @@ def _create_faceted_imshow(
     facet_col_wrap: int,
     score_metric: str,
 ):
-    colour = "Blues" if score_metric == "mrr" else "Blues_r"
+    colour = "Blues_r" if score_metric == "mean_rank" else "Blues"
 
     return px.imshow(
         np.array(score_matrices),
@@ -301,7 +303,7 @@ def _create_faceted_imshow(
 
 
 def _prepare_faceted_heatmap_data(
-    character_weight_results: dict[int, dict], score_metric: str
+    character_weight_results: dict[int, dict], score_metric: str, k: int | None = None
 ):
     weight_results_df = pd.concat(
         [
@@ -325,6 +327,16 @@ def _prepare_faceted_heatmap_data(
         weight_results_df = weight_results_df.assign(
             label_text=weight_results_df["label_best"].map(
                 lambda value: f"{value:.0f}" if value != 0 else ""
+            ),
+        )
+    elif score_metric in ("precision_at_k", "recall_at_k"):
+
+        weight_results_df = weight_results_df.assign(
+            label_best=weight_results_df[score_metric].apply(lambda x: x.get(str(k))),
+        )
+        weight_results_df = weight_results_df.assign(
+            label_text=weight_results_df["label_best"].map(
+                lambda value: f"{value:.2f}" if value != 0 else ""
             ),
         )
     else:
@@ -404,19 +416,22 @@ def _rename_facet_titles(fig, character_order):
 
 
 def generate_faceted_heatmap(
-    character_weight_results: dict[int, dict], score_metric: str = "mrr"
+    character_weight_results: dict[int, dict],
+    score_metric: str = "mrr",
+    k: int | None = None,
 ):
     """Generate faceted heatmaps of n/p/s weight combinations by character count.
 
     Args:
         character_weight_results (dict): Weight test results keyed by character count.
         score_metric (str): The metric used for assessing the performance.
+        k (int | optional): rank k for recall and precision.
 
     Returns:
         fig: A Plotly figure object representing the faceted heatmaps.
     """
     weight_results_df = _prepare_faceted_heatmap_data(
-        character_weight_results, score_metric=score_metric
+        character_weight_results, score_metric=score_metric, k=k
     )
 
     ngram_weight_order = [
@@ -437,7 +452,7 @@ def generate_faceted_heatmap(
         weight_results_df, character_order, weight_orders, score_metric=score_metric
     )
     fig = _create_faceted_imshow(
-        matrices[score_metric],
+        matrices["score"],
         semantic_weight_order,
         ngram_weight_order,
         facet_col_wrap,
@@ -525,9 +540,13 @@ for char in characters_list:
     data_by_character[char] = data_weights
 
 # %%
-score_metric_label = "mean_rank"
+score_metric_label = "recall_at_k"
+k_value = 1
+
 faceted_plot = generate_faceted_heatmap(
-    character_weight_results=data_by_character, score_metric=score_metric_label
+    character_weight_results=data_by_character,
+    score_metric=score_metric_label,
+    k=k_value,
 )
 if SAVE_PLOT:
     faceted_plot.write_html(
