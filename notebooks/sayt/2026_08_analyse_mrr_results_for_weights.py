@@ -176,9 +176,10 @@ def _build_faceted_heatmap_matrices(
     weight_orders: tuple[list[str], list[str]],
     score_metric: str,
 ):
-    mrr_matrices = []
+    score_matrices = []
     label_matrices = []
     prefix_matrices = []
+    mrr_matrices = []
     mean_rank_matrices = []
     precision_matrices = []
     recall_matrices = []
@@ -196,7 +197,7 @@ def _build_faceted_heatmap_matrices(
             weight_orders,
         ).fillna("")
 
-        mrr_matrices.append(score_matrix.to_numpy())
+        score_matrices.append(score_matrix.to_numpy())
         label_matrices.append(
             _underline_max_min_labels(
                 score_matrix, label_matrix, score_metric=score_metric
@@ -211,13 +212,23 @@ def _build_faceted_heatmap_matrices(
             .map(lambda value: f"{value:.1f}" if pd.notna(value) else "")
             .to_numpy()
         )
+
+        mrr_matrices.append(
+            _pivot_weight_matrix(
+                data,
+                "MRR_percent",
+                weight_orders,
+            )
+            .map(lambda value: f"{value:.0f}" if pd.notna(value) else "")
+            .to_numpy()
+        )
         mean_rank_matrices.append(
             _pivot_weight_matrix(
                 data,
                 "mean_rank",
                 weight_orders,
             )
-            .map(lambda value: f"{value:.1f}" if pd.notna(value) else "")
+            .map(lambda value: f"{value:.3f}" if pd.notna(value) else "")
             .to_numpy()
         )
         precision_matrices.append(
@@ -250,21 +261,19 @@ def _build_faceted_heatmap_matrices(
             )
             .to_numpy()
         )
-
-    matrices = {
-        "mrr": mrr_matrices,
+    return {
+        "score": score_matrices,
         "Label": label_matrices,
         "Prefix": prefix_matrices,
         "mean_rank": mean_rank_matrices,
         "precision": precision_matrices,
         "recall": recall_matrices,
+        "mrr": mrr_matrices,
     }
-
-    return matrices
 
 
 def _create_faceted_imshow(
-    mrr_matrices: list[np.ndarray],
+    score_matrices: list[np.ndarray],
     semantic_weight_order: list[str],
     ngram_weight_order: list[str],
     facet_col_wrap: int,
@@ -273,7 +282,7 @@ def _create_faceted_imshow(
     colour = "Blues" if score_metric == "mrr" else "Blues_r"
 
     return px.imshow(
-        np.array(mrr_matrices),
+        np.array(score_matrices),
         x=semantic_weight_order,
         y=ngram_weight_order,
         facet_col=0,
@@ -292,7 +301,7 @@ def _create_faceted_imshow(
 
 
 def _prepare_faceted_heatmap_data(
-    character_weight_results: dict[int, dict], score_metric: str = "mrr"
+    character_weight_results: dict[int, dict], score_metric: str
 ):
     weight_results_df = pd.concat(
         [
@@ -307,14 +316,25 @@ def _prepare_faceted_heatmap_data(
         Ngram_weight=weight_results_df["Ngram_weight"] / 10,
         Semantic_weight=weight_results_df["Semantic_weight"] / 10,
         Prefix_weight=weight_results_df["Prefix_weight"] / 10,
+        MRR_percent=weight_results_df["mrr"] * 100,
     )
     if score_metric == "mrr":
         weight_results_df = weight_results_df.assign(
             label_best=weight_results_df[score_metric] * 100,
         )
+        weight_results_df = weight_results_df.assign(
+            label_text=weight_results_df["label_best"].map(
+                lambda value: f"{value:.0f}" if value != 0 else ""
+            ),
+        )
     else:
         weight_results_df = weight_results_df.assign(
             label_best=weight_results_df[score_metric],
+        )
+        weight_results_df = weight_results_df.assign(
+            label_text=weight_results_df["label_best"].map(
+                lambda value: f"{value:.1f}" if value != 0 else ""
+            ),
         )
 
     weight_results_df = weight_results_df.assign(
@@ -323,9 +343,6 @@ def _prepare_faceted_heatmap_data(
         ),
         Semantic_weight_label=weight_results_df["Semantic_weight"].map(
             lambda value: f"{value:.1f}"
-        ),
-        label_text=weight_results_df["label_best"].map(
-            lambda value: f"{value:.1f}" if value != 0 else ""
         ),
     )
     return weight_results_df
@@ -338,6 +355,7 @@ def _add_faceted_heatmap_text(
     score_metric,
     metrics_matrices,
 ):
+    metrics_matrices.pop("score")
     metric_names = list(metrics_matrices)
     for character, trace, labels, *metric_matrices in zip(
         character_order,
@@ -356,6 +374,13 @@ def _add_faceted_heatmap_text(
             ]
             for rows in zip(*metric_matrices, strict=True)
         ]
+
+        score_result = (
+            f"{score_metric} " + "(%): %{z:.0f}<extra></extra>"
+            if score_metric == "mrr"
+            else f"{score_metric}" + ": %{z:.3f}<extra></extra>"
+        )
+
         trace.update(
             hovertext=hover_matrix,
             text=labels,
@@ -366,7 +391,7 @@ def _add_faceted_heatmap_text(
                 "Ngram Weight: %{y}<br>"
                 "Semantic Weight: %{x}<br>"
                 "%{hovertext}"
-                f"{score_metric} " + "(%): %{z:.3f}<extra></extra>"
+                f"{score_result}"
             ),
         )
 
@@ -385,7 +410,7 @@ def generate_faceted_heatmap(
 
     Args:
         character_weight_results (dict): Weight test results keyed by character count.
-        score_metric (str): The metrics used for assessing the performance.
+        score_metric (str): The metric used for assessing the performance.
 
     Returns:
         fig: A Plotly figure object representing the faceted heatmaps.
@@ -442,7 +467,11 @@ def generate_faceted_heatmap(
         height=(360 * facet_rows) + 160,
         margin={"l": 80, "r": 120, "t": 90, "b": 70},
         plot_bgcolor="white",
-        coloraxis_colorbar={"title": f"{score_metric} (%)"},
+        coloraxis_colorbar=(
+            {"title": f"{score_metric} (%)"}
+            if score_metric == "mrr"
+            else {"title": f"{score_metric}"}
+        ),
     )
     _style_faceted_heatmap_axes(fig)
 
@@ -496,11 +525,14 @@ for char in characters_list:
     data_by_character[char] = data_weights
 
 # %%
+score_metric_label = "mean_rank"
 faceted_plot = generate_faceted_heatmap(
-    character_weight_results=data_by_character, score_metric="mean_rank"
+    character_weight_results=data_by_character, score_metric=score_metric_label
 )
 if SAVE_PLOT:
-    faceted_plot.write_html(f"data/sayt/{TEST_FOLDER}/heatmaps_by_character.html")
+    faceted_plot.write_html(
+        f"data/sayt/{TEST_FOLDER}/heatmaps_by_character_{score_metric_label}.html"
+    )
 faceted_plot.show()
 
 
