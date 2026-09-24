@@ -11,15 +11,10 @@ The variables are loaded from the ".env" file.
 # %%
 import logging
 import os
+from copy import copy
 
 import pandas as pd
 from dotenv import load_dotenv
-from survey_assist_embed_core.sayt import (
-    NgramRetrieverSpec,
-    PrefixRetrieverSpec,
-    SAYTSuggester,
-    SemanticRetrieverSpec,
-)
 from survey_assist_utils.logging import get_logger
 
 from notebooks.sayt.sayt_utils import (
@@ -27,12 +22,14 @@ from notebooks.sayt.sayt_utils import (
     create_figure,
     get_suggestions_by_chars,
     melt_results_for_analysis,
+    update_suggester_weights,
     validate_one_code,
 )
+from survey_assist_eval.data_cleaning.code_standard import SIC_EXPECTED_CODE_LENGTH
 
 # %%
 EXTENDED_RUN = False  # set to True to include more suggesters and debug messages
-SIC_CODE_LENGTH = 5
+SIC_CODE_LENGTH = SIC_EXPECTED_CODE_LENGTH
 MAX_SUGGESTIONS = 9  # for the evaluation we will look at ranks up to 9 only
 
 if EXTENDED_RUN:
@@ -117,40 +114,75 @@ sayt2_corpus = list(
 )
 
 # %%
-# define bunch of different suggesters to evaluate
+# define default suggesters by specified corpuses
+suggester_sayt_corpus = build_lookup_suggester(
+    sayt_corpus, prefix_weights=1.0, ngram_weights=1.0, semantic_weights=1.0
+)
+
+suggester_sayt2_corpus = build_lookup_suggester(
+    sayt2_corpus, prefix_weights=1.0, ngram_weights=1.0, semantic_weights=1.0
+)
+# %%
 suggesters = {
-    "Blaise proxy method (prefix + n_grams)": build_lookup_suggester(
-        sayt_corpus, semantic_weight=None
+    "Blaise proxy method (prefix + n_grams)": update_suggester_weights(
+        suggester=copy(suggester_sayt_corpus),
+        prefix_weights=1.0,
+        ngram_weights=1.0,
+        semantic_weights=0.0,
     ),
-    "Hybrid method including semantic retriever": build_lookup_suggester(
-        sayt_corpus, semantic_weight=1.0
+    "Hybrid method including semantic retriever": update_suggester_weights(
+        suggester=copy(suggester_sayt_corpus),
+        prefix_weights=1.0,
+        ngram_weights=1.0,
+        semantic_weights=1.0,
     ),
-    "Hybrid method with extended knowledge base": build_lookup_suggester(
-        sayt2_corpus, semantic_weight=1.0
+    "Hybrid method with extended knowledge base": update_suggester_weights(
+        suggester=copy(suggester_sayt2_corpus),
+        prefix_weights=1.0,
+        ngram_weights=1.0,
+        semantic_weights=1.0,
     ),
 }
 
 if EXTENDED_RUN:
     suggesters.update(
         {
-            "Ngrams only": SAYTSuggester(
-                sayt_corpus, retrievers=[NgramRetrieverSpec()]
+            "Ngrams only": update_suggester_weights(
+                suggester=copy(suggester_sayt_corpus),
+                prefix_weights=0.0,
+                ngram_weights=1.0,
+                semantic_weights=0.0,
             ),
-            "Prefix only": SAYTSuggester(
-                sayt_corpus, retrievers=[PrefixRetrieverSpec()]
+            "Prefix only": update_suggester_weights(
+                suggester=copy(suggester_sayt_corpus),
+                prefix_weights=1.0,
+                ngram_weights=0.0,
+                semantic_weights=0.0,
             ),
-            "Semantic only": SAYTSuggester(
-                sayt_corpus, retrievers=[SemanticRetrieverSpec()]
+            "Semantic only": update_suggester_weights(
+                suggester=copy(suggester_sayt_corpus),
+                prefix_weights=0.0,
+                ngram_weights=0.0,
+                semantic_weights=1.0,
             ),
-            "Hybrid sem_w=0.5": build_lookup_suggester(
-                sayt_corpus, semantic_weight=0.5
+            "Hybrid sem_w=0.5": update_suggester_weights(
+                suggester=copy(suggester_sayt_corpus),
+                prefix_weights=1.0,
+                ngram_weights=1.0,
+                semantic_weights=0.5,
             ),
-            "Hybrid sem_w=1.5": build_lookup_suggester(
-                sayt_corpus, semantic_weight=1.5
+            "Hybrid sem_w=1.5": update_suggester_weights(
+                suggester=copy(suggester_sayt_corpus),
+                prefix_weights=1.0,
+                ngram_weights=1.0,
+                semantic_weights=1.5,
             ),
             "Blaise proxy method (prefix + n_grams) "
-            "with extended knowledge base": build_lookup_suggester(
-                sayt2_corpus, semantic_weight=None
+            "with extended knowledge base": update_suggester_weights(
+                suggester=copy(suggester_sayt2_corpus),
+                prefix_weights=1.0,
+                ngram_weights=1.0,
+                semantic_weights=0.0,
             ),
         }
     )
