@@ -19,6 +19,11 @@ from survey_assist_eval.data_cleaning.code_standard import (
     get_clean_n_digit_codes,
     get_codability_level,
 )
+from survey_assist_eval.data_cleaning.prep_data import (
+    prep_clerical_codes,
+    prep_model_codes,
+)
+from survey_assist_eval.evaluation.metrics import calc_simple_metrics
 
 # ============================================================================
 # SETUP: Pandas Display Options
@@ -640,12 +645,6 @@ if not SA_DATA_PATH.exists():
         "Survey Assist's SOC output for this subset is available, then re-run."
     )
 else:
-    from survey_assist_eval.data_cleaning.prep_data import (
-        prep_clerical_codes,
-        prep_model_codes,
-    )
-    from survey_assist_eval.evaluation.metrics import calc_simple_metrics
-
     print(f"\n{'='*70}")
     print("SURVEY ASSIST PERFORMANCE COMPARISON")
     print(f"{'='*70}")
