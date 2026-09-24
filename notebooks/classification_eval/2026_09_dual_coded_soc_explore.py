@@ -230,17 +230,17 @@ show_value_counts(
 # INTER-RATER RELIABILITY: CODER AGREEMENT ANALYSIS
 # ============================================================================
 # Compute inter-rater reliability metrics (Cohen's kappa, % agreement),
-# at each SOC digit level (1/2/3/4-digit), treating "uncodeable" as a
+# at each SOC digit level (1/2/3/4-digit), treating "uncodable" as a
 # genuine category rather than missing data.
 
 
-UNCODEABLE_LABEL = "Uncodable"
+UNCODABLE_LABEL = "Uncodable"
 SOC_DIGIT_LEVELS = sorted(
     {digits for digits, _label in SOC_CODABILITY_LEVELS if digits > 0}
 )
 
 # get_clean_n_digit_codes logs a warning for every cell it can't parse as a
-# code (e.g. "uncodeable" itself) - that's expected here and would be very
+# code (e.g. "uncodable" itself) - that's expected here and would be very
 # noisy at ~90 occurrences x 4 digit levels, so quiet it for this section.
 _code_standard_logger = logging.getLogger(
     "survey_assist_eval.data_cleaning.code_standard"
@@ -252,26 +252,26 @@ try:
 
     def soc_label_at_digits(raw: object, n_digits: int, unrecognised: set) -> str:
         """Return the n-digit SOC code for a single coder's cell, or the
-        Uncodeable sentinel if the cell is blank, 'uncodeable', or otherwise
+        Uncodable sentinel if the cell is blank, 'uncodable', or otherwise
         not a valid SOC code (any such value is also recorded in
         `unrecognised` so it can be surfaced separately from genuine
-        uncodeable calls).
+        uncodable calls).
         """
         if pd.isna(raw):
-            return UNCODEABLE_LABEL
+            return UNCODABLE_LABEL
         raw_str = str(raw).strip()
         if not raw_str:
-            return UNCODEABLE_LABEL
+            return UNCODABLE_LABEL
 
         cleaned, invalid = get_clean_n_digit_codes(
             [raw_str], n=n_digits, code_type="SOC"
         )
-        if invalid and raw_str.lower() not in {"uncodeable", "uncodable"}:
+        if invalid and raw_str.lower() not in {"uncodable"}:
             unrecognised.add(raw_str)
         if len(cleaned) == 1:
             return next(iter(cleaned))
-        # empty (invalid/uncodeable) or, unexpectedly, >1 candidate
-        return UNCODEABLE_LABEL
+        # empty (invalid/uncodable) or, unexpectedly, >1 candidate
+        return UNCODABLE_LABEL
 
     print(f"\n{'='*70}")
     print("INTER-RATER RELIABILITY: Coder1 vs Coder2 (by SOC digit level)")
@@ -317,14 +317,14 @@ try:
     digit_level_df = pd.DataFrame(digit_level_summary).sort_values(
         "digits", ascending=False
     )
-    print("\nAgreement by SOC digit level (uncodeable treated as its own category):")
+    print("\nAgreement by SOC digit level (uncodable treated as its own category):")
     print(digit_level_df.to_string(index=False))
 
     if unrecognised_values:
         print(
             f"\n⚠️  {len(unrecognised_values)} distinct coder value(s) were neither a "
-            "valid SOC code nor 'uncodeable' - check these for typos, they are "
-            "currently being folded into the Uncodeable category:"
+            "valid SOC code nor 'uncodable' - check these for typos, they are "
+            "currently being folded into the Uncodable category:"
         )
         print(sorted(unrecognised_values)[:20])
 
@@ -389,7 +389,7 @@ try:
     )
 
     # Finest SOC digit level at which Coder1 and Coder2 agree, per row.
-    soc_codability = pd.Series(UNCODEABLE_LABEL, index=new_data_df.index)
+    soc_codability = pd.Series(UNCODABLE_LABEL, index=new_data_df.index)
     already_resolved = pd.Series(False, index=new_data_df.index)
     for n in sorted(SOC_DIGIT_LEVELS, reverse=True):
         coder1_labels = new_data_df[NEW_DATA_CODER1_COL].apply(
@@ -402,10 +402,10 @@ try:
                 x, n_digits=n, unrecognised=unrecognised_values
             )
         )
-        either_uncodeable = (coder1_labels == UNCODEABLE_LABEL) | (
-            coder2_labels == UNCODEABLE_LABEL
+        either_uncodable = (coder1_labels == UNCODABLE_LABEL) | (
+            coder2_labels == UNCODABLE_LABEL
         )
-        agree = (coder1_labels == coder2_labels) & ~either_uncodeable
+        agree = (coder1_labels == coder2_labels) & ~either_uncodable
         level_label = next(
             label for digits, label in SOC_CODABILITY_LEVELS if digits == n
         )
