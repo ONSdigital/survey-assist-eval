@@ -252,7 +252,6 @@ def add_sayt_metrics_columns(
         axis=1,
     )
 
-
     return df
 
 
@@ -305,7 +304,9 @@ def summarise_performance_metrics(  # noqa: PLR0913 pylint: disable = R0913, R09
         "mrr": df[f"{prefix}reciprocal_rank"].mean(),
         "mean_rank": df[f"{prefix}correct_code_rank"].mean(),
         "mean_rank_penalised": df[f"{prefix}mean_rank_penalised"].mean(),
-        "median_rank": df[f"{prefix}correct_code_rank"].quantile(0.5, interpolation = "midpoint"),
+        "median_rank": df[f"{prefix}correct_code_rank"].quantile(
+            0.5, interpolation="midpoint"
+        ),
         "median_test": df[f"{prefix}correct_code_rank"].median(),
         "precision_at_k": {k: df[f"{prefix}precision_at_{k}"].mean() for k in k_values},
         "recall_at_k": {k: df[f"{prefix}recall_at_{k}"].mean() for k in k_values},
