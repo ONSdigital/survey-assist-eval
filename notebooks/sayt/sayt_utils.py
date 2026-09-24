@@ -107,6 +107,13 @@ def update_suggester_weights(
         )
     )
 
+    logger.info(
+        "Updated suggester weights",
+        prefix_weights=prefix_weights,
+        ngram_weights=ngram_weights,
+        semantic_weights=semantic_weights,
+    )
+
     return suggester
 
 
