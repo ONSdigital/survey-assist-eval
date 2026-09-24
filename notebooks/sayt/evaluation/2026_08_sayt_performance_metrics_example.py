@@ -84,6 +84,9 @@ _, sayt2_corpus = build_sayt_corpus_from_df(
 # %%
 # define bunch of different suggesters to evaluate
 suggesters = {
+    "all": build_lookup_suggester(
+        sayt2_corpus, retrievers=[NgramRetrieverSpec(), PrefixRetrieverSpec(), SemanticRetrieverSpec()]
+    ),
     "Ngrams only": build_lookup_suggester(
         sayt2_corpus, retrievers=[NgramRetrieverSpec()]
     ),
