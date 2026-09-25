@@ -7,9 +7,10 @@ Convert occupation and industry classifications from dual-coded datasets.
 
 # %%
 import logging
-from pathlib import Path
+import os
 
 import pandas as pd
+from dotenv import load_dotenv
 from scipy.stats import chi2_contingency
 from sklearn.metrics import cohen_kappa_score
 
@@ -37,19 +38,22 @@ pd.set_option("display.max_rows", 10)
 # Update file paths and column names based on your actual data.
 
 # File paths
-DATA_DIR = Path("data")
+load_dotenv()
+bukket_name = os.getenv("EVALUATION_BUCKET_NAME")
 NEW_DATA_PATH = (
-    DATA_DIR / "evaluation-pipeline_original_datasets_sic_2k_comparison_soc_2k.xlsx"
+    f"gs://{bukket_name}/evaluation-pipeline/original_datasets/sic_2k/"
+    "comparison_soc_2k.xlsx"
 )
 TWO_K_PATH = (
-    DATA_DIR / "evaluation-pipeline_original_datasets_sic_2k_sic_2k_test_data.parquet"
+    f"gs://{bukket_name}/evaluation-pipeline/original_datasets/sic_2k/"
+    "sic_2k_test_data.parquet"
 )
 
 TWO_K_CLERICAL_CODES = "clerical_codes"  # List of candidate codes
 
 # Survey Assist's own SOC output for this same subset
 SA_DATA_PATH = (
-    DATA_DIR / "evaluation-pipeline_yavuz_soc_STG2.parquet"
+    f"gs://{bukket_name}/evaluation-pipeline/original_datasets/sic_2k/" "STG2.parquet"
 )  # Pipeline run by Peter
 SA_ID_COL = "Unique_identifier"
 SA_CODES_COL = "initial_code"
@@ -635,7 +639,7 @@ if not eligible_groups.empty:
 # SURVEY ASSIST PERFORMANCE COMPARISON
 # ============================================================================
 
-if not SA_DATA_PATH.exists():
+if not os.path.exists(SA_DATA_PATH):
     print(f"\n{'='*70}")
     print("SURVEY ASSIST PERFORMANCE COMPARISON - SKIPPED")
     print(f"{'='*70}")
