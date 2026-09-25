@@ -39,13 +39,13 @@ pd.set_option("display.max_rows", 10)
 
 # File paths
 load_dotenv()
-bukket_name = os.getenv("EVALUATION_BUCKET_NAME")
+bucket_name = os.getenv("EVALUATION_BUCKET_NAME")
 NEW_DATA_PATH = (
-    f"gs://{bukket_name}/evaluation-pipeline/original_datasets/sic_2k/"
+    f"gs://{bucket_name}/evaluation-pipeline/original_datasets/sic_2k/"
     "comparison_soc_2k.xlsx"
 )
 TWO_K_PATH = (
-    f"gs://{bukket_name}/evaluation-pipeline/original_datasets/sic_2k/"
+    f"gs://{bucket_name}/evaluation-pipeline/original_datasets/sic_2k/"
     "sic_2k_test_data.parquet"
 )
 
@@ -53,7 +53,7 @@ TWO_K_CLERICAL_CODES = "clerical_codes"  # List of candidate codes
 
 # Survey Assist's own SOC output for this same subset
 SA_DATA_PATH = (
-    f"gs://{bukket_name}/evaluation-pipeline/original_datasets/sic_2k/" "STG2.parquet"
+    f"gs://{bucket_name}/evaluation-pipeline/dual_coded_2k/soc/" "STG2.parquet"
 )  # Pipeline run by Peter
 SA_ID_COL = "Unique_identifier"
 SA_CODES_COL = "initial_code"
@@ -639,7 +639,12 @@ if not eligible_groups.empty:
 # SURVEY ASSIST PERFORMANCE COMPARISON
 # ============================================================================
 
-if not os.path.exists(SA_DATA_PATH):
+try:
+    sa_df = pd.read_parquet(SA_DATA_PATH, dtype_backend="numpy_nullable")
+except FileNotFoundError:
+    sa_df = None
+
+if sa_df is None:
     print(f"\n{'='*70}")
     print("SURVEY ASSIST PERFORMANCE COMPARISON - SKIPPED")
     print(f"{'='*70}")
@@ -653,13 +658,59 @@ else:
     print("SURVEY ASSIST PERFORMANCE COMPARISON")
     print(f"{'='*70}")
 
-    sa_df = pd.read_parquet(SA_DATA_PATH, dtype_backend="numpy_nullable")
     if SA_ID_COL != "unique_id":
         sa_df = sa_df.rename(columns={SA_ID_COL: "unique_id"})
     # Match dtype with truth_input_df's "unique_id" (built from two_k_df, also
     # read with dtype_backend='numpy_nullable') so the merge below can't
     # silently under-match on a string-dtype mismatch between the two files.
     sa_df["unique_id"] = sa_df["unique_id"].astype(str)
+
+    SA_CODABILITY_CONFIDENCE_THRESHOLD = 0.8
+    SA_LIKELIHOOD_COL = "initial_likelihood"
+
+    def _max_candidate_likelihood(candidates: object) -> float:
+        """Highest 'likelihood' across a row's alt_{sic,soc}_candidates, or NaN."""
+        if not isinstance(candidates, list | tuple):
+            return float("nan")
+        likelihoods = [
+            candidate.get("likelihood")
+            for candidate in candidates
+            if isinstance(candidate, dict) and candidate.get("likelihood") is not None
+        ]
+        return max(likelihoods) if likelihoods else float("nan")
+
+    def blank_low_confidence_initial_code(
+        df: pd.DataFrame, codes_col: str, alt_codes_col: str, label: str
+    ) -> pd.DataFrame:
+        """Blank `codes_col` wherever its likelihood is below
+        SA_CODABILITY_CONFIDENCE_THRESHOLD (i.e. not unambiguously codable).
+
+        The likelihood is read from SA_LIKELIHOOD_COL when present (one-prompt
+        pipeline), otherwise from the best `alt_codes_col` candidate likelihood.
+        """
+        if SA_LIKELIHOOD_COL in df.columns:
+            confidence = pd.to_numeric(df[SA_LIKELIHOOD_COL], errors="coerce")
+        else:
+            confidence = df[alt_codes_col].apply(_max_candidate_likelihood)
+        print(
+            f"{label} likelihood source: "
+            f"{SA_LIKELIHOOD_COL if SA_LIKELIHOOD_COL in df.columns else alt_codes_col} "
+            f"({confidence.isna().sum()} of {len(df)} missing)"
+        )
+        has_initial_code = df[codes_col].fillna("").astype(str).str.strip().ne("")
+        low_confidence = confidence < SA_CODABILITY_CONFIDENCE_THRESHOLD
+        not_unambiguously_codable = has_initial_code & low_confidence
+        print(
+            f"Blanking {not_unambiguously_codable.sum()} of {len(df)} {label} "
+            f"initial_code value(s) with likelihood below "
+            f"{SA_CODABILITY_CONFIDENCE_THRESHOLD} (not unambiguously codable)."
+        )
+        df.loc[not_unambiguously_codable, codes_col] = ""
+        return df
+
+    sa_df = blank_low_confidence_initial_code(
+        sa_df, SA_CODES_COL, SA_ALT_CODES_COL, label="Survey Assist SOC"
+    )
 
     # ========================================================================
     # Run performance evaluation with INITIAL_CODE only
@@ -686,7 +737,7 @@ else:
             model_codes_df = prep_model_codes(
                 sa_df,
                 codes_col=SA_CODES_COL,
-                alt_codes_col=SA_ALT_CODES_COL,
+                alt_codes_col=None,
                 code_type="SOC",
                 digits=n,
                 out_col="model_codes",
@@ -728,17 +779,6 @@ else:
 
         print("\nSurvey Assist vs clerical truth, by SOC digit level:")
         print(pd.DataFrame(digit_perf_summary).to_string(index=False))
-
-        # ====================================================================
-        # POST-HOC ANALYSIS: Does the model's single pick exactly match the
-        # clerical truth at the 4-digit level? (full_digit_combined is fixed
-        # at the finest digit level, captured above.) Note this is the same
-        # comparison as the "OO_accuracy"/"MM_accuracy" columns in the
-        # digits=4 row of the table above, just shown here as raw counts
-        # instead of a rate - there is no separate SOC "shortlist" to check
-        # against, since Coder1/Coder2 each record a single code, not a list
-        # of candidates (unlike the 2k parquet's SIC clerical_codes).
-        # ====================================================================
 
         print(f"\n{'='*70}")
         print("POST-HOC ANALYSIS: Model's Pick vs Clerical Truth (4-digit)")
