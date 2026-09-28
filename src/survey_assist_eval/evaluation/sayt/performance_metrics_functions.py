@@ -193,6 +193,43 @@ def compute_reciprocal_rank(
     return 0.0
 
 
+def compute_average_precision_at_k(
+    retrieved_codes: list[str], correct_codes: str | list[str] | set[str] | None, k: int
+) -> float:
+    """Compute Average Precision@K for a single query.
+
+    Average Precision@K summarizes precision at ranks up to ``k``, giving credit
+    when a retrieved code matches one of the correct codes.
+
+    Args:
+        retrieved_codes: Codes retrieved by the system, ordered by relevance.
+        correct_codes: A correct code or collection of correct codes to match
+            against. ``None`` or an empty collection represents missing ground truth.
+        k: The maximum rank to include. Must be a positive integer.
+
+    Returns:
+        The Average Precision@K score, or 0.0 when there is no ground truth.
+
+    Raises:
+        ValueError: If ``k`` is not a positive integer.
+    """
+    if not isinstance(k, int) or k <= 0:
+        raise ValueError("k must be a positive integer.")
+
+    if correct_codes is None or is_correct_codes_empty(correct_codes):
+        return 0.0
+
+    if isinstance(correct_codes, str):
+        correct_codes = {correct_codes}
+
+    sum_precision = 0.0
+    for i in range(1, k + 1):
+        precision_at_k = compute_precision_at_k(retrieved_codes, correct_codes, k=i)
+        sum_precision += precision_at_k
+
+    return sum_precision / k
+
+
 def add_sayt_metrics_columns(
     df,
     retrieved_codes_col: str,
