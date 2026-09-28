@@ -332,7 +332,7 @@ def _prepare_faceted_heatmap_data(
     )
     if score_metric == "mrr":
         weight_results_df = weight_results_df.assign(
-            metric_value=weight_results_df[score_metric] * 100,
+            metric_value=weight_results_df["MRR_percent"],
         )
         weight_results_df = weight_results_df.assign(
             label_text=weight_results_df["metric_value"].map(
@@ -539,7 +539,7 @@ for char in characters_list:
     data_by_character[char] = data_weights
 
 # %%
-score_metric_label = "recall_at_k"
+score_metric_label = "mrr"
 k_value = 1
 
 faceted_plot = generate_faceted_heatmap(
