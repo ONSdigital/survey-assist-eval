@@ -7,6 +7,7 @@ from survey_assist_eval.evaluation.sayt.suggestion_ranking_functions import (
     clean_codes_columns,
     get_codes_from_suggestions,
     get_rank_of_first_matching_code,
+    get_ranks_of_correct_codes,
     is_correct_codes_empty,
     rank_of_correct_code_in_suggestions,
 )
@@ -70,6 +71,24 @@ def test_is_correct_codes_empty_does_not_error_on_nan_mixed_with_lists():
         "Expected NaN and empty list to be treated as empty, and non-empty list "
         "as not empty, without raising an error."
     )
+
+
+# ============================================================================
+# Test get_rank_of_first_matching_code function
+# ============================================================================
+
+
+def test_get_ranks_of_correct_codes_returns_all_ranks_for_each_correct_code():
+    """Map correct codes to every rank, or an empty list when not retrieved."""
+    assert get_ranks_of_correct_codes(["1111", "2222", "1111"], ["1111", "3333"]) == {
+        "1111": [1, 3],
+        "3333": [],
+    }
+
+
+def test_get_ranks_of_correct_codes_accepts_a_single_correct_code():
+    """A single correct code should produce a one-entry mapping."""
+    assert get_ranks_of_correct_codes(["1111", "2222"], "2222") == {"2222": [2]}
 
 
 # ============================================================================
