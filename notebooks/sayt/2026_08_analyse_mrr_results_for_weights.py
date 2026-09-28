@@ -232,7 +232,7 @@ def _build_faceted_heatmap_matrices(
                 "MRR_percent",
                 weight_orders,
             )
-            .map(lambda value: f"{value:.0f}" if pd.notna(value) else "")
+            .map(lambda value: f"{value:.3f}" if pd.notna(value) else "")
             .to_numpy()
         )
         mean_rank_matrices.append(
