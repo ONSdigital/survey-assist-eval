@@ -16,7 +16,7 @@ from src.survey_assist_eval.pipeline.shared_components import _read_json
 # %%
 TEST_FOLDER = "weights_grid_10_2k_sic_kb"
 LOCAL_DIR = f"data/sayt/{TEST_FOLDER}/"
-USE_BUCKET = False
+USE_BUCKET = True
 SAVE_PLOT = True
 
 os.makedirs(LOCAL_DIR, exist_ok=True)
@@ -101,6 +101,17 @@ def get_ranked_setups(data: dict):
 
 
 # %%
+def _metric_display_titles(score_metric: str, k: int | None = None) -> str:
+    """Return a human-readable title for the score metric."""
+    if score_metric in {"precision_at_k", "recall_at_k"}:
+        return f"{score_metric.split('_at_')[0].capitalize()}@{"k" if k is None else k}"
+
+    if score_metric == "mrr":
+        return "MRR (%)"
+
+    return score_metric.replace("_", " ").capitalize()
+
+
 def _pivot_weight_matrix(
     data: pd.DataFrame,
     value_col: str,
@@ -296,7 +307,6 @@ def _create_faceted_imshow(
         labels={
             "x": "semantic",
             "y": "ngram",
-            "color": "MRR (%)",
             "facet_col": "Characters",
         },
     )
@@ -364,7 +374,7 @@ def _add_faceted_heatmap_text(
     fig,
     character_order,
     label_matrices,
-    score_metric,
+    score_metric_title,
     metrics_matrices,
 ):
     metric_names = list(metrics_matrices)
@@ -378,19 +388,13 @@ def _add_faceted_heatmap_text(
         hover_matrix = [
             [
                 "".join(
-                    f"{metric}: {value}<br>"
+                    f"{_metric_display_titles(metric)}: {value}<br>"
                     for metric, value in zip(metric_names, cell_values, strict=True)
                 )
                 for cell_values in zip(*rows, strict=True)
             ]
             for rows in zip(*metric_matrices, strict=True)
         ]
-
-        score_result = (
-            f"{score_metric} " + "(%): %{z:.0f}<extra></extra>"
-            if score_metric == "mrr"
-            else f"{score_metric}" + ": %{z:.3f}<extra></extra>"
-        )
 
         trace.update(
             hovertext=hover_matrix,
@@ -402,7 +406,7 @@ def _add_faceted_heatmap_text(
                 "Ngram Weight: %{y}<br>"
                 "Semantic Weight: %{x}<br>"
                 "%{hovertext}"
-                f"{score_result}"
+                f"{score_metric_title}: " + "%{z:.3f}<extra></extra>"
             ),
         )
 
@@ -470,7 +474,7 @@ def generate_faceted_heatmap(
         fig=fig,
         character_order=character_order,
         label_matrices=matrices["Label"],
-        score_metric=score_metric,
+        score_metric_title=_metric_display_titles(score_metric, k),
         metrics_matrices=hover_metrics_dict,
     )
     _rename_facet_titles(fig, character_order)
@@ -481,11 +485,7 @@ def generate_faceted_heatmap(
         height=(360 * facet_rows) + 160,
         margin={"l": 80, "r": 120, "t": 90, "b": 70},
         plot_bgcolor="white",
-        coloraxis_colorbar=(
-            {"title": f"{score_metric} (%)"}
-            if score_metric == "mrr"
-            else {"title": f"{score_metric}"}
-        ),
+        coloraxis_colorbar={"title": _metric_display_titles(score_metric, k)},
     )
     _style_faceted_heatmap_axes(fig)
 
