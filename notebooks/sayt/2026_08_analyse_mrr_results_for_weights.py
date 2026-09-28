@@ -16,7 +16,7 @@ from src.survey_assist_eval.pipeline.shared_components import _read_json
 # %%
 TEST_FOLDER = "weights_grid_10_2k_sic_kb"
 LOCAL_DIR = f"data/sayt/{TEST_FOLDER}/"
-USE_BUCKET = True
+USE_BUCKET = False
 SAVE_PLOT = True
 
 os.makedirs(LOCAL_DIR, exist_ok=True)
@@ -190,7 +190,7 @@ def _build_faceted_heatmap_matrices(
         data = weight_results_df[weight_results_df["Characters"] == character]
         score_matrix = _pivot_weight_matrix(
             data,
-            "label_best",
+            "metric_value",
             weight_orders,
         )
         label_matrix = _pivot_weight_matrix(
@@ -266,7 +266,7 @@ def _build_faceted_heatmap_matrices(
     return {
         "score": score_matrices,
         "Label": label_matrices,
-        "Prefix": prefix_matrices,
+        "Prefix Weight": prefix_matrices,
         "mean_rank": mean_rank_matrices,
         "precision_at_k": precision_matrices,
         "recall_at_k": recall_matrices,
@@ -322,29 +322,29 @@ def _prepare_faceted_heatmap_data(
     )
     if score_metric == "mrr":
         weight_results_df = weight_results_df.assign(
-            label_best=weight_results_df[score_metric] * 100,
+            metric_value=weight_results_df[score_metric] * 100,
         )
         weight_results_df = weight_results_df.assign(
-            label_text=weight_results_df["label_best"].map(
+            label_text=weight_results_df["metric_value"].map(
                 lambda value: f"{value:.0f}" if value != 0 else ""
             ),
         )
     elif score_metric in ("precision_at_k", "recall_at_k"):
 
         weight_results_df = weight_results_df.assign(
-            label_best=weight_results_df[score_metric].apply(lambda x: x.get(str(k))),
+            metric_value=weight_results_df[score_metric].apply(lambda x: x.get(str(k))),
         )
         weight_results_df = weight_results_df.assign(
-            label_text=weight_results_df["label_best"].map(
+            label_text=weight_results_df["metric_value"].map(
                 lambda value: f"{value:.2f}" if value != 0 else ""
             ),
         )
     else:
         weight_results_df = weight_results_df.assign(
-            label_best=weight_results_df[score_metric],
+            metric_value=weight_results_df[score_metric],
         )
         weight_results_df = weight_results_df.assign(
-            label_text=weight_results_df["label_best"].map(
+            label_text=weight_results_df["metric_value"].map(
                 lambda value: f"{value:.1f}" if value != 0 else ""
             ),
         )
@@ -367,7 +367,6 @@ def _add_faceted_heatmap_text(
     score_metric,
     metrics_matrices,
 ):
-    metrics_matrices.pop("score")
     metric_names = list(metrics_matrices)
     for character, trace, labels, *metric_matrices in zip(
         character_order,
@@ -459,7 +458,7 @@ def generate_faceted_heatmap(
         score_metric=score_metric,
     )
 
-    excluded_hover_metrics = {score_metric, "Label"}
+    excluded_hover_metrics = {score_metric, "Label", "score"}
 
     hover_metrics_dict = {
         metric: result
