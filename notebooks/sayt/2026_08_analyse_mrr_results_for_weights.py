@@ -139,8 +139,8 @@ def _underline_max_min_labels(
     if pd.isna(best_score) or best_score == 0:
         return label_matrix
 
-    max_cells = (score_matrix == best_score).stack()
-    for ngram_weight, semantic_weight in max_cells[max_cells].index:
+    max_min_cells = (score_matrix == best_score).stack()
+    for ngram_weight, semantic_weight in max_min_cells[max_min_cells].index:
         label_matrix.loc[ngram_weight, semantic_weight] = (
             "<span style='text-decoration: underline; text-decoration-color: red;'>"
             f"{label_matrix.loc[ngram_weight, semantic_weight]}</span>"
