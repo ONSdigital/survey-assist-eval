@@ -204,7 +204,7 @@ def compute_median_with_none_as_inf(
     Returns:
         The median value, with None treated as infinity.
     """
-    return float(pd.Series(values).fillna(float("inf")).median())
+    return float(pd.Series(values, dtype="float64").fillna(float("inf")).median())
 
 
 def add_sayt_metrics_columns(
