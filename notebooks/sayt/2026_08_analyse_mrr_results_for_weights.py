@@ -453,7 +453,9 @@ def generate_faceted_heatmap(
         score_metric=score_metric,
     )
 
-    excluded_hover_metrics = {score_metric, "Label", "score"}
+    excluded_hover_metrics = {"Label", "score"}
+    if score_metric not in {"precision_at_k", "recall_at_k"}:
+        excluded_hover_metrics.add(score_metric)
 
     hover_metrics_dict = {
         metric: result
