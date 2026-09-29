@@ -14,7 +14,8 @@ from dotenv import load_dotenv
 from src.survey_assist_eval.pipeline.shared_components import _read_json
 
 # %%
-TEST_FOLDER = "weights_grid_10_sic_kb"
+GRID_SIZE = 10  # grid granuality (should be same as in TEST_FOLDER)
+TEST_FOLDER = "weights_grid_10_2k_sic_kb"
 LOCAL_DIR = f"data/sayt/{TEST_FOLDER}/"
 USE_BUCKET = True
 SAVE_PLOT = True
@@ -26,7 +27,7 @@ load_dotenv()
 bucket_name = os.getenv("EVALUATION_BUCKET_NAME")
 if not bucket_name:
     raise ValueError("EVALUATION_BUCKET_NAME environment variable not set")
-BLOB_NAME = f"evaluation-pipeline/SAYT/weights_by_character/{TEST_FOLDER}/"
+blob_name = f"evaluation-pipeline/SAYT/weights_by_character/{TEST_FOLDER}/"
 
 
 # %%
@@ -73,8 +74,8 @@ def find_best_performing_setup(data: dict):
         best_dict (dict): a dictionary with those entries that achieved highest MRR.
     """
     # find best score and those tests that achieved that score
-    max_score = max(d["MRR"] for d in data.values())
-    best_dics = {k: v for k, v in data.items() if v["MRR"] == max_score}
+    max_score = max(d["mrr"] for d in data.values())
+    best_dics = {k: v for k, v in data.items() if v["mrr"] == max_score}
     return max_score, best_dics
 
 
@@ -89,53 +90,103 @@ def get_ranked_setups(data: dict):
         dict: A dictionary of tests, ordered by their MRR scores.
     """
     # Sort by MRR descending
-    sorted_items = sorted(data.items(), key=lambda x: x[1]["MRR"], reverse=True)
+    sorted_items = sorted(data.items(), key=lambda x: x[1]["mrr"], reverse=True)
 
     rankings = {}
 
     for key, value in sorted_items:
-        score = value["MRR"]
+        score = value["mrr"]
         rankings.setdefault(score, {})[key] = value
 
     return rankings
 
 
 # %%
+def _metric_display_titles(score_metric: str, k: int | None = None) -> str:
+    """Return a human-readable title for the score metric.
+
+    Args:
+        score_metric (str): Name of the score metric.
+        k (int | None): Cutoff value for an @k metric, if applicable.
+
+    Returns:
+        str: The human-readable metric title.
+    """
+    if score_metric in {"precision_at_k", "recall_at_k"}:
+        return f"{score_metric.split('_at_')[0].capitalize()}@{"k" if k is None else k}"
+
+    if score_metric == "mrr":
+        return "MRR (%)"
+
+    return score_metric.replace("_", " ").capitalize()
+
+
 def _pivot_weight_matrix(
     data: pd.DataFrame,
-    character: str,
     value_col: str,
     weight_orders: tuple[list[str], list[str]],
-    aggfunc: str = "mean",
+    aggfunc: str = "first",
 ):
+    """Pivot a weight-results dataframe into a matrix for plotting.
+
+    Args:
+        data (pd.DataFrame): Weight result rows.
+        value_col (str): Column to place in the matrix.
+        weight_orders (tuple[list[str], list[str]]): Desired n-gram and semantic weight order.
+        aggfunc (str): Aggregation function used when pivoting.
+
+    Returns:
+        pd.DataFrame: The reshaped matrix aligned to the requested weight order.
+    """
     ngram_weight_order, semantic_weight_order = weight_orders
-    return (
-        data[data["Characters"] == character]
-        .pivot_table(
-            index="Ngram_weight_label",
-            columns="Semantic_weight_label",
-            values=value_col,
-            aggfunc=aggfunc,
-        )
-        .reindex(index=ngram_weight_order, columns=semantic_weight_order)
+    return data.pivot_table(
+        index="Ngram_weight",
+        columns="Semantic_weight",
+        values=value_col,
+        aggfunc=aggfunc,
+    ).reindex(index=ngram_weight_order, columns=semantic_weight_order)
+
+
+def _underline_max_min_labels(
+    score_matrix: pd.DataFrame, label_matrix: pd.DataFrame, score_metric
+):
+    """Underline the best-performing cell(s) labels in a heatmap matrix.
+
+    Args:
+        score_matrix (pd.DataFrame): Matrix of metric scores.
+        label_matrix (pd.DataFrame): Matrix of display text for each cell.
+        score_metric (str): Metric name used to determine whether to take the max or min.
+
+    Returns:
+        pd.DataFrame: Label matrix with the winning cells underlined.
+    """
+    best_score = (
+        score_matrix.min().min()
+        if score_metric == "mean_rank"
+        else score_matrix.max().max()
     )
 
-
-def _underline_max_labels(mrr_matrix: pd.DataFrame, label_matrix: pd.DataFrame):
-    max_mrr = mrr_matrix.max().max()
-    if pd.isna(max_mrr) or max_mrr == 0:
+    if pd.isna(best_score) or best_score == 0:
         return label_matrix
 
-    max_cells = (mrr_matrix == max_mrr).stack()
-    for ngram_weight, semantic_weight in max_cells[max_cells].index:
+    max_min_cells = (score_matrix == best_score).stack()
+    for ngram_weight, semantic_weight in max_min_cells[max_min_cells].index:
         label_matrix.loc[ngram_weight, semantic_weight] = (
-            "<span style='text-decoration: underline; text-decoration-color: red;'>"
-            f"{label_matrix.loc[ngram_weight, semantic_weight]}</span>"
+            "<b><span style='color: #ffff00; text-decoration: underline;'>"
+            f"{label_matrix.loc[ngram_weight, semantic_weight]}</span></b>"
         )
     return label_matrix
 
 
 def _style_faceted_heatmap_axes(fig):
+    """Apply axis titles and styling to a faceted heatmap.
+
+    Args:
+        fig: Plotly figure containing the faceted heatmaps.
+
+    Returns:
+        None: Updates the figure in place.
+    """
     xaxes = [axis for axis in fig.select_xaxes() if axis.anchor]
     yaxes = [axis for axis in fig.select_yaxes() if axis.anchor]
     yaxis_by_name = {axis.plotly_name.replace("axis", ""): axis for axis in yaxes}
@@ -174,70 +225,171 @@ def _build_faceted_heatmap_matrices(
     weight_results_df: pd.DataFrame,
     character_order: list[str],
     weight_orders: tuple[list[str], list[str]],
+    score_metric: str,
 ):
-    mrr_matrices = []
+    """Build the score and label matrices for each character facet.
+
+    Args:
+        weight_results_df (pd.DataFrame): Prepared weight result data.
+        character_order (list[str]): Character-count labels in facet order.
+        weight_orders (tuple[list[str], list[str]]): N-gram and semantic weight orders.
+        score_metric (str): Metric used for the heatmap values.
+
+    Returns:
+        dict: Matrices keyed by metric name for each character facet.
+    """
+    score_matrices = []
     label_matrices = []
     prefix_matrices = []
+    mrr_matrices = []
+    mean_rank_matrices = []
+    precision_matrices = []
+    recall_matrices = []
 
     for character in character_order:
-        mrr_matrix = _pivot_weight_matrix(
-            weight_results_df,
-            character,
-            "MRR_percent",
+        data = weight_results_df[weight_results_df["Characters"] == character]
+        score_matrix = _pivot_weight_matrix(
+            data,
+            "metric_value",
             weight_orders,
         )
         label_matrix = _pivot_weight_matrix(
-            weight_results_df,
-            character,
-            "MRR_text",
+            data,
+            "label_text",
             weight_orders,
-            aggfunc="first",
         ).fillna("")
 
-        mrr_matrices.append(mrr_matrix.to_numpy())
+        score_matrices.append(score_matrix.to_numpy())
         label_matrices.append(
-            _underline_max_labels(mrr_matrix, label_matrix).to_numpy()
+            _underline_max_min_labels(
+                score_matrix, label_matrix, score_metric=score_metric
+            ).to_numpy()
         )
         prefix_matrices.append(
             _pivot_weight_matrix(
-                weight_results_df,
-                character,
+                data,
                 "Prefix_weight",
                 weight_orders,
             )
-            .map(lambda value: f"{value:.1f}" if pd.notna(value) else "")
+            .map(lambda value: f"{value}" if pd.notna(value) else "")
             .to_numpy()
         )
 
-    return mrr_matrices, label_matrices, prefix_matrices
+        mrr_matrices.append(
+            _pivot_weight_matrix(
+                data,
+                "MRR_percent",
+                weight_orders,
+            )
+            .map(lambda value: f"{value:.3f}" if pd.notna(value) else "")
+            .to_numpy()
+        )
+        mean_rank_matrices.append(
+            _pivot_weight_matrix(
+                data,
+                "mean_rank",
+                weight_orders,
+            )
+            .map(lambda value: f"{value:.3f}" if pd.notna(value) else "")
+            .to_numpy()
+        )
+        precision_matrices.append(
+            _pivot_weight_matrix(
+                data,
+                "precision_at_k",
+                weight_orders,
+            )
+            .map(
+                lambda d: (
+                    {k: round(v, 2) if pd.notna(v) else "" for k, v in d.items()}
+                    if isinstance(d, dict)
+                    else np.nan
+                )
+            )
+            .to_numpy()
+        )
+        recall_matrices.append(
+            _pivot_weight_matrix(
+                data,
+                "recall_at_k",
+                weight_orders,
+            )
+            .map(
+                lambda d: (
+                    {k: round(v, 2) if pd.notna(v) else "" for k, v in d.items()}
+                    if isinstance(d, dict)
+                    else np.nan
+                )
+            )
+            .to_numpy()
+        )
+    return {
+        "score": score_matrices,
+        "Label": label_matrices,
+        "Prefix Weight": prefix_matrices,
+        "mean_rank": mean_rank_matrices,
+        "precision_at_k": precision_matrices,
+        "recall_at_k": recall_matrices,
+        "mrr": mrr_matrices,
+    }
 
 
 def _create_faceted_imshow(
-    mrr_matrices: list[np.ndarray],
+    score_matrices: list[np.ndarray],
     semantic_weight_order: list[str],
     ngram_weight_order: list[str],
     facet_col_wrap: int,
+    score_metric: str,
 ):
+    """Create a faceted Plotly heatmap from score matrices.
+
+    Args:
+        score_matrices (list[np.ndarray]): Arrays of metric values for each facet.
+        semantic_weight_order (list[str]): Semantic weight labels on the x-axis.
+        ngram_weight_order (list[str]): N-gram weight labels on the y-axis.
+        facet_col_wrap (int): Number of columns before wrapping facets.
+        score_metric (str): Metric name used to pick the color scale.
+
+    Returns:
+        plotly.graph_objects.Figure: Faceted heatmap figure.
+    """
+    colour = "Blues_r" if score_metric == "mean_rank" else "Blues"
+
     return px.imshow(
-        np.array(mrr_matrices),
+        np.array(score_matrices),
         x=semantic_weight_order,
         y=ngram_weight_order,
         facet_col=0,
         facet_col_wrap=facet_col_wrap,
-        color_continuous_scale="Blues",
+        color_continuous_scale=colour,
         text_auto=False,
         aspect="equal",
         origin="lower",
         labels={
             "x": "semantic",
             "y": "ngram",
-            "color": "MMR (%)",
             "facet_col": "Characters",
         },
     )
 
 
-def _prepare_faceted_heatmap_data(character_weight_results: dict[int, dict]):
+def _prepare_faceted_heatmap_data(
+    character_weight_results: dict[int, dict],
+    grid_size: int,
+    score_metric: str,
+    k: int | None = None,
+):
+    """Transform raw weight result data into a plotting dataframe.
+
+    Args:
+        character_weight_results (dict[int, dict]): Results keyed by character count.
+        grid_size (int): the granuality of the grid.
+        score_metric (str): Score metric to visualise.
+        k (int | None): Rank cutoff used for precision and recall metrics.
+
+    Returns:
+        pd.DataFrame: Dataframe ready for facet heatmap plotting.
+    """
     weight_results_df = pd.concat(
         [
             pd.DataFrame.from_dict(data, orient="index").assign(
@@ -248,31 +400,83 @@ def _prepare_faceted_heatmap_data(character_weight_results: dict[int, dict]):
         ignore_index=True,
     )
     weight_results_df = weight_results_df.assign(
-        Ngram_weight=weight_results_df["Ngram_weight"] / 10,
-        Semantic_weight=weight_results_df["Semantic_weight"] / 10,
-        Prefix_weight=weight_results_df["Prefix_weight"] / 10,
-        MRR_percent=weight_results_df["MRR"] * 100,
+        Ngram_weight=weight_results_df["Ngram_weight"] / grid_size,
+        Semantic_weight=weight_results_df["Semantic_weight"] / grid_size,
+        Prefix_weight=weight_results_df["Prefix_weight"] / grid_size,
+        MRR_percent=weight_results_df["mrr"] * 100,
     )
-    weight_results_df = weight_results_df.assign(
-        Ngram_weight_label=weight_results_df["Ngram_weight"].map(
-            lambda value: f"{value:.1f}"
-        ),
-        Semantic_weight_label=weight_results_df["Semantic_weight"].map(
-            lambda value: f"{value:.1f}"
-        ),
-        MRR_text=weight_results_df["MRR_percent"].map(
-            lambda value: f"{value:.0f}" if value != 0 else ""
-        ),
-    )
+    if score_metric == "mrr":
+        weight_results_df = weight_results_df.assign(
+            metric_value=weight_results_df["MRR_percent"],
+        )
+        weight_results_df = weight_results_df.assign(
+            label_text=weight_results_df["metric_value"].map(
+                lambda value: f"{value:.0f}" if value != 0 else ""
+            ),
+        )
+    elif score_metric in ("precision_at_k", "recall_at_k"):
+
+        weight_results_df = weight_results_df.assign(
+            metric_value=weight_results_df[score_metric].apply(lambda x: x.get(str(k))),
+        )
+        weight_results_df = weight_results_df.assign(
+            label_text=weight_results_df["metric_value"].map(
+                lambda value: f"{value:.2f}" if value != 0 else ""
+            ),
+        )
+    else:
+        weight_results_df = weight_results_df.assign(
+            metric_value=weight_results_df[score_metric],
+        )
+        weight_results_df = weight_results_df.assign(
+            label_text=weight_results_df["metric_value"].map(
+                lambda value: f"{value:.1f}" if value != 0 else ""
+            ),
+        )
+
     return weight_results_df
 
 
-def _add_faceted_heatmap_text(fig, character_order, label_matrices, prefix_matrices):
-    for character, trace, labels, prefix_weights in zip(
-        character_order, fig.data, label_matrices, prefix_matrices, strict=True
+def _add_faceted_heatmap_text(
+    fig,
+    character_order,
+    label_matrices,
+    score_metric_title,
+    metrics_matrices,
+):
+    """Attach hover text and labels to each heatmap facet.
+
+    Args:
+        fig: Plotly figure containing the heatmap traces.
+        character_order: Facet labels by character count.
+        label_matrices: Display labels for each heatmap cell.
+        score_metric_title (str): Human-readable metric title.
+        metrics_matrices: Additional metric matrices used for hover text.
+
+    Returns:
+        None: Updates the figure in place.
+    """
+    metric_names = list(metrics_matrices)
+    for character, trace, labels, *metric_matrices in zip(
+        character_order,
+        fig.data,
+        label_matrices,
+        *metrics_matrices.values(),
+        strict=True,
     ):
+        hover_matrix = [
+            [
+                "".join(
+                    f"{_metric_display_titles(metric)}: {value}<br>"
+                    for metric, value in zip(metric_names, cell_values, strict=True)
+                )
+                for cell_values in zip(*rows, strict=True)
+            ]
+            for rows in zip(*metric_matrices, strict=True)
+        ]
+
         trace.update(
-            customdata=prefix_weights,
+            hovertext=hover_matrix,
             text=labels,
             texttemplate="%{text}",
             textfont={"size": 10},
@@ -280,37 +484,51 @@ def _add_faceted_heatmap_text(fig, character_order, label_matrices, prefix_matri
                 f"Characters: {character}<br>"
                 "Ngram Weight: %{y}<br>"
                 "Semantic Weight: %{x}<br>"
-                "Prefix Weight: %{customdata}<br>"
-                "MMR (%): %{z:.3f}<extra></extra>"
+                "%{hovertext}"
+                f"{score_metric_title}: " + "%{z:.3f}<extra></extra>"
             ),
         )
 
 
 def _rename_facet_titles(fig, character_order):
+    """Rename faceted heatmap titles to readable character-count labels.
+
+    Args:
+        fig: Plotly figure for the faceted heatmap.
+        character_order: Ordered list of facet labels.
+
+    Returns:
+        None: Updates the figure annotations in place.
+    """
     for annotation in fig.layout.annotations:
         if annotation.text.startswith("Characters="):
             character_index = int(annotation.text.removeprefix("Characters="))
             annotation.update(text=character_order[character_index])
 
 
-def generate_faceted_heatmap(character_weight_results: dict[int, dict]):
+def generate_faceted_heatmap(
+    character_weight_results: dict[int, dict],
+    grid_size: int,
+    score_metric: str = "mrr",
+    k: int | None = None,
+):
     """Generate faceted heatmaps of n/p/s weight combinations by character count.
 
     Args:
         character_weight_results (dict): Weight test results keyed by character count.
+        grid_size (int): the granuality of the grid.
+        score_metric (str): The metric used for assessing the performance.
+        k (int | optional): rank k for recall and precision.
 
     Returns:
         fig: A Plotly figure object representing the faceted heatmaps.
     """
-    weight_results_df = _prepare_faceted_heatmap_data(character_weight_results)
+    weight_results_df = _prepare_faceted_heatmap_data(
+        character_weight_results, grid_size=grid_size, score_metric=score_metric, k=k
+    )
 
-    ngram_weight_order = [
-        f"{value:.1f}" for value in sorted(weight_results_df["Ngram_weight"].unique())
-    ]
-    semantic_weight_order = [
-        f"{value:.1f}"
-        for value in sorted(weight_results_df["Semantic_weight"].unique())
-    ]
+    ngram_weight_order = sorted(weight_results_df["Ngram_weight"].unique())
+    semantic_weight_order = sorted(weight_results_df["Semantic_weight"].unique())
     character_order = [
         f"{character} chars" for character in sorted(character_weight_results)
     ]
@@ -319,18 +537,37 @@ def generate_faceted_heatmap(character_weight_results: dict[int, dict]):
     facet_rows = (len(character_order) + facet_col_wrap - 1) // facet_col_wrap
 
     matrices = _build_faceted_heatmap_matrices(
-        weight_results_df,
-        character_order,
-        weight_orders,
+        weight_results_df, character_order, weight_orders, score_metric=score_metric
     )
     fig = _create_faceted_imshow(
-        matrices[0],
+        matrices["score"],
         semantic_weight_order,
         ngram_weight_order,
         facet_col_wrap,
+        score_metric=score_metric,
     )
-    _add_faceted_heatmap_text(fig, character_order, matrices[1], matrices[2])
+
+    excluded_hover_metrics = {"Label", "score"}
+    if score_metric not in {"precision_at_k", "recall_at_k"}:
+        excluded_hover_metrics.add(score_metric)
+
+    hover_metrics_dict = {
+        metric: result
+        for metric, result in matrices.items()
+        if metric not in excluded_hover_metrics
+    }
+
+    _add_faceted_heatmap_text(
+        fig=fig,
+        character_order=character_order,
+        label_matrices=matrices["Label"],
+        score_metric_title=_metric_display_titles(score_metric, k),
+        metrics_matrices=hover_metrics_dict,
+    )
     _rename_facet_titles(fig, character_order)
+
+    fig.update_xaxes(type="category")
+    fig.update_yaxes(type="category")
 
     fig.update_layout(
         title="Weight Configurations by Character Count",
@@ -338,7 +575,7 @@ def generate_faceted_heatmap(character_weight_results: dict[int, dict]):
         height=(360 * facet_rows) + 160,
         margin={"l": 80, "r": 120, "t": 90, "b": 70},
         plot_bgcolor="white",
-        coloraxis_colorbar={"title": "MMR (%)"},
+        coloraxis_colorbar={"title": _metric_display_titles(score_metric, k)},
     )
     _style_faceted_heatmap_axes(fig)
 
@@ -352,7 +589,7 @@ for char in characters_list:
     data_weights = get_weight_by_char_dicts(
         characters=char,
         use_bucket=USE_BUCKET,
-        bucket_path=f"gs://{bucket_name}/{BLOB_NAME}",
+        bucket_path=f"gs://{bucket_name}/{blob_name}",
         local_path=LOCAL_DIR,
     )
 
@@ -367,7 +604,7 @@ char = 9
 data_weights = get_weight_by_char_dicts(
     characters=char,
     use_bucket=USE_BUCKET,
-    bucket_path=f"gs://{bucket_name}/{BLOB_NAME}",
+    bucket_path=f"gs://{bucket_name}/{blob_name}",
     local_path=LOCAL_DIR,
 )
 
@@ -386,15 +623,25 @@ for char in characters_list:
     data_weights = get_weight_by_char_dicts(
         characters=char,
         use_bucket=USE_BUCKET,
-        bucket_path=f"gs://{bucket_name}/{BLOB_NAME}",
+        bucket_path=f"gs://{bucket_name}/{blob_name}",
         local_path=LOCAL_DIR,
     )
     data_by_character[char] = data_weights
 
 # %%
-faceted_plot = generate_faceted_heatmap(data_by_character)
+score_metric_label = "precision_at_k"
+k_value = 1
+
+faceted_plot = generate_faceted_heatmap(
+    character_weight_results=data_by_character,
+    score_metric=score_metric_label,
+    k=k_value,
+    grid_size=GRID_SIZE,
+)
 if SAVE_PLOT:
-    faceted_plot.write_html(f"data/sayt/{TEST_FOLDER}/heatmaps_by_character.html")
+    faceted_plot.write_html(
+        f"data/sayt/{TEST_FOLDER}/heatmaps_by_character_{score_metric_label}.html"
+    )
 faceted_plot.show()
 
 
