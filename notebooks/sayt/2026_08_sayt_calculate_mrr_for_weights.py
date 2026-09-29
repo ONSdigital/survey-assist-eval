@@ -6,6 +6,7 @@
 import json
 import os
 
+import numpy as np
 import pandas as pd
 from dotenv import load_dotenv
 from google.cloud import storage as gcs
@@ -23,19 +24,29 @@ from notebooks.sayt.sayt_utils import (
 )
 from src.survey_assist_eval.pipeline.shared_components import _write_json
 from survey_assist_eval.evaluation.sayt.performance_metrics_functions import (
-    build_sayt_metrics_comparison_table,
+    compute_performance_metrics_from_suggestions,
 )
 
 # %%
-SIC_CODE_LENGTH = 5
 MAX_SUGGESTIONS = 9
 CORRECT_CODE_COL = "correct_sic_code"
+SUGGESTERS_NAME = "ngram_prefix_semantic"
 NUM_CHARACTERS_LIST = list(range(4, 10))
 HARD_LIMIT = False
+USE_2K = True  # If flase, use 100 sample
 
 GRID_GRANULARITY = 10
-FOLDER_PREFIX = f"weights_grid_{GRID_GRANULARITY}"
 OUTPUT_DIR = "data/sayt/"
+FOLDER_PREFIX = f"weights_grid_{GRID_GRANULARITY}"
+
+KEYS_TO_DELETE = [
+    "suggestions_col",
+    "total_queries",
+    "queries_with_ground_truth",
+    "queries_missing_ground_truth",
+    "unmatched_query_count",
+    "code_digit_match_length",
+]
 
 # %%
 load_dotenv()
@@ -48,78 +59,101 @@ logger = get_logger(__name__)
 logger.info("Location specs", bucket_name=bucket_name, output_dir=OUTPUT_DIR)
 
 client = gcs.Client()
-BLOB_NAME = f"evaluation-pipeline/SAYT/weights_by_character/{FOLDER_PREFIX}/"
 
 # %%
-test_df = pd.read_excel(
-    f"gs://{bucket_name}/evaluation-pipeline/SAYT/SAYT matching.xlsx",
-    dtype=str,
-    nrows=100,  # Excel formatting causes 10s of thousands of blank input rows after the real 100
-    header=1,  # first row is header
-)
-rename_columns = {
-    "Correct SIC code": "correct_sic_code",
-    "Full entry looking for": "full_entry",
-    "Position of correct SIC ": "rank_5chars_Blaise (as reported from SAYT team)",
-    "Position of correct SIC .1": "_rank_5chars_sa_shared",
-}
-
-test_df = test_df.rename(columns=rename_columns)
-test_df = test_df[rename_columns.values()]
-
-# clean the rank values reported by the SAYT team
-for col in [
-    "rank_5chars_Blaise (as reported from SAYT team)",
-    "_rank_5chars_sa_shared",
-]:
-    test_df[col] = pd.to_numeric(
-        test_df[col].replace({"5 or 12": "5"}), errors="coerce"
+# access data for evaluation
+if USE_2K:
+    df_size = "_2k"
+    test_df = pd.read_parquet(
+        f"gs://{bucket_name}/evaluation-pipeline/original_datasets/sic_2k/sic_2k_test_data.parquet"
     )
+
+    is_self_employed = test_df["sic2007_employee"] == "-9"
+
+    test_df["full_entry"] = np.where(
+        is_self_employed,
+        test_df["sic2007_self_employed"],
+        test_df["sic2007_employee"],
+    )
+    test_df["employment_status"] = np.where(
+        is_self_employed, "self_employed", "employed"
+    )
+
+    test_df = test_df.rename(columns={"clerical_codes": CORRECT_CODE_COL})
+
+else:
+    df_size = "_100"
+    test_df = pd.read_excel(
+        f"gs://{bucket_name}/evaluation-pipeline/SAYT/SAYT matching.xlsx",
+        dtype=str,
+        nrows=100,  # Excel formatting causes 10s of thousands of blank input rows after the real 100
+        header=1,  # first row is header
+    )
+    rename_columns = {
+        "Correct SIC code": "correct_sic_code",
+        "Full entry looking for": "full_entry",
+        "Position of correct SIC ": "rank_5chars_Blaise (as reported from SAYT team)",
+        "Position of correct SIC .1": "_rank_5chars_sa_shared",
+    }
+
+    test_df = test_df.rename(columns=rename_columns)
+    test_df = test_df[rename_columns.values()]
+
+    # clean the rank values reported by the SAYT team
+    for col in [
+        "rank_5chars_Blaise (as reported from SAYT team)",
+        "_rank_5chars_sa_shared",
+    ]:
+        test_df[col] = pd.to_numeric(
+            test_df[col].replace({"5 or 12": "5"}), errors="coerce"
+        )
 
 # %%
-# LOOKUP_FILE_NAME = f"gs://{bucket_name}/evaluation-pipeline/SAYT/Lookup_IT3_Final.csv"
-LOOKUP_FILE_NAME = f"gs://{bucket_name}/sic_knowledgebase/sic_kb_for_sayt.csv"
+# lookup_file_name = f"gs://{bucket_name}/evaluation-pipeline/SAYT/Lookup_IT3_Final.csv"
+lookup_file_name = f"gs://{bucket_name}/sic_knowledgebase/sic_kb_for_sayt.csv"
 
-sayt_df = pd.read_csv(LOOKUP_FILE_NAME, dtype=str)
-if LOOKUP_FILE_NAME.endswith("sic_kb_for_sayt.csv"):
-    SAVE_FOLDER = FOLDER_PREFIX + "_sic_kb"
-    BLOB_NAME = BLOB_NAME + "sic_kb/"
-    sayt_corpus = build_sayt_corpus_from_df(
-        sayt_df,
-        search_text_col="search_text",
-        display_text_col="display_text",
-        code_col="code",
-    )[1]
+sayt_df = pd.read_csv(lookup_file_name, dtype=str)
+if lookup_file_name.endswith("sic_kb_for_sayt.csv"):
+    kb = "_sic_kb"
 
-elif LOOKUP_FILE_NAME.endswith("Lookup_IT3_Final.csv"):
-    SAVE_FOLDER = FOLDER_PREFIX + "_lookup_it3"
-    BLOB_NAME = BLOB_NAME + "lookup_it3/"
-    sayt_df["code"] = sayt_df["SIC07"].apply(
-        lambda x: x if len(x) == SIC_CODE_LENGTH else f"0{x}"
-    )
-    sayt_df = sayt_df.rename(columns={"SIC_lookup": "search_text"})
-    sayt_corpus = build_sayt_corpus_from_df(
-        sayt_df,
-        search_text_col="search_text",
-        display_text_col="search_text",
-        code_col="code",
-    )[1]
+    search_text_col = "search_text"
+    display_text_col = "display_text"
+    code_col = "code"
+
+elif lookup_file_name.endswith("Lookup_IT3_Final.csv"):
+    kb = "_lookup_it3"
+
+    search_text_col = "SIC_lookup"
+    display_text_col = "SIC_lookup"
+    code_col = "SIC07"
+
 else:
     raise ValueError(
-        f"LOOKUP_FILE_NAME {LOOKUP_FILE_NAME} does not match expected file names."
+        f"lookup_file_name {lookup_file_name} does not match expected file names."
     )
 
-# %%
-if not os.path.exists(OUTPUT_DIR + SAVE_FOLDER):
-    os.makedirs(OUTPUT_DIR + SAVE_FOLDER)
-    print(f"Created folder: {OUTPUT_DIR + SAVE_FOLDER}")
-# %%
+sayt_corpus = build_sayt_corpus_from_df(
+    df=sayt_df,
+    search_text_col=search_text_col,
+    display_text_col=display_text_col,
+    code_col=code_col,
+)[1]
 
+save_folder = FOLDER_PREFIX + df_size + kb
+blob_name = f"evaluation-pipeline/SAYT/weights_by_character/{save_folder}/"
+
+
+# %%
+if not os.path.exists(OUTPUT_DIR + save_folder):
+    os.makedirs(OUTPUT_DIR + save_folder)
+    print(f"Created folder: {OUTPUT_DIR + save_folder}")
+
+# %%
 characters_to_run = NUM_CHARACTERS_LIST.copy()
 for characters in NUM_CHARACTERS_LIST.copy():
 
     main_file_name = (
-        f"{OUTPUT_DIR}{SAVE_FOLDER}/weight_test_{characters}chars_n_p_s.json"
+        f"{OUTPUT_DIR}{save_folder}/weight_test_{characters}chars_n_p_s.json"
     )
 
     if os.path.exists(main_file_name):
@@ -135,7 +169,7 @@ for ngram in range(0, GRID_GRANULARITY + 1):
         characters_to_run2 = characters_to_run.copy()
         for characters in characters_to_run2.copy():
 
-            sub_file_name = f"{OUTPUT_DIR}{SAVE_FOLDER}/w_{characters}_n{ngram}_p{prefix}_s{semantic}.json"
+            sub_file_name = f"{OUTPUT_DIR}{save_folder}/w_{characters}_n{ngram}_p{prefix}_s{semantic}.json"
             if os.path.exists(sub_file_name):
                 print(
                     f"File already exists, no need to run for {characters} characters."
@@ -157,7 +191,7 @@ for ngram in range(0, GRID_GRANULARITY + 1):
             retrievers_list.append(SemanticRetrieverSpec(weight=semantic))
 
         suggesters_three = {
-            "ngram, prefix and semantic": build_lookup_suggester(
+            SUGGESTERS_NAME: build_lookup_suggester(
                 sayt_corpus,
                 retrievers=retrievers_list,
             ),
@@ -168,35 +202,39 @@ for ngram in range(0, GRID_GRANULARITY + 1):
                 f"""Running evaluation for {characters} characters,
 with ngram={ngram}, prefix={prefix}, semantic={semantic}."""
             )
-            sub_file_name = f"{OUTPUT_DIR}{SAVE_FOLDER}/w_{characters}_n{ngram}_p{prefix}_s{semantic}.json"
+            sub_file_name = f"{OUTPUT_DIR}{save_folder}/w_{characters}_n{ngram}_p{prefix}_s{semantic}.json"
 
             suggestions_df, avg_ms_dict = get_suggestions_by_chars(
-                test_df,
+                df=test_df,
                 suggesters_dict=suggesters_three,
+                correct_codes_col=CORRECT_CODE_COL,
                 num_chars=[characters],
                 suggestions_limit=MAX_SUGGESTIONS,
                 hard_suggestions_limit=HARD_LIMIT,
             )
 
-            suggestions_cols_to_compare = suggestions_df.columns[
-                suggestions_df.columns.str.startswith("suggestions_")
-            ].tolist()
+            suggestions_col_to_compare = (
+                f"suggestions_{characters}chars_{SUGGESTERS_NAME}"
+            )
 
-            compare_performance_metrics = build_sayt_metrics_comparison_table(
-                suggestions_df,
-                suggestions_cols_to_compare=suggestions_cols_to_compare,
+            compare_performance_metrics = compute_performance_metrics_from_suggestions(
+                df=suggestions_df,
                 correct_codes_col=CORRECT_CODE_COL,
-                k_values=[characters],
-                ave_time_per_query_dict=avg_ms_dict,
+                suggestions_col=suggestions_col_to_compare,
+                ave_time_per_query=avg_ms_dict[suggestions_col_to_compare],
+                k_values=list(range(1, MAX_SUGGESTIONS + 1)),
             )
 
             data = {
                 "Ngram_weight": ngram,
                 "Prefix_weight": prefix,
                 "Semantic_weight": semantic,
-                "MRR": compare_performance_metrics["mrr"][0],
-                "avg_time": compare_performance_metrics["ave_time_per_query_ms"][0],
+                **compare_performance_metrics.__dict__,
             }
+
+            for key in KEYS_TO_DELETE:
+                data.pop(key, None)
+
             print(data)
 
             with open(sub_file_name, "w", encoding="utf-8") as f:
@@ -204,23 +242,23 @@ with ngram={ngram}, prefix={prefix}, semantic={semantic}."""
 
 # %%
 # combine separate test results into one file
-remove_files = False  # set to True to remove the individual test files after combining
-save_to_bucket = True  # set to True to save the combined file to the GCS bucket
+REMOVE_FILES = False  # set to True to remove the individual test files after combining
+SAVE_TO_BUCKET = True  # set to True to save the combined file to the GCS bucket
 
 for character_file in NUM_CHARACTERS_LIST:
     master_dict = {}
     files_to_delete = []
     final_file_name = f"weight_test_{character_file}chars_n_p_s.json"
-    main_file_name = f"{OUTPUT_DIR}{SAVE_FOLDER}/{final_file_name}"
+    main_file_name = f"{OUTPUT_DIR}{save_folder}/{final_file_name}"
 
     if os.path.exists(main_file_name):
         print("Final file already exists.")
     else:
-        for filename in sorted(os.listdir(OUTPUT_DIR + SAVE_FOLDER)):
+        for filename in sorted(os.listdir(OUTPUT_DIR + save_folder)):
             if filename.startswith(f"w_{character_file}_n") and filename.endswith(
                 ".json"
             ):
-                full_path = os.path.join(OUTPUT_DIR + SAVE_FOLDER, filename)
+                full_path = os.path.join(OUTPUT_DIR + save_folder, filename)
                 key_name = filename[:-5]  # remove .json from the file name
                 test_name = key_name.lstrip(f"w_{character_file}")
                 with open(full_path, encoding="utf-8") as f:
@@ -228,7 +266,7 @@ for character_file in NUM_CHARACTERS_LIST:
                 files_to_delete.append(full_path)
         # Save locally
         with open(
-            os.path.join(OUTPUT_DIR + SAVE_FOLDER, final_file_name),
+            os.path.join(OUTPUT_DIR + save_folder, final_file_name),
             "w",
             encoding="utf-8",
         ) as f:
@@ -237,16 +275,14 @@ for character_file in NUM_CHARACTERS_LIST:
         print(f"File {final_file_name} saved.")
 
         # Save to the bucket
-        if save_to_bucket:
-            bucket_path = "gs://" + bucket_name + "/" + BLOB_NAME + final_file_name
+        if SAVE_TO_BUCKET:
+            bucket_path = "gs://" + bucket_name + "/" + blob_name + final_file_name
             _write_json(master_dict, bucket_path)
 
         # remove files
-        if remove_files:
+        if REMOVE_FILES:
             for file_path in files_to_delete:
                 os.remove(file_path)
             print("Source files removed.")
         else:
             print("Source files not removed.")
-
-# %%
