@@ -14,6 +14,7 @@ from dotenv import load_dotenv
 from src.survey_assist_eval.pipeline.shared_components import _read_json
 
 # %%
+GRID_SIZE = 10  # grid granuality (should be same as in TEST_FOLDER)
 TEST_FOLDER = "weights_grid_10_2k_sic_kb"
 LOCAL_DIR = f"data/sayt/{TEST_FOLDER}/"
 USE_BUCKET = True
@@ -139,8 +140,8 @@ def _pivot_weight_matrix(
     """
     ngram_weight_order, semantic_weight_order = weight_orders
     return data.pivot_table(
-        index="Ngram_weight_label",
-        columns="Semantic_weight_label",
+        index="Ngram_weight",
+        columns="Semantic_weight",
         values=value_col,
         aggfunc=aggfunc,
     ).reindex(index=ngram_weight_order, columns=semantic_weight_order)
@@ -373,12 +374,16 @@ def _create_faceted_imshow(
 
 
 def _prepare_faceted_heatmap_data(
-    character_weight_results: dict[int, dict], score_metric: str, k: int | None = None
+    character_weight_results: dict[int, dict],
+    grid_size: int,
+    score_metric: str,
+    k: int | None = None,
 ):
     """Transform raw weight result data into a plotting dataframe.
 
     Args:
         character_weight_results (dict[int, dict]): Results keyed by character count.
+        grid_size (int): the granuality of the grid.
         score_metric (str): Score metric to visualise.
         k (int | None): Rank cutoff used for precision and recall metrics.
 
@@ -395,9 +400,9 @@ def _prepare_faceted_heatmap_data(
         ignore_index=True,
     )
     weight_results_df = weight_results_df.assign(
-        Ngram_weight=weight_results_df["Ngram_weight"] / 10,
-        Semantic_weight=weight_results_df["Semantic_weight"] / 10,
-        Prefix_weight=weight_results_df["Prefix_weight"] / 10,
+        Ngram_weight=weight_results_df["Ngram_weight"] / grid_size,
+        Semantic_weight=weight_results_df["Semantic_weight"] / grid_size,
+        Prefix_weight=weight_results_df["Prefix_weight"] / grid_size,
         MRR_percent=weight_results_df["mrr"] * 100,
     )
     if score_metric == "mrr":
@@ -429,10 +434,6 @@ def _prepare_faceted_heatmap_data(
             ),
         )
 
-    weight_results_df = weight_results_df.assign(
-        Ngram_weight_label=weight_results_df["Ngram_weight"],
-        Semantic_weight_label=weight_results_df["Semantic_weight"],
-    )
     return weight_results_df
 
 
@@ -521,7 +522,7 @@ def generate_faceted_heatmap(
         fig: A Plotly figure object representing the faceted heatmaps.
     """
     weight_results_df = _prepare_faceted_heatmap_data(
-        character_weight_results, score_metric=score_metric, k=k
+        character_weight_results, grid_size=GRID_SIZE, score_metric=score_metric, k=k
     )
 
     ngram_weight_order = sorted(weight_results_df["Ngram_weight"].unique())
