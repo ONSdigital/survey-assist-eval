@@ -400,9 +400,9 @@ def _prepare_faceted_heatmap_data(
         ignore_index=True,
     )
     weight_results_df = weight_results_df.assign(
-        Ngram_weight=weight_results_df["Ngram_weight"] / grid_size,
-        Semantic_weight=weight_results_df["Semantic_weight"] / grid_size,
-        Prefix_weight=weight_results_df["Prefix_weight"] / grid_size,
+        Ngram_weight=round(weight_results_df["Ngram_weight"] / grid_size, 2),
+        Semantic_weight=round(weight_results_df["Semantic_weight"] / grid_size, 2),
+        Prefix_weight=round(weight_results_df["Prefix_weight"] / grid_size, 2),
         MRR_percent=weight_results_df["mrr"] * 100,
     )
     if score_metric == "mrr":
@@ -629,7 +629,7 @@ for char in characters_list:
     data_by_character[char] = data_weights
 
 # %%
-score_metric_label = "precision_at_k"
+score_metric_label = "mean_rank"
 k_value = 1
 
 faceted_plot = generate_faceted_heatmap(
