@@ -508,6 +508,7 @@ def _rename_facet_titles(fig, character_order):
 
 def generate_faceted_heatmap(
     character_weight_results: dict[int, dict],
+    grid_size: int,
     score_metric: str = "mrr",
     k: int | None = None,
 ):
@@ -515,6 +516,7 @@ def generate_faceted_heatmap(
 
     Args:
         character_weight_results (dict): Weight test results keyed by character count.
+        grid_size (int): the granuality of the grid.
         score_metric (str): The metric used for assessing the performance.
         k (int | optional): rank k for recall and precision.
 
@@ -522,7 +524,7 @@ def generate_faceted_heatmap(
         fig: A Plotly figure object representing the faceted heatmaps.
     """
     weight_results_df = _prepare_faceted_heatmap_data(
-        character_weight_results, grid_size=GRID_SIZE, score_metric=score_metric, k=k
+        character_weight_results, grid_size=grid_size, score_metric=score_metric, k=k
     )
 
     ngram_weight_order = sorted(weight_results_df["Ngram_weight"].unique())
@@ -634,6 +636,7 @@ faceted_plot = generate_faceted_heatmap(
     character_weight_results=data_by_character,
     score_metric=score_metric_label,
     k=k_value,
+    grid_size=GRID_SIZE,
 )
 if SAVE_PLOT:
     faceted_plot.write_html(
