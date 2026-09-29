@@ -192,6 +192,7 @@ def test_get_rank_of_first_matching_code_with_none_in_retrieved(
         (["1111"], "1111", 1),
         (["2222"], "1111", None),
         ([None], "1111", None),
+        ([None, "2222", "1111"], [None, "2222"], 2),
     ],
     ids=[
         "empty_with_string",
@@ -200,6 +201,7 @@ def test_get_rank_of_first_matching_code_with_none_in_retrieved(
         "single_match",
         "single_no_match",
         "single_none",
+        "single_none_with_none_correct_codes",
     ],
 )
 def test_get_rank_of_first_matching_code_with_empty_or_single_element(

@@ -54,6 +54,8 @@ def get_rank_of_first_matching_code(
         correct_codes = {correct_codes}
 
     for rank, item in enumerate(retrieved_codes, start=1):
+        if item is None:
+            continue
         if item in correct_codes:
             return int(rank)
     return len(retrieved_codes) + 1 if penalise_if_not_found else None
