@@ -360,12 +360,8 @@ def _prepare_faceted_heatmap_data(
         )
 
     weight_results_df = weight_results_df.assign(
-        Ngram_weight_label=weight_results_df["Ngram_weight"].map(
-            lambda value: f"{value:.1f}"
-        ),
-        Semantic_weight_label=weight_results_df["Semantic_weight"].map(
-            lambda value: f"{value:.1f}"
-        ),
+        Ngram_weight_label=weight_results_df["Ngram_weight"],
+        Semantic_weight_label=weight_results_df["Semantic_weight"],
     )
     return weight_results_df
 
@@ -437,13 +433,8 @@ def generate_faceted_heatmap(
         character_weight_results, score_metric=score_metric, k=k
     )
 
-    ngram_weight_order = [
-        f"{value:.1f}" for value in sorted(weight_results_df["Ngram_weight"].unique())
-    ]
-    semantic_weight_order = [
-        f"{value:.1f}"
-        for value in sorted(weight_results_df["Semantic_weight"].unique())
-    ]
+    ngram_weight_order = sorted(weight_results_df["Ngram_weight"].unique())
+    semantic_weight_order = sorted(weight_results_df["Semantic_weight"].unique())
     character_order = [
         f"{character} chars" for character in sorted(character_weight_results)
     ]
@@ -478,6 +469,9 @@ def generate_faceted_heatmap(
         metrics_matrices=hover_metrics_dict,
     )
     _rename_facet_titles(fig, character_order)
+
+    fig.update_xaxes(type="category")
+    fig.update_yaxes(type="category")
 
     fig.update_layout(
         title="Weight Configurations by Character Count",
