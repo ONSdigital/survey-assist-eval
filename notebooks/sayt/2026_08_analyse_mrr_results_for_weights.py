@@ -271,7 +271,7 @@ def _build_faceted_heatmap_matrices(
                 "Prefix_weight",
                 weight_orders,
             )
-            .map(lambda value: f"{value:.1f}" if pd.notna(value) else "")
+            .map(lambda value: f"{value}" if pd.notna(value) else "")
             .to_numpy()
         )
 
