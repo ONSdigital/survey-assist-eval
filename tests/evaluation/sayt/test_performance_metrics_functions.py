@@ -13,6 +13,7 @@ from survey_assist_eval.evaluation.sayt.performance_metrics_functions import (
     SAYTPerformanceMetrics,
     add_sayt_metrics_columns,
     build_sayt_metrics_comparison_table,
+    compute_median_with_none_as_inf,
     compute_performance_metrics_from_suggestions,
     compute_precision_at_k,
     compute_recall_at_k,
@@ -405,6 +406,32 @@ def test_compute_reciprocal_rank_with_none_values(
 
 
 # ============================================================================
+# Test compute_median_with_none_as_inf function
+# ============================================================================
+
+
+@pytest.mark.parametrize(
+    "values,expected",
+    [
+        ([1.0, 2.0, 3.0], 2.0),
+        ([1.0, None, 3.0], 3.0),
+        (pd.Series([1.0, None, 3.0]), 3.0),
+        ([1.0, None], float("inf")),
+        ([None, None], float("inf")),
+    ],
+)
+def test_compute_median_with_none_as_inf(values, expected):
+    """None and pandas nulls should count as infinity when computing the median."""
+    assert compute_median_with_none_as_inf(values) == expected
+
+
+@pytest.mark.parametrize("values", [[], pd.Series(dtype=float)], ids=["list", "series"])
+def test_compute_median_with_none_as_inf_returns_nan_for_empty_input(values):
+    """An empty input should produce a NaN median."""
+    assert math.isnan(compute_median_with_none_as_inf(values))
+
+
+# ============================================================================
 # Test add_sayt_metrics_columns function
 # ============================================================================
 
@@ -594,6 +621,7 @@ def sayt_metrics_df():
         {
             "reciprocal_rank": [1.0, 0.5, 0.0],
             "correct_code_rank": [1.0, 2.0, None],
+            "correct_code_rank_penalised": [1.0, 2.0, 10.0],
             "precision_at_1": [1.0, 0.0, 0.0],
             "precision_at_3": [1 / 3, 1 / 3, 0.0],
             "recall_at_1": [1.0, 0.0, 0.0],
@@ -712,6 +740,24 @@ def test_summarise_performance_metrics_computes_mean_rank(sayt_metrics_df):
     ), "Expected mean_rank to equal the row-wise mean of the correct_code_rank column."
 
 
+def test_summarise_performance_metrics_computes_median_rank(sayt_metrics_df):
+    """median_rank should be the median of the per-row correct_code_rank column,
+    ignoring None values.
+    """
+    result = summarise_performance_metrics(
+        sayt_metrics_df,
+        suggestions_col="suggestions",
+        correct_codes_col="correct_code",
+        code_digit_match_length=5,
+        k_values=[1],
+        ave_time_per_query=0.0,
+    )
+
+    assert result.median_rank == pytest.approx(
+        2.0
+    ), "Expected median_rank to equal the row-wise median of the correct_code_rank column."
+
+
 def test_summarise_performance_metrics_builds_precision_at_k_dict(sayt_metrics_df):
     """precision_at_k should map each k to the mean of the corresponding column."""
     result = summarise_performance_metrics(
@@ -752,6 +798,7 @@ def test_summarise_performance_metrics_all_matched():
         {
             "reciprocal_rank": [1.0, 0.5],
             "correct_code_rank": [1.0, 2.0],
+            "correct_code_rank_penalised": [1.0, 2.0],
             "precision_at_1": [1.0, 0.0],
             "recall_at_1": [1.0, 1.0],
             "correct_code": ["1111", "2222"],
@@ -778,6 +825,7 @@ def test_summarise_performance_metrics_all_unmatched():
         {
             "reciprocal_rank": [0.0, 0.0],
             "correct_code_rank": [None, None],
+            "correct_code_rank_penalised": [10.0, 10.0],
             "precision_at_1": [0.0, 0.0],
             "recall_at_1": [0.0, 0.0],
             "correct_code": ["1111", "2222"],
@@ -802,6 +850,9 @@ def test_summarise_performance_metrics_all_unmatched():
     assert math.isnan(
         result.mean_rank
     ), "Expected mean_rank to be NaN when no query has a rank (all correct_code_rank are None)."
+    assert result.mean_rank_penalised == pytest.approx(
+        10.0
+    ), "Expected mean_rank_penalised to equal the penalised rank values."
 
 
 def test_summarise_performance_metrics_single_row():
@@ -810,6 +861,7 @@ def test_summarise_performance_metrics_single_row():
         {
             "reciprocal_rank": [0.5],
             "correct_code_rank": [2.0],
+            "correct_code_rank_penalised": [2.0],
             "precision_at_2": [0.5],
             "recall_at_2": [1.0],
             "correct_code": ["1111"],
@@ -837,6 +889,8 @@ def test_summarise_performance_metrics_single_row():
     assert result.mean_rank == pytest.approx(
         2.0
     ), "Expected mean_rank to equal the single row's rank value."
+    assert result.mean_rank_penalised == pytest.approx(2.0)
+    assert result.median_rank == pytest.approx(2.0)
 
 
 def test_summarise_performance_metrics_stores_suggestions_col(sayt_metrics_df):
@@ -884,6 +938,7 @@ def test_summarise_performance_metrics_with_prefix_reads_prefixed_columns():
         {
             "pfx_reciprocal_rank": [1.0, 0.0],
             "pfx_correct_code_rank": [1.0, None],
+            "pfx_correct_code_rank_penalised": [1.0, 10.0],
             "pfx_precision_at_1": [1.0, 0.0],
             "pfx_recall_at_1": [1.0, 0.0],
             "correct_code": ["1111", "2222"],
@@ -909,6 +964,9 @@ def test_summarise_performance_metrics_with_prefix_reads_prefixed_columns():
     assert result.mrr == pytest.approx(
         0.5
     ), "Expected MRR computed from the prefixed reciprocal_rank column."
+    assert result.mean_rank_penalised == pytest.approx(
+        5.5
+    ), "Expected mean_rank_penalised computed from the prefixed correct_code_rank_penalised column."
 
 
 def test_summarise_performance_metrics_raises_when_correct_codes_col_missing(
@@ -934,6 +992,7 @@ def test_summarise_performance_metrics_splits_queries_missing_ground_truth():
         {
             "reciprocal_rank": [1.0, 0.0, 0.0],
             "correct_code_rank": [1.0, None, None],
+            "correct_code_rank_penalised": [1.0, 10.0, 10.0],
             "precision_at_1": [1.0, 0.0, 0.0],
             "recall_at_1": [1.0, 0.0, 0.0],
             "correct_code": ["1111", "", None],
@@ -969,6 +1028,7 @@ def test_summarise_performance_metrics_treats_empty_list_as_missing_ground_truth
         {
             "reciprocal_rank": [1.0, 0.0],
             "correct_code_rank": [1.0, None],
+            "correct_code_rank_penalised": [1.0, 10.0],
             "precision_at_1": [1.0, 0.0],
             "recall_at_1": [1.0, 0.0],
             "correct_code": [["1111"], []],
@@ -990,6 +1050,12 @@ def test_summarise_performance_metrics_treats_empty_list_as_missing_ground_truth
     assert (
         result.queries_missing_ground_truth == 1
     ), "Expected the row with an empty list to count as missing ground truth."
+    assert result.mrr == pytest.approx(
+        1.0
+    ), "Expected mrr to be computed only over the row with valid ground truth."
+    assert result.median_rank == pytest.approx(
+        1.0
+    ), "Expected median_rank to be computed only over the row with valid ground truth."
 
 
 def test_summarise_performance_metrics_treats_nan_mixed_with_lists_as_missing_ground_truth():
@@ -998,6 +1064,7 @@ def test_summarise_performance_metrics_treats_nan_mixed_with_lists_as_missing_gr
         {
             "reciprocal_rank": [1.0, 0.0, 0.0],
             "correct_code_rank": [1.0, None, None],
+            "correct_code_rank_penalised": [1.0, 10.0, 10.0],
             "precision_at_1": [1.0, 0.0, 0.0],
             "recall_at_1": [1.0, 0.0, 0.0],
             "correct_code": [["1111", "1112"], float("nan"), []],
@@ -1023,6 +1090,9 @@ def test_summarise_performance_metrics_treats_nan_mixed_with_lists_as_missing_gr
         "Expected mrr to be computed only over the row with valid ground truth, "
         "without a NaN-vs-list comparison error."
     )
+    assert result.mean_rank_penalised == pytest.approx(
+        1.0
+    ), "Expected mean_rank_penalised to be computed only over the row with valid ground truth."
 
 
 # ============================================================================
@@ -1261,6 +1331,8 @@ def test_sayt_performance_metrics_instantiation_with_valid_data():
         unmatched_query_count=5,
         mrr=0.85,
         mean_rank=2.3,
+        mean_rank_penalised=3.0,
+        median_rank=2.0,
         precision_at_k={1: 0.9, 3: 0.8, 5: 0.7},
         recall_at_k={1: 0.7, 3: 0.85, 5: 0.9},
     )
@@ -1302,6 +1374,8 @@ def test_sayt_performance_metrics_instantiation_with_empty_k_dicts():
         unmatched_query_count=0,
         mrr=1.0,
         mean_rank=1.0,
+        mean_rank_penalised=1.0,
+        median_rank=1.0,
         precision_at_k={},
         recall_at_k={},
     )
@@ -1324,6 +1398,8 @@ def test_sayt_performance_metrics_instantiation_with_zero_values():
         unmatched_query_count=0,
         mrr=0.0,
         mean_rank=0.0,
+        mean_rank_penalised=0.0,
+        median_rank=0.0,
         precision_at_k={1: 0.0},
         recall_at_k={1: 0.0},
     )
@@ -1346,6 +1422,8 @@ def test_sayt_performance_metrics_report_metrics_includes_all_fields():
         unmatched_query_count=5,
         mrr=0.85,
         mean_rank=2.3,
+        mean_rank_penalised=3.0,
+        median_rank=2.0,
         precision_at_k={1: 0.9, 3: 0.8},
         recall_at_k={1: 0.7, 3: 0.85},
     )
@@ -1359,6 +1437,8 @@ def test_sayt_performance_metrics_report_metrics_includes_all_fields():
     assert "5" in report, "Expected unmatched_query_count in report."
     assert "0.8500" in report, "Expected mrr value in report."
     assert "2.30" in report, "Expected mean_rank value in report."
+    assert "Mean rank penalised: 3.00" in report
+    assert "Median rank: 2.00" in report
     assert "test_suggestions" in report, "Expected suggestions_col name in report."
     assert "Precision@1" in report, "Expected Precision@1 in report."
     assert "Precision@3" in report, "Expected Precision@3 in report."
@@ -1384,6 +1464,8 @@ def test_sayt_performance_metrics_report_metrics_returns_string():
         unmatched_query_count=0,
         mrr=0.5,
         mean_rank=2.0,
+        mean_rank_penalised=2.0,
+        median_rank=2.0,
         precision_at_k={1: 0.8},
         recall_at_k={1: 0.6},
     )
@@ -1404,6 +1486,8 @@ def test_sayt_performance_metrics_report_metrics_starts_with_header():
         unmatched_query_count=1,
         mrr=0.9,
         mean_rank=1.5,
+        mean_rank_penalised=1.5,
+        median_rank=1.5,
         precision_at_k={},
         recall_at_k={},
     )
@@ -1426,6 +1510,8 @@ def test_sayt_performance_metrics_report_metrics_contains_formatted_numbers():
         unmatched_query_count=8,
         mrr=0.123456,
         mean_rank=3.6789,
+        mean_rank_penalised=4.5678,
+        median_rank=3.0,
         precision_at_k={1: 0.789123},
         recall_at_k={1: 0.456789},
     )
@@ -1454,6 +1540,8 @@ def test_sayt_performance_metrics_report_metrics_with_multiple_k_values():
         unmatched_query_count=0,
         mrr=0.8,
         mean_rank=2.0,
+        mean_rank_penalised=2.0,
+        median_rank=2.0,
         precision_at_k={1: 0.9, 3: 0.7, 5: 0.6, 10: 0.4},
         recall_at_k={1: 0.5, 3: 0.7, 5: 0.8, 10: 0.9},
     )
@@ -1491,6 +1579,8 @@ def test_sayt_performance_metrics_report_metrics_with_empty_k_dicts():
         unmatched_query_count=2,
         mrr=0.6,
         mean_rank=3.0,
+        mean_rank_penalised=3.0,
+        median_rank=3.0,
         precision_at_k={},
         recall_at_k={},
     )
@@ -1520,6 +1610,8 @@ def test_sayt_performance_metrics_validates_field_types():
             unmatched_query_count=0,
             mrr=0.8,
             mean_rank=2.0,
+            mean_rank_penalised=2.0,
+            median_rank=2.0,
             precision_at_k={},
             recall_at_k={},
         )
@@ -1538,6 +1630,8 @@ def test_sayt_performance_metrics_validates_required_fields():
             unmatched_query_count=0,
             mrr=0.8,
             # missing mean_rank
+            mean_rank_penalised=2.0,
+            median_rank=2.0,
             precision_at_k={},
             recall_at_k={},
         )
@@ -1555,6 +1649,8 @@ def test_sayt_performance_metrics_report_metrics_sorts_k_values():
         unmatched_query_count=0,
         mrr=0.8,
         mean_rank=2.0,
+        mean_rank_penalised=2.0,
+        median_rank=2.0,
         precision_at_k={5: 0.6, 1: 0.9, 3: 0.7},
         recall_at_k={5: 0.8, 1: 0.5, 3: 0.7},
     )
