@@ -629,7 +629,7 @@ for char in characters_list:
     data_by_character[char] = data_weights
 
 # %%
-score_metric_label = "mean_rank"
+score_metric_label = "mrr"
 k_value = 1
 
 faceted_plot = generate_faceted_heatmap(
@@ -643,6 +643,48 @@ if SAVE_PLOT:
         f"data/sayt/{TEST_FOLDER}/heatmaps_by_character_{score_metric_label}.html"
     )
 faceted_plot.show()
+
+# %%
+# Mean square - distance from the best performing setup
+
+characters_list = list(range(5, 10))
+
+y_true = []
+for char in characters_list:
+    data_weights = get_weight_by_char_dicts(
+        characters=char,
+        use_bucket=USE_BUCKET,
+        bucket_path=f"gs://{bucket_name}/{blob_name}",
+        local_path=LOCAL_DIR,
+    )
+
+    mrr_score, best_dict = find_best_performing_setup(data_weights)
+    y_true.append(mrr_score)
+y_true = np.array(y_true)
+
+# %%
+setup_dict = {}
+
+for char in characters_list:
+    data_weights = get_weight_by_char_dicts(
+        characters=char,
+        use_bucket=USE_BUCKET,
+        bucket_path=f"gs://{bucket_name}/{blob_name}",
+        local_path=LOCAL_DIR,
+    )
+    for setup in data_weights:
+        if setup not in setup_dict:
+            setup_dict[setup] = []
+        setup_dict[setup].append(data_weights[setup]["mrr"])
+# %%
+msq = {}
+for setup_key, y_pred in setup_dict.items():
+    # y_pred = np.array(y_pred)
+    msq[setup_key] = np.mean((y_true - y_pred) ** 2)
+
+top_five_setups = sorted(msq.items(), key=lambda item: item[1])[:5]
+for rank, (setup_key, mse) in enumerate(top_five_setups, start=1):
+    print(f"{rank}. {setup_key}: {mse}")
 
 
 # %%
