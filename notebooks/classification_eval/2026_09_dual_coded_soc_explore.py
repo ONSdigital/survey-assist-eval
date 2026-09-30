@@ -3,12 +3,13 @@
 Convert occupation and industry classifications from dual-coded datasets.
 """
 
-# pylint: disable=invalid-name
+# pylint: disable=invalid-name,too-many-lines
 
 # %%
 import logging
 import os
 
+import numpy as np
 import pandas as pd
 from dotenv import load_dotenv
 from scipy.stats import chi2_contingency
@@ -54,10 +55,19 @@ TWO_K_CLERICAL_CODES = "clerical_codes"  # List of candidate codes
 SA_DATA_PATH = (
     f"gs://{bucket_name}/evaluation-pipeline/dual_coded_2k/soc/" "STG2.parquet"
 )  # Pipeline run by Peter
-SA_ID_COL = "Unique_identifier"
-SA_CODES_COL = "initial_code"
-SA_ALT_CODES_COL = "alt_soc_candidates"
-SA_LIKELIHOOD_COL = "initial_likelihood"
+SA_SOC_ID_COL = "Unique_identifier"
+SA_SOC_CODES_COL = "initial_code"
+SA_SOC_ALT_CODES_COL = "alt_soc_candidates"
+SA_SOC_LIKELIHOOD_COL = "initial_likelihood"
+
+# Survey Assist's own SIC output for this same subset
+SA_SIC_DATA_PATH = (
+    f"gs://{bucket_name}/evaluation-pipeline/dual_coded_2k/sic/" "STG2.parquet"
+)
+SA_SIC_ID_COL = "Unique_identifier"
+SA_SIC_CODES_COL = "initial_code"
+SA_SIC_ALT_CODES_COL = "alt_sic_candidates"
+SA_SIC_LIKELIHOOD_COL = "initial_likelihood"
 
 SIGNIFICANCE_LEVEL = 0.05
 
@@ -82,7 +92,7 @@ def show_value_counts(
         )
         all_codes = []
         for item in df[column].dropna():
-            if isinstance(item, list | tuple):
+            if isinstance(item, list | tuple | np.ndarray):
                 all_codes.extend(item)
             else:
                 all_codes.append(item)
@@ -167,8 +177,15 @@ clerically_coded_soc_df = clerically_coded_soc_df.rename(
         "Lynne_Comments": "Coder2_Comments",
     }
 )
-# Replace '6321' with '6231' in the clerically coded SOC data
-clerically_coded_soc_df = clerically_coded_soc_df.replace({"6321": "6231"})
+# Replace '6321' with '6231' in the clerical SOC code columns only
+code_cols = [
+    c
+    for c in ("Coder1", "Coder2", "Final code")
+    if c in clerically_coded_soc_df.columns
+]
+clerically_coded_soc_df[code_cols] = clerically_coded_soc_df[code_cols].replace(
+    {"6321": "6231"}
+)
 
 # %%
 # Clean every clerical SOC code column once, treat them as full-length SOC codes for rest
@@ -387,12 +404,12 @@ digit_level_summary = []
 coder1_full = pd.Series(dtype=object)
 coder2_full = pd.Series(dtype=object)
 
-for n in SOC_DIGIT_LEVELS:
+for soc_digit_count in SOC_DIGIT_LEVELS:
     coder1_labels = clerically_coded_soc_df[CLERICALLY_CODED_SOC_CODER1_COL].apply(
-        lambda x, n=n: soc_label_at_digits(x, n_digits=n)
+        lambda x, n=soc_digit_count: soc_label_at_digits(x, n_digits=n)
     )
     coder2_labels = clerically_coded_soc_df[CLERICALLY_CODED_SOC_CODER2_COL].apply(
-        lambda x, n=n: soc_label_at_digits(x, n_digits=n)
+        lambda x, n=soc_digit_count: soc_label_at_digits(x, n_digits=n)
     )
 
     n_agree = (coder1_labels == coder2_labels).sum()
@@ -401,7 +418,7 @@ for n in SOC_DIGIT_LEVELS:
 
     digit_level_summary.append(
         {
-            "digits": n,
+            "digits": soc_digit_count,
             "n_records": len(clerically_coded_soc_df),
             "n_agree": int(n_agree),
             "pct_agree": round(pct_agree, 1),
@@ -409,7 +426,7 @@ for n in SOC_DIGIT_LEVELS:
         }
     )
 
-    if n == max(SOC_DIGIT_LEVELS):
+    if soc_digit_count == max(SOC_DIGIT_LEVELS):
         # keep the full 4-digit labels around for the "Agree" cross-check below
         coder1_full = coder1_labels
         coder2_full = coder2_labels
@@ -486,19 +503,21 @@ try:
     # Finest SOC digit level at which Coder1 and Coder2 agree, per row.
     soc_codability = pd.Series(UNCODABLE_LABEL, index=merged.index)
     already_resolved = pd.Series(False, index=merged.index)
-    for n in sorted(SOC_DIGIT_LEVELS, reverse=True):
+    for soc_digit_count in sorted(SOC_DIGIT_LEVELS, reverse=True):
         coder1_labels = merged[CLERICALLY_CODED_SOC_CODER1_COL].apply(
-            lambda x, n=n: soc_label_at_digits(x, n_digits=n)
+            lambda x, digits=soc_digit_count: soc_label_at_digits(x, n_digits=digits)
         )
         coder2_labels = merged[CLERICALLY_CODED_SOC_CODER2_COL].apply(
-            lambda x, n=n: soc_label_at_digits(x, n_digits=n)
+            lambda x, digits=soc_digit_count: soc_label_at_digits(x, n_digits=digits)
         )
         either_uncodable = (coder1_labels == UNCODABLE_LABEL) | (
             coder2_labels == UNCODABLE_LABEL
         )
         agree = (coder1_labels == coder2_labels) & ~either_uncodable
         level_label = next(
-            label for digits, label in SOC_CODABILITY_LEVELS if digits == n
+            label
+            for digits, label in SOC_CODABILITY_LEVELS
+            if digits == soc_digit_count
         )
         newly_resolved = agree & ~already_resolved
         soc_codability[newly_resolved] = level_label
@@ -551,11 +570,14 @@ non_empty_rows = codability_crosstab.sum(axis=1) > 0
 non_empty_cols = codability_crosstab.sum(axis=0) > 0
 contingency = codability_crosstab.loc[non_empty_rows, non_empty_cols]
 if contingency.shape[0] > 1 and contingency.shape[1] > 1:
-    chi2, p_value, dof, _expected = chi2_contingency(contingency)
-    print(
-        f"\nChi-square test for independence: chi2={chi2:.2f}, dof={dof}, p={p_value:.4g}"
+    codability_chi2, codability_p_value, codability_dof, _expected = chi2_contingency(
+        contingency
     )
-    if p_value < SIGNIFICANCE_LEVEL:
+    print(
+        f"\nChi-square test for independence: chi2={codability_chi2:.2f}, "
+        f"dof={codability_dof}, p={codability_p_value:.4g}"
+    )
+    if codability_p_value < SIGNIFICANCE_LEVEL:
         print(
             "=> SIC and SOC codability appear related (reject independence at 5%): "
             "cases that are hard to code for one tend to be hard to code for the other."
@@ -573,18 +595,16 @@ else:
 # %%
 # PATTERN INSIGHTS: DISAGREEMENT BY INDUSTRY (SIC SECTION) AND OCCUPATION
 # Where does Coder1/Coder2 disagreement concentrate? "Disagree" here means
-# the two coders did not land on the exact same 4-digit SOC unit group
-# (i.e. soc_codability_level is anything other than "Unit group (4-digits)"),
-# the same criterion used for the digit=4 row in the reliability table above.
+# the two coders did not assign the same full 4-digit SOC label, with
+# Uncodable/Uncodable counted as agreement - the same criterion used for the
+# digit=4 row in the reliability table above.
 
 SECTION_MIN_N = 15  # groups smaller than this are noisy - shown but flagged
 
 
 def primary_soc_code(row: pd.Series) -> object:
     """Best single SOC code for a row: the adjudicated Final code where
-    available (i.e. where the coders disagreed), otherwise Coder1's code
-    (arbitrary - Coder1 and Coder2 agree on ~97% of rows so it barely
-    matters which one is used as the "primary" occupation label).
+    available (i.e. where the coders disagreed), otherwise Coder1's code.
     """
     final = row.get(FINAL_CODE_COL)
     if pd.notna(final) and str(final).strip():
@@ -612,70 +632,10 @@ merged["soc_major_group"] = (
     merged["soc_major_group_digit"].map(SOC_MAJOR_GROUP_TITLES).fillna("Uncodable")
 )
 
-merged["disagree"] = merged["soc_codability_level"] != "Unit group (4-digits)"
-
-print(f"\n{'='*70}")
-print("DISAGREEMENT BY SIC SECTION (INDUSTRY)")
-print(f"{'='*70}")
-section_stats = (
-    merged.groupby("sic_section")["disagree"]
-    .agg(n="size", n_disagree="sum")
-    .assign(disagree_rate=lambda d: (d["n_disagree"] / d["n"]).round(3))
-    .sort_values("disagree_rate", ascending=False)
+merged["disagree"] = (
+    merged[CLERICALLY_CODED_SOC_CODER1_COL] != merged[CLERICALLY_CODED_SOC_CODER2_COL]
 )
-section_stats["low_sample_lt_15"] = section_stats["n"] < SECTION_MIN_N
-print(section_stats.to_string())
 
-section_ct = pd.crosstab(merged["sic_section"], merged["disagree"])
-if section_ct.shape[0] > 1:
-    chi2, p_value, dof, _expected = chi2_contingency(section_ct)
-    print(
-        f"\nChi-square test (disagreement rate vs SIC section): "
-        f"chi2={chi2:.2f}, dof={dof}, p={p_value:.4g}"
-    )
-    if p_value < SIGNIFICANCE_LEVEL:
-        print(
-            "=> Disagreement rate varies significantly by industry "
-            f"(p<{SIGNIFICANCE_LEVEL})."
-        )
-    else:
-        print(
-            "=> No significant evidence that disagreement rate varies by industry "
-            f"(p>={SIGNIFICANCE_LEVEL})."
-        )
-
-print(f"\n{'='*70}")
-print("DISAGREEMENT BY OCCUPATION (SOC MAJOR GROUP)")
-print(f"{'='*70}")
-major_group_stats = (
-    merged.groupby("soc_major_group")["disagree"]
-    .agg(n="size", n_disagree="sum")
-    .assign(disagree_rate=lambda d: (d["n_disagree"] / d["n"]).round(3))
-    .sort_values("disagree_rate", ascending=False)
-)
-major_group_stats["low_sample_lt_15"] = major_group_stats["n"] < SECTION_MIN_N
-print(major_group_stats.to_string())
-
-major_group_ct = pd.crosstab(merged["soc_major_group"], merged["disagree"])
-if major_group_ct.shape[0] > 1:
-    chi2, p_value, dof, _expected = chi2_contingency(major_group_ct)
-    print(
-        f"\nChi-square test (disagreement rate vs SOC major group): "
-        f"chi2={chi2:.2f}, dof={dof}, p={p_value:.4g}"
-    )
-    if p_value < SIGNIFICANCE_LEVEL:
-        print(
-            "=> Disagreement rate varies significantly by occupation "
-            f"(p<{SIGNIFICANCE_LEVEL})."
-        )
-    else:
-        print(
-            "=> No significant evidence that disagreement rate varies by occupation "
-            f"(p>={SIGNIFICANCE_LEVEL})."
-        )
-# A handful of concrete example disagreements from the worst-performing
-# section and major group, so the numbers above can be read alongside what
-# the actual job titles/descriptions/comments look like.
 EXAMPLE_COLS = [
     CLERICALLY_CODED_SOC_ID_COL,
     "soc2020_job_title_main_job",
@@ -684,147 +644,192 @@ EXAMPLE_COLS = [
     CLERICALLY_CODED_SOC_CODER2_COL,
     FINAL_CODE_COL,
 ]
-eligible_sections = section_stats[~section_stats["low_sample_lt_15"]]
-if not eligible_sections.empty:
-    worst_section = eligible_sections.index[0]
-    print(f"\nExample disagreements in worst SIC section ({worst_section}):")
-    print(
-        merged[(merged["sic_section"] == worst_section) & merged["disagree"]][
-            EXAMPLE_COLS
-        ]
-        .head(5)
-        .to_string(index=False)
-    )
 
-eligible_groups = major_group_stats[~major_group_stats["low_sample_lt_15"]]
-if not eligible_groups.empty:
-    worst_group = eligible_groups.index[0]
-    print(f"\nExample disagreements in worst SOC major group ({worst_group}):")
-    print(
-        merged[(merged["soc_major_group"] == worst_group) & merged["disagree"]][
-            EXAMPLE_COLS
-        ]
-        .head(5)
-        .to_string(index=False)
+
+def disagreement_by(group_col: str, title: str, what: str) -> None:
+    """Disagreement rate per group, chi-square test and worst-group examples."""
+    print(f"\n{'='*70}")
+    print(title)
+    print(f"{'='*70}")
+    stats = (
+        merged.groupby(group_col)["disagree"]
+        .agg(n="size", n_disagree="sum")
+        .assign(disagree_rate=lambda d: (d["n_disagree"] / d["n"]).round(3))
+        .sort_values("disagree_rate", ascending=False)
     )
+    stats["low_sample_lt_15"] = stats["n"] < SECTION_MIN_N
+    print(stats.to_string())
+
+    ct = pd.crosstab(merged[group_col], merged["disagree"])
+    if ct.shape[0] > 1:
+        chi2, p_value, dof, _expected = chi2_contingency(ct)
+        print(
+            f"\nChi-square test (disagreement rate vs {what}): "
+            f"chi2={chi2:.2f}, dof={dof}, p={p_value:.4g}"
+        )
+        if p_value < SIGNIFICANCE_LEVEL:
+            print(
+                f"=> Disagreement rate varies significantly by {what} "
+                f"(p<{SIGNIFICANCE_LEVEL})."
+            )
+        else:
+            print(
+                f"=> No significant evidence that disagreement rate varies by {what} "
+                f"(p>={SIGNIFICANCE_LEVEL})."
+            )
+
+    eligible = stats[~stats["low_sample_lt_15"]]
+    if not eligible.empty:
+        worst = eligible.index[0]
+        print(f"\nExample disagreements in worst {what} group ({worst}):")
+        print(
+            merged[(merged[group_col] == worst) & merged["disagree"]][EXAMPLE_COLS]
+            .head(5)
+            .to_string(index=False)
+        )
+
+
+disagreement_by("sic_section", "DISAGREEMENT BY SIC SECTION (INDUSTRY)", "industry")
+disagreement_by(
+    "soc_major_group", "DISAGREEMENT BY OCCUPATION (SOC MAJOR GROUP)", "occupation"
+)
 
 # %%
-# SURVEY ASSIST PERFORMANCE COMPARISON
+# SURVEY ASSIST SHARED HELPERS (used by both the SOC and SIC comparisons)
 
-try:
-    sa_df = pd.read_parquet(SA_DATA_PATH, dtype_backend="numpy_nullable")
-except FileNotFoundError:
-    sa_df = None
+SA_CODABILITY_CONFIDENCE_THRESHOLD = 0.8
 
-if sa_df is None:
-    print(f"\n{'='*70}")
-    print("SURVEY ASSIST PERFORMANCE COMPARISON - SKIPPED")
-    print(f"{'='*70}")
+
+def _max_candidate_likelihood(candidates: object) -> float:
+    """Highest 'likelihood' across a row's alt_{sic,soc}_candidates, or NaN."""
+    if not isinstance(candidates, list | tuple | np.ndarray):
+        return float("nan")
+    likelihoods = [
+        candidate.get("likelihood")
+        for candidate in candidates
+        if isinstance(candidate, dict) and candidate.get("likelihood") is not None
+    ]
+    return max(likelihoods) if likelihoods else float("nan")
+
+
+def blank_low_confidence_initial_code(  # pylint: disable=too-many-arguments
+    df: pd.DataFrame,
+    codes_col: str,
+    alt_codes_col: str,
+    likelihood_col: str,
+    label: str,
+) -> pd.DataFrame:
+    """Blank `codes_col` wherever its likelihood is below
+    SA_CODABILITY_CONFIDENCE_THRESHOLD or missing (i.e. not unambiguously codable).
+
+    The likelihood is read from `likelihood_col` when present (one-prompt
+    pipeline), otherwise from the best `alt_codes_col` candidate likelihood.
+    """
+    if likelihood_col in df.columns:
+        confidence = pd.to_numeric(df[likelihood_col], errors="coerce")
+        source = likelihood_col
+    else:
+        confidence = df[alt_codes_col].apply(_max_candidate_likelihood)
+        source = alt_codes_col
     print(
-        f"'{SA_DATA_PATH}' not found. Update SA_DATA_PATH (and SA_CODES_COL/"
-        "SA_ALT_CODES_COL if needed) in the CONFIGURATION section once "
-        "Survey Assist's SOC output for this subset is available, then re-run."
+        f"{label} likelihood source: {source} "
+        f"({confidence.isna().sum()} of {len(df)} missing)"
     )
-else:
+    has_initial_code = df[codes_col].fillna("").astype(str).str.strip().ne("")
+    # Missing likelihood = not confident
+    low_confidence = confidence.isna() | (
+        confidence < SA_CODABILITY_CONFIDENCE_THRESHOLD
+    ).fillna(False)
+    not_unambiguously_codable = has_initial_code & low_confidence
+    print(
+        f"Blanking {not_unambiguously_codable.sum()} of {len(df)} {label} "
+        f"initial_code value(s) with likelihood below "
+        f"{SA_CODABILITY_CONFIDENCE_THRESHOLD} or missing (not unambiguously codable)."
+    )
+    df.loc[not_unambiguously_codable, codes_col] = ""
+    return df
+
+
+def soc_major_group_label(code_set: set) -> str:
+    """SOC major group title for a single-code set, else Ambiguous/Uncodable."""
+    if len(code_set) != 1:
+        return "Ambiguous/Uncodable"
+    return SOC_MAJOR_GROUP_TITLES.get(next(iter(code_set))[:1], "Uncodable")
+
+
+def run_sa_comparison(  # noqa: PLR0913  # pylint: disable=too-many-arguments,too-many-locals
+    *,
+    code_type: str,
+    sa_path: str,
+    sa_id_col: str,
+    codes_col: str,
+    alt_codes_col: str,
+    likelihood_col: str,
+    digit_levels: list[int],
+    build_truth,  # n -> DataFrame[unique_id, clerical_codes]
+    group_label,  # set -> str, for the distribution table
+    group_name: str,
+    sort_distribution: bool = False,
+) -> None:
+    """Compare Survey Assist initial codes with clerical truth by digit level."""
+    title = f"SURVEY ASSIST {code_type} PERFORMANCE COMPARISON"
+    try:
+        sa = pd.read_parquet(sa_path, dtype_backend="numpy_nullable")
+    except FileNotFoundError:
+        print(f"\n{'='*70}")
+        print(f"{title} - SKIPPED")
+        print(f"{'='*70}")
+        print(
+            f"'{sa_path}' not found. Update the SA_{code_type} path/column "
+            f"constants in the CONFIGURATION section once Survey Assist's "
+            f"{code_type} output for this subset is available, then re-run."
+        )
+        return
     print(f"\n{'='*70}")
-    print("SURVEY ASSIST PERFORMANCE COMPARISON")
+    print(title)
     print(f"{'='*70}")
 
     # Standardise column names
-    sa_df = sa_df.rename(columns={SA_ID_COL: TWO_K_ID_COL})
-    sa_df[TWO_K_ID_COL] = sa_df[TWO_K_ID_COL].astype(str)
-
-    SA_CODABILITY_CONFIDENCE_THRESHOLD = 0.8
-
-    def _max_candidate_likelihood(candidates: object) -> float:
-        """Highest 'likelihood' across a row's alt_{sic,soc}_candidates, or NaN."""
-        if not isinstance(candidates, list | tuple):
-            return float("nan")
-        likelihoods = [
-            candidate.get("likelihood")
-            for candidate in candidates
-            if isinstance(candidate, dict) and candidate.get("likelihood") is not None
-        ]
-        return max(likelihoods) if likelihoods else float("nan")
-
-    def blank_low_confidence_initial_code(
-        df: pd.DataFrame, codes_col: str, alt_codes_col: str, label: str
-    ) -> pd.DataFrame:
-        """Blank `codes_col` wherever its likelihood is below
-        SA_CODABILITY_CONFIDENCE_THRESHOLD (i.e. not unambiguously codable).
-
-        The likelihood is read from SA_LIKELIHOOD_COL when present (one-prompt
-        pipeline), otherwise from the best `alt_codes_col` candidate likelihood.
-        """
-        if SA_LIKELIHOOD_COL in df.columns:
-            confidence = pd.to_numeric(df[SA_LIKELIHOOD_COL], errors="coerce")
-        else:
-            confidence = df[alt_codes_col].apply(_max_candidate_likelihood)
-        print(
-            f"{label} likelihood source: "
-            f"{SA_LIKELIHOOD_COL if SA_LIKELIHOOD_COL in df.columns else alt_codes_col} "
-            f"({confidence.isna().sum()} of {len(df)} missing)"
-        )
-        has_initial_code = df[codes_col].fillna("").astype(str).str.strip().ne("")
-        low_confidence = confidence < SA_CODABILITY_CONFIDENCE_THRESHOLD
-        not_unambiguously_codable = has_initial_code & low_confidence
-        print(
-            f"Blanking {not_unambiguously_codable.sum()} of {len(df)} {label} "
-            f"initial_code value(s) with likelihood below "
-            f"{SA_CODABILITY_CONFIDENCE_THRESHOLD} (not unambiguously codable)."
-        )
-        df.loc[not_unambiguously_codable, codes_col] = ""
-        return df
-
-    sa_df = blank_low_confidence_initial_code(
-        sa_df, SA_CODES_COL, SA_ALT_CODES_COL, label="Survey Assist SOC"
+    sa = sa.rename(columns={sa_id_col: TWO_K_ID_COL})
+    sa[TWO_K_ID_COL] = sa[TWO_K_ID_COL].astype(str)
+    sa = blank_low_confidence_initial_code(
+        sa,
+        codes_col,
+        alt_codes_col,
+        likelihood_col=likelihood_col,
+        label=f"Survey Assist {code_type}",
     )
 
     # Run performance evaluation with INITIAL_CODE only
-
-    truth_input_df = merged[["unique_id"]].copy()
-    truth_input_df["unique_id"] = truth_input_df["unique_id"].astype(str)
-    # Already-clean full-length codes (or the Uncodable sentinel)
-    truth_input_df["consensus_code"] = merged.apply(primary_soc_code, axis=1)
-
+    top = max(digit_levels)
+    summary = []
+    full = pd.DataFrame()
     _code_standard_logger.setLevel(logging.ERROR)
     try:
-        digit_perf_summary = []
-        full_digit_combined = pd.DataFrame()
-        for n in sorted(SOC_DIGIT_LEVELS, reverse=True):
-            truth_codes_df = prep_clerical_codes(
-                truth_input_df,
-                clerical_col="consensus_code",
-                code_type="SOC",
-                digits=n,
-                out_col="clerical_codes",
-            )
-
-            # STANDARD prep_model_codes
-            model_codes_df = prep_model_codes(
-                sa_df,
-                codes_col=SA_CODES_COL,
+        for n in sorted(digit_levels, reverse=True):
+            truth = build_truth(n)
+            model = prep_model_codes(
+                sa,
+                codes_col=codes_col,
                 alt_codes_col=None,
-                code_type="SOC",
+                code_type=code_type,
                 digits=n,
                 out_col="model_codes",
             )
-
-            combined = truth_codes_df.merge(model_codes_df, on="unique_id", how="inner")
-            n_unmatched_sa = len(truth_codes_df) - len(combined)
-            if n_unmatched_sa:
+            combined = truth.merge(model, on="unique_id", how="inner")
+            n_missing = len(truth) - len(combined)
+            if n_missing:
                 print(
-                    f"⚠️  {n_unmatched_sa} clerical rows had no matching Survey Assist "
-                    "record (ID mismatch) - excluded from this comparison."
+                    f"⚠️  {n_missing} clerical rows had no matching Survey Assist "
+                    f"{code_type} record (ID mismatch) - excluded from this comparison."
                 )
-
             metrics = calc_simple_metrics(
                 combined,
                 truth_col="clerical_codes",
                 initial_model_col="model_codes",
                 final_model_col=None,
             )
-            digit_perf_summary.append(
+            summary.append(
                 {
                     "digits": n,
                     "n_records": len(combined),
@@ -840,67 +845,177 @@ else:
                     ),
                 }
             )
-            if n == max(SOC_DIGIT_LEVELS):
+            if n == top:
                 print(metrics.report_metrics())
-                full_digit_combined = combined
-
-        print("\nSurvey Assist vs clerical truth, by SOC digit level:")
-        print(pd.DataFrame(digit_perf_summary).to_string(index=False))
-
-        print(f"\n{'='*70}")
-        print("POST-HOC ANALYSIS: Model's Pick vs Clerical Truth (4-digit)")
-        print(f"{'='*70}")
-
-        comparison = full_digit_combined.copy()
-        comparison["model_pick_matches_truth"] = comparison.apply(
-            lambda row: len(row["model_codes"]) == 1
-            and (row["model_codes"] <= row["clerical_codes"]),
-            axis=1,
-        )
-
-        print("\nModel's initial_code vs clerical truth:")
-        n_match = comparison["model_pick_matches_truth"].sum()
-        pct_match = 100 * comparison["model_pick_matches_truth"].mean()
-        print(
-            f"  Model pick matches clerical truth: {n_match} of {len(comparison)} "
-            f"({pct_match:.1f}%)"
-        )
-        print(
-            f"  Model pick does not match: {(~comparison['model_pick_matches_truth']).sum()}"
-        )
-
-        # Distribution comparison
-        def _major_group_label(code_set: set) -> str:
-            if len(code_set) != 1:
-                return "Ambiguous/Uncodable"
-            return SOC_MAJOR_GROUP_TITLES.get(next(iter(code_set))[:1], "Uncodable")
-
-        truth_major_dist = (
-            full_digit_combined["clerical_codes"]
-            .apply(_major_group_label)
-            .value_counts(normalize=True)
-        )
-        sa_major_dist = (
-            full_digit_combined["model_codes"]
-            .apply(_major_group_label)
-            .value_counts(normalize=True)
-        )
-        dist_compare = (
-            pd.concat(
-                [
-                    truth_major_dist.rename("Clerical truth"),
-                    sa_major_dist.rename("Survey Assist"),
-                ],
-                axis=1,
-            )
-            .fillna(0)
-            .mul(100)
-            .round(1)
-        )
-        print("\nSOC major group distribution, clerical truth vs Survey Assist (%):")
-        print(dist_compare.to_string())
-
+                full = combined
     finally:
         _code_standard_logger.setLevel(_previous_log_level)
+
+    print(f"\nSurvey Assist vs clerical truth, by {code_type} digit level:")
+    print(pd.DataFrame(summary).to_string(index=False))
+
+    print(f"\n{'='*70}")
+    print(
+        f"POST-HOC ANALYSIS: Model's Pick vs Clerical Truth ({top}-digit {code_type})"
+    )
+    print(f"{'='*70}")
+
+    matches = full.apply(
+        lambda row: len(row["model_codes"]) == 1
+        and (row["model_codes"] <= row["clerical_codes"]),
+        axis=1,
+    )
+    print("\nModel's initial_code vs clerical truth:")
+    print(
+        f"  Model pick matches clerical truth: {matches.sum()} of {len(full)} "
+        f"({100 * matches.mean():.1f}%)"
+    )
+    print(f"  Model pick does not match: {(~matches).sum()}")
+
+    # Distribution comparison
+    dist = (
+        pd.concat(
+            [
+                full["clerical_codes"]
+                .apply(group_label)
+                .value_counts(normalize=True)
+                .rename("Clerical truth"),
+                full["model_codes"]
+                .apply(group_label)
+                .value_counts(normalize=True)
+                .rename("Survey Assist"),
+            ],
+            axis=1,
+        )
+        .fillna(0)
+        .mul(100)
+        .round(1)
+    )
+    if sort_distribution:
+        dist = dist.sort_index()
+    print(f"\n{group_name} distribution, clerical truth vs Survey Assist (%):")
+    print(dist.to_string())
+
+
+# %%
+# SURVEY ASSIST PERFORMANCE COMPARISON - SOC
+
+truth_input_df = merged[["unique_id"]].copy()
+truth_input_df["unique_id"] = truth_input_df["unique_id"].astype(str)
+# Already-clean full-length codes (or the Uncodable sentinel)
+truth_input_df["consensus_code"] = merged.apply(primary_soc_code, axis=1)
+
+run_sa_comparison(
+    code_type="SOC",
+    sa_path=SA_DATA_PATH,
+    sa_id_col=SA_SOC_ID_COL,
+    codes_col=SA_SOC_CODES_COL,
+    alt_codes_col=SA_SOC_ALT_CODES_COL,
+    likelihood_col=SA_SOC_LIKELIHOOD_COL,
+    digit_levels=SOC_DIGIT_LEVELS,
+    build_truth=lambda n: prep_clerical_codes(
+        truth_input_df,
+        clerical_col="consensus_code",
+        code_type="SOC",
+        digits=n,
+        out_col="clerical_codes",
+    ),
+    group_label=soc_major_group_label,
+    group_name="SOC major group",
+)
+
+# %%
+# SURVEY ASSIST PERFORMANCE COMPARISON - SIC
+
+SIC_DIGIT_LEVELS = sorted(
+    {digits for digits, _label in SIC_CODABILITY_LEVELS if digits > 0}
+)
+
+# UK SIC 2007 sections by division (first 2 digits)
+_SIC_SECTION_RANGES = [
+    ("A", 1, 3),
+    ("B", 5, 9),
+    ("C", 10, 33),
+    ("D", 35, 35),
+    ("E", 36, 39),
+    ("F", 41, 43),
+    ("G", 45, 47),
+    ("H", 49, 53),
+    ("I", 55, 56),
+    ("J", 58, 63),
+    ("K", 64, 66),
+    ("L", 68, 68),
+    ("M", 69, 75),
+    ("N", 77, 82),
+    ("O", 84, 84),
+    ("P", 85, 85),
+    ("Q", 86, 88),
+    ("R", 90, 93),
+    ("S", 94, 96),
+    ("T", 97, 98),
+    ("U", 99, 99),
+]
+
+
+def sic_section_from_code(code: str) -> str:
+    """Map a clean SIC code to its SIC 2007 section letter."""
+    try:
+        division = int(str(code)[:2])
+    except ValueError:
+        return "Uncodable"
+    for section, low, high in _SIC_SECTION_RANGES:
+        if low <= division <= high:
+            return section
+    return "Uncodable"
+
+
+def sic_truth_at_digits(raw: object, n_digits: int) -> set:
+    """Clean the 2k `clerical_codes` candidate list to a set of n-digit SIC codes."""
+    codes = clerical_codes_to_set(raw)
+    if not codes:
+        return set()
+    cleaned, _invalid = get_clean_n_digit_codes(
+        sorted(codes), n=n_digits, code_type="SIC"
+    )
+    return set(cleaned)
+
+
+def sic_section_label(code_set: set) -> str:
+    """SIC section letter for a single-code set, else Ambiguous/Uncodable."""
+    if len(code_set) != 1:
+        return "Ambiguous/Uncodable"
+    return sic_section_from_code(next(iter(code_set)))
+
+
+# SIC clerical truth comes from the 2k parquet, so only matched rows have it
+sic_truth_input_df = merged.loc[is_matched, [TWO_K_ID_COL, TWO_K_CLERICAL_CODES]].copy()
+sic_truth_input_df[TWO_K_ID_COL] = sic_truth_input_df[TWO_K_ID_COL].astype(str)
+
+
+def build_sic_truth(n: int) -> pd.DataFrame:
+    """SIC clerical truth as sets of n-digit codes, keyed by unique_id."""
+    return pd.DataFrame(
+        {
+            "unique_id": sic_truth_input_df[TWO_K_ID_COL],
+            "clerical_codes": sic_truth_input_df[TWO_K_CLERICAL_CODES].apply(
+                lambda raw: sic_truth_at_digits(raw, n_digits=n)
+            ),
+        }
+    )
+
+
+run_sa_comparison(
+    code_type="SIC",
+    sa_path=SA_SIC_DATA_PATH,
+    sa_id_col=SA_SIC_ID_COL,
+    codes_col=SA_SIC_CODES_COL,
+    alt_codes_col=SA_SIC_ALT_CODES_COL,
+    likelihood_col=SA_SIC_LIKELIHOOD_COL,
+    digit_levels=SIC_DIGIT_LEVELS,
+    build_truth=build_sic_truth,
+    group_label=sic_section_label,
+    group_name="SIC section",
+    sort_distribution=True,
+)
 
 print("\n✓ Analysis complete!")
