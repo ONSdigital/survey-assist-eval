@@ -31,16 +31,21 @@ def get_codes_from_suggestions(
 
 
 def get_rank_of_first_matching_code(
-    retrieved_codes: list[str], correct_codes: str | list[str] | set[str] | None
+    retrieved_codes: list[str],
+    correct_codes: str | list[str] | set[str] | None,
+    penalise_if_not_found: bool = False,
 ) -> int | None:
     """Get the rank of the first retrieved code matching correct code(s).
 
     Args:
         retrieved_codes: List of codes retrieved by the system (ordered by relevance).
         correct_codes: A single correct code or set of correct codes to match against.
+        penalise_if_not_found: Whether to return a penalised rank if no match is found.
+            Defaults to False.
 
     Returns:
         int: Rank of the first matching code, or None if no match found.
+        If penalise_if_not_found is True, returns len(retrieved_codes) + 1 when no match is found.
     """
     if correct_codes is None or is_correct_codes_empty(correct_codes):
         return None
@@ -49,9 +54,11 @@ def get_rank_of_first_matching_code(
         correct_codes = {correct_codes}
 
     for rank, item in enumerate(retrieved_codes, start=1):
+        if item is None:
+            continue
         if item in correct_codes:
             return int(rank)
-    return None
+    return len(retrieved_codes) + 1 if penalise_if_not_found else None
 
 
 def is_correct_codes_empty(codes: str | list[str] | set[str] | None) -> bool:
