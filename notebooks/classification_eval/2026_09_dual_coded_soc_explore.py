@@ -933,27 +933,17 @@ SIC_DIGIT_LEVELS = sorted(
 
 # UK SIC 2007 sections by division (first 2 digits)
 _SIC_SECTION_RANGES = [
-    ("A", 1, 3),
-    ("B", 5, 9),
-    ("C", 10, 33),
-    ("D", 35, 35),
-    ("E", 36, 39),
-    ("F", 41, 43),
-    ("G", 45, 47),
-    ("H", 49, 53),
-    ("I", 55, 56),
-    ("J", 58, 63),
-    ("K", 64, 66),
-    ("L", 68, 68),
-    ("M", 69, 75),
-    ("N", 77, 82),
-    ("O", 84, 84),
-    ("P", 85, 85),
-    ("Q", 86, 88),
-    ("R", 90, 93),
-    ("S", 94, 96),
-    ("T", 97, 98),
-    ("U", 99, 99),
+    ("Agriculture, Forestry, and Fishing", 1, 9),
+    ("Mining", 10, 14),
+    ("Construction", 15, 17),
+    ("Manufacturing", 20, 39),
+    ("Transportation, Communications", 40, 49),
+    ("Wholesale Trade", 50, 51),
+    ("Retail Trade", 52, 59),
+    ("Finance, Insurance, and Real Estate", 60, 67),
+    ("Services", 70, 89),
+    ("Public Administration", 91, 97),
+    ("Nonclassifiable Establishments", 99, 99),
 ]
 
 
