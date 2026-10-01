@@ -189,6 +189,36 @@ def compute_reciprocal_rank(
     return 0.0
 
 
+def compute_single_query_mean_rank(
+    correct_codes_ranks_dict: dict[str, list[int]],
+) -> float:
+    """Compute the mean of each correct code's minimum rank for one query.
+
+    Args:
+        correct_codes_ranks_dict: Mapping of each correct code to its retrieved ranks.
+
+    Returns:
+        float: Mean of minimum ranks, excluding codes without ranks (0 if none are available).
+    """
+    minimum_ranks = [min(ranks) for ranks in correct_codes_ranks_dict.values() if ranks]
+    return sum(minimum_ranks) / len(minimum_ranks) if minimum_ranks else 0.0
+
+
+def get_rank_of_final_correct_code(
+    correct_codes_ranks_dict: dict[str, list[int]],
+) -> int:
+    """Get the rank of the final correct code for one query.
+
+    Args:
+        correct_codes_ranks_dict: Mapping of each correct code to its retrieved ranks.
+
+    Returns:
+        int: Rank of the final correct code (0 if none are available).
+    """
+    first_ranks = [min(ranks) for ranks in correct_codes_ranks_dict.values() if ranks]
+    return max(first_ranks) if first_ranks else 0
+
+
 def add_sayt_metrics_columns(
     df,
     retrieved_codes_col: str,

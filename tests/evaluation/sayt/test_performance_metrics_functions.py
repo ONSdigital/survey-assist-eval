@@ -17,6 +17,8 @@ from survey_assist_eval.evaluation.sayt.performance_metrics_functions import (
     compute_precision_at_k,
     compute_recall_at_k,
     compute_reciprocal_rank,
+    compute_single_query_mean_rank,
+    get_rank_of_final_correct_code,
     summarise_performance_metrics,
 )
 
@@ -402,6 +404,58 @@ def test_compute_reciprocal_rank_with_none_values(
         f"Expected reciprocal rank to be {expected_reciprocal_rank} for "
         f"retrieved_codes={retrieved_codes} and correct_codes={correct_codes}."
     )
+
+
+# ============================================================================
+# Test compute_single_query_mean_rank function
+# ============================================================================
+
+
+@pytest.mark.parametrize(
+    "ranks_by_code,expected_mean_rank",
+    [
+        ({"1111": [2, 5], "2222": [4], "3333": []}, 3.0),
+        ({"1111": [3, 1], "2222": [2, 7]}, 1.5),
+        ({"1111": []}, 0.0),
+        ({}, 0.0),
+    ],
+)
+def test_compute_single_query_mean_rank_uses_minimum_rank_per_correct_code(
+    ranks_by_code, expected_mean_rank
+):
+    """Mean rank should use each code's first hit and ignore codes without hits."""
+    mean_rank = compute_single_query_mean_rank(ranks_by_code)
+
+    assert mean_rank == pytest.approx(expected_mean_rank)
+
+
+# ============================================================================
+# Test get_rank_of_final_correct_code function
+# ============================================================================
+
+
+@pytest.mark.parametrize(
+    "ranks_by_code,expected_rank",
+    [
+        ({"1111": [2, 5], "2222": [1, 4]}, 2),
+        ({"1111": [4, 1], "2222": [3]}, 3),
+        ({"1111": []}, 0),
+        ({}, 0),
+    ],
+    ids=[
+        "maximum-of-first-hits",
+        "minimum-rank-not-list-order",
+        "all-codes-unmatched",
+        "no-correct-codes",
+    ],
+)
+def test_get_rank_of_final_correct_code_uses_first_appearance_per_code(
+    ranks_by_code, expected_rank
+):
+    """Final correct rank should ignore later appearances of the same code."""
+    rank = get_rank_of_final_correct_code(ranks_by_code)
+
+    assert rank == expected_rank
 
 
 # ============================================================================
