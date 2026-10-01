@@ -26,6 +26,8 @@ class SAYTPerformanceMetrics(BaseModel):
     unmatched_query_count: int
     mrr: float
     mean_rank: float
+    mean_rank_penalised: float
+    median_rank: float
     precision_at_k: dict[int, float]
     recall_at_k: dict[int, float]
 
@@ -41,6 +43,8 @@ class SAYTPerformanceMetrics(BaseModel):
             f" Unmatched query count: {self.unmatched_query_count}",
             f" Mean reciprocal rank: {self.mrr:.4f}",
             f" Mean rank: {self.mean_rank:.2f}",
+            f" Mean rank penalised: {self.mean_rank_penalised:.2f}",
+            f" Median rank: {self.median_rank:.2f}",
         ]
         for k, val in sorted(self.precision_at_k.items()):
             lines.append(f" Precision@{k}: {val:.4f}")
@@ -189,6 +193,20 @@ def compute_reciprocal_rank(
     return 0.0
 
 
+def compute_median_with_none_as_inf(
+    values: list[float | None] | pd.Series,
+) -> float:
+    """Compute the median of a list of values, treating None as infinity.
+
+    Args:
+        values: Numeric values that may contain missing values.
+
+    Returns:
+        The median value, with None treated as infinity.
+    """
+    return float(pd.Series(values, dtype="float64").fillna(float("inf")).median())
+
+
 def add_sayt_metrics_columns(
     df,
     retrieved_codes_col: str,
@@ -240,6 +258,14 @@ def add_sayt_metrics_columns(
         ),
         axis=1,
     )
+
+    df[f"{prefix}correct_code_rank_penalised"] = df.apply(
+        lambda row: get_rank_of_first_matching_code(
+            row[retrieved_codes_col], row[correct_codes_col], penalise_if_not_found=True
+        ),
+        axis=1,
+    )
+
     return df
 
 
@@ -291,6 +317,10 @@ def summarise_performance_metrics(  # noqa: PLR0913 pylint: disable = R0913, R09
         "unmatched_query_count": df[f"{prefix}correct_code_rank"].isna().sum(),
         "mrr": df[f"{prefix}reciprocal_rank"].mean(),
         "mean_rank": df[f"{prefix}correct_code_rank"].mean(),
+        "mean_rank_penalised": df[f"{prefix}correct_code_rank_penalised"].mean(),
+        "median_rank": compute_median_with_none_as_inf(
+            df[f"{prefix}correct_code_rank"]
+        ),
         "precision_at_k": {k: df[f"{prefix}precision_at_{k}"].mean() for k in k_values},
         "recall_at_k": {k: df[f"{prefix}recall_at_{k}"].mean() for k in k_values},
     }

@@ -156,7 +156,7 @@ merge_with_duplicates = rephrased_df.merge(
 # %%
 # Report missing or collapsed titles to SAYT team
 msk = merge_with_duplicates["code_it4"].apply(
-    lambda x: pd.isna(x) or len(x) < SIC_EXPECTED_CODE_LENGTH
+    lambda x: True if pd.isna(x) else x.endswith("x")
 )
 out = merge_with_duplicates[msk]
 out.to_csv(f"{OUTPUT_DIR}/collapsed_or_missing_code_groups_it4.csv", index=False)
