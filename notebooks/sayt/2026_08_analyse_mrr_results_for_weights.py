@@ -17,7 +17,7 @@ from src.survey_assist_eval.pipeline.shared_components import _read_json
 GRID_SIZE = 10  # grid granuality (should be same as in TEST_FOLDER)
 TEST_FOLDER = "weights_grid_10_2k_sic_kb"
 LOCAL_DIR = f"data/sayt/{TEST_FOLDER}/"
-USE_BUCKET = True
+USE_BUCKET = False
 SAVE_PLOT = True
 
 os.makedirs(LOCAL_DIR, exist_ok=True)
@@ -63,19 +63,24 @@ def get_weight_by_char_dicts(
 
 
 # %%
-def find_best_performing_setup(data: dict):
-    """Finds best performing setup measured by MRR.
+def find_best_performing_setup(data: dict, metric: str, k: str | None = None):
+    """Return the highest score and all setups tied at that score.
 
     Args:
-        data (dict): A dictionary containing the test results with MRR scores.
+        data: Results keyed by setup, with metric scores and optional cutoff scores.
+        metric: Metric name to compare, such as ``mrr`` or ``precision_at_k``.
+        k: Cutoff key required for precision and recall metrics.
 
     Returns:
-        max_score (float): the highest MRR score achieved.
-        best_dict (dict): a dictionary with those entries that achieved highest MRR.
+        A tuple containing the best score and all matching setup results.
     """
     # find best score and those tests that achieved that score
-    max_score = max(d["mrr"] for d in data.values())
-    best_dics = {k: v for k, v in data.items() if v["mrr"] == max_score}
+    if metric in ["precision_at_k", "recall_at_k"]:
+        max_score = max(d[metric][k] for d in data.values())
+        best_dics = {i: v for i, v in data.items() if v[metric][k] == max_score}
+    else:
+        max_score = max(d[metric] for d in data.values())
+        best_dics = {i: v for i, v in data.items() if v[metric] == max_score}
     return max_score, best_dics
 
 
@@ -593,7 +598,7 @@ for char in characters_list:
         local_path=LOCAL_DIR,
     )
 
-    mrr_score, best_dict = find_best_performing_setup(data_weights)
+    mrr_score, best_dict = find_best_performing_setup(data=data_weights, metric="mrr")
     print(f"Best MRR for {char} characters: {mrr_score}")
     print(f"Best setup for {char} characters: {best_dict.keys()}\n")
 
@@ -646,12 +651,42 @@ faceted_plot.show()
 
 
 # %%
+def get_best_scores_values(data: dict, metric: str, k: str | None = None):
+    """Return the best score for a metric, optionally at a cutoff.
+
+    Args:
+        data: Results keyed by setup, with metric scores and optional cutoff scores.
+        metric: Metric name to compare, such as ``mrr`` or ``recall_at_k``.
+        k: Cutoff key required for precision and recall metrics.
+
+    Returns:
+        The highest score across all setups for the requested metric.
+    """
+    highest_score, _ = find_best_performing_setup(data=data, metric=metric, k=k)
+    return highest_score
+
+
+# %%
 # Mean square - distance from the best performing setup
 
-characters_list = list(range(5, 10))
+characters_list = list(range(5, 9))
 
-y_true = []
+y_true = {}
 setup_dict = {}
+score_metric_labels = ["mrr", "precision_at_k", "recall_at_k"]
+k_values = ["3", "5", "9"]
+column_names = []
+
+for name in score_metric_labels:
+    if "at_k" in name:
+        for position in k_values:
+            column_names.append(f"{name.removesuffix('_at_k')}_at_{position}")
+    else:
+        column_names.append(name)
+
+for column_name in column_names:
+    y_true[column_name] = []
+    setup_dict[column_name] = {}
 
 for char in characters_list:
     data_weights = get_weight_by_char_dicts(
@@ -661,24 +696,42 @@ for char in characters_list:
         local_path=LOCAL_DIR,
     )
 
-    mrr_score, _ = find_best_performing_setup(data_weights)
-    y_true.append(mrr_score)
+    for score_metric_name in score_metric_labels:
+        if score_metric_name in ["precision_at_k", "recall_at_k"]:
+            for position in k_values:
+                column_name = f"{score_metric_name.removesuffix('_at_k')}_at_{position}"
+                y_true[column_name].append(
+                    get_best_scores_values(
+                        data=data_weights, metric=score_metric_name, k=position
+                    )
+                )
+                for setup, result in data_weights.items():
+                    setup_dict[column_name].setdefault(setup, []).append(
+                        result[score_metric_name][position]
+                    )
+        else:
+            y_true[score_metric_name].append(
+                get_best_scores_values(data=data_weights, metric=score_metric_name)
+            )
+            for setup, result in data_weights.items():
+                setup_dict[score_metric_name].setdefault(setup, []).append(
+                    result[score_metric_name]
+                )
 
-    for setup in data_weights:
-        if setup not in setup_dict:
-            setup_dict[setup] = []
-        setup_dict[setup].append(data_weights[setup]["mrr"])
-
-y_true = np.array(y_true)
 
 # %%
-msq = {}
-for setup_key, y_pred in setup_dict.items():
-    msq[setup_key] = np.mean((y_true - y_pred) ** 2)
+msq = pd.DataFrame(
+    {
+        column_name: {
+            setup_key: np.mean(
+                (np.asarray(y_true[column_name]) - np.asarray(predicted_values)) ** 2
+            )
+            for setup_key, predicted_values in setup_dict[column_name].items()
+        }
+        for column_name in column_names
+    }
+)
 
-top_five_setups = sorted(msq.items(), key=lambda item: item[1])[:5]
-for rank, (setup_key, mse) in enumerate(top_five_setups, start=1):
-    print(f"{rank}. {setup_key}: {mse}")
-
+msq.sort_values("mrr")  # change those depending on which metric you want to use
 
 # %%
