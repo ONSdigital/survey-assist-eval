@@ -1,16 +1,6 @@
-"""Note:
-This example uses a repository that is no longer actively maintained.
+"""Load and demo a SAYT artifact built from the sic_kb_for_sayt lookup.
 
-The SAYT functionality has since been migrated to the
-`survey-assist-embed-core` repository. This script is retained for
-reference purposes only and may not reflect the latest implementation.
-
-For an up-to-date example using the new repository, see:
-`notebooks/sayt/2026_09_sayt_artifact_loader_example.py`
-
-Load and demo a SAYT artifact built from the IT3 lookup.
-
-Run ``2026_06_01_sayt_artifact_builder_example.py`` before this notebook.
+Run ``2026_09_sayt_artifact_builder_example.py`` before this notebook.
 """
 
 # pylint: disable=C0103,R0801,duplicate-code
@@ -19,8 +9,8 @@ Run ``2026_06_01_sayt_artifact_builder_example.py`` before this notebook.
 import json
 from pathlib import Path
 
-from industrial_classification_utils.sayt import SAYTSuggester
-from industrial_classification_utils.sayt.core import _normalise
+from survey_assist_embed_core.sayt import SAYTSuggester
+from survey_assist_embed_core.sayt.core import _normalise
 
 
 # %%
@@ -46,7 +36,7 @@ def print_suggester_breakdown(
 
 # %%
 ARTIFACT_DIR = (
-    Path(__file__).parent.parent.parent / "data" / "sayt_artifacts" / "lookup_it3_final"
+    Path(__file__).parent.parent.parent / "data" / "sayt_artifacts" / "sic_kb_for_sayt"
 )
 QUERIES = ["car", "cars", "waxi", "auto", "hea", "heal", "health"]
 
@@ -56,7 +46,7 @@ print("Artifact input directory:", ARTIFACT_DIR.resolve())
 # %%
 if not ARTIFACT_DIR.exists():
     raise FileNotFoundError(
-        "Artifact directory not found. Run 2026_06_01_sayt_artifact_builder_example.py first."
+        "Artifact directory not found. Run 2026_09_sayt_artifact_builder_example.py first."
     )
 
 manifest = json.loads((ARTIFACT_DIR / "manifest.json").read_text(encoding="utf-8"))
