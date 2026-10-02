@@ -34,14 +34,18 @@ input_data_xlsx = (
     f"gs://{bucket_name}/2026-08-tlfs-sayt-free-text/???.xlsx",
 )[DATADROP_NUM - 1]
 
+output_dir = "data/plots/sayt_analysis"
+os.makedirs(output_dir, exist_ok=True)
+
 logger.info(
     "Analysing SIC classification from SAYT Blaise pilot survey",
     input_data=input_data_xlsx,
+    output_dir=output_dir,
 )
 
 
 # %%
-# Load the dataset (two sheets from the Excel file)
+# Load the dataset (coded by three methods: clerical, CIMS, and SurveyAssist)
 df_sayt_coded = pd.read_excel(input_data_xlsx, sheet_name="all_data", dtype=str)
 df_sayt_coded["unique_id"] = (
     "tlfs_"
@@ -123,7 +127,7 @@ df_sub["sa_codes"] = prep_clerical_codes(df_sub, clerical_col="sa_combine")[
 ]
 
 # %%
-
+# Calculate performance at different number of digits
 DIGIT_LEVELS = [0, 2, 3, 4, 5]
 for col in ["clerical_codes", "cims_codes", "sa_codes"]:
     for digits in DIGIT_LEVELS:
@@ -155,8 +159,6 @@ for digits in DIGIT_LEVELS:
         final_model_col=None,
     )
 
-
-# %%
 plot_df = pd.DataFrame(
     [
         {
@@ -201,7 +203,7 @@ plot_df.loc[msk, list(cols)] = None
 
 
 # %%
-# melt for easier plotting
+# Melt results dataframe and plot ambiguity decision metrics
 plot_df_f1 = plot_df.melt(
     id_vars=["digits", "method"],
     value_vars=["Codability", "Precision", "Recall", "F1", "Accuracy"],
@@ -246,18 +248,19 @@ Accuracy: Overall percentage of correct codability/ambiguity decisions.
     font={"size": 10},
 )
 fig.update_layout(height=500, width=1000)
+fig.write_html(f"{output_dir}/sayt_sic_ambiguity_decision_metrics.html")
 fig.show()
 
 # %%
+# Melt results dataframe and plot matching accuracy metrics
 plot_df_accu = plot_df.melt(
     id_vars=["digits", "method"],
     value_vars=["OO Accuracy", "OM Accuracy", "MO Accuracy", "MM Accuracy"],
     var_name="metrics",
     value_name="value_tuple",
 )
-# drop NAs in Clerical
+# drop NAs in Clerical itself
 plot_df_accu = plot_df_accu[plot_df_accu["method"] != "Clerical"]
-
 
 # unwrap tuple into three columns
 plot_df_accu[["accu_value", "matches", "total"]] = pd.DataFrame(
@@ -301,6 +304,8 @@ MM: Many-to-Many match on the full set. (Is there any overlap between the cleric
     font={"size": 10},
 )
 fig.update_layout(height=500, width=770)
+
+fig.write_html(f"{output_dir}/sayt_sic_matching_accuracy_metrics.html")
 fig.show()
 
 # %%
