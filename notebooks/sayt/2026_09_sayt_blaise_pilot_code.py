@@ -13,16 +13,21 @@ from survey_assist_utils.logging import get_logger
 
 # %%
 # Load environment variables and set up logging
+DATADROP_NUM = 2
+
 load_dotenv()
 bucket_name = os.getenv("PREPROD_DATA_BUCKET_NAME")
 if not bucket_name:
     raise ValueError("PREPROD_DATA_BUCKET_NAME environment variable not set")
 
 logger = get_logger("sayt_blaise_pilot_sic_classification")
-work_folder = f"gs://{bucket_name}/2026-08-tlfs-sayt-free-text/tmp"
+
 input_data_xlsx = (
-    f"gs://{bucket_name}/2026-08-tlfs-sayt-free-text/SA_coding_sheet_01.xlsx"
-)
+    f"gs://{bucket_name}/2026-08-tlfs-sayt-free-text/SA_coding_sheet_01.xlsx",
+    f"gs://{bucket_name}/2026-08-tlfs-sayt-free-text/SA_TLFS_DROP_2.xlsx",
+)[DATADROP_NUM - 1]
+work_folder = f"gs://{bucket_name}/2026-08-tlfs-sayt-free-text/tmp/{DATADROP_NUM}"
+
 logger.info(
     "Processing SIC classification for SAYT Blaise pilot survey",
     input_data=input_data_xlsx,
@@ -105,18 +110,43 @@ df = pd.concat(
         ),
     ],
     ignore_index=True,
-)[["unique_id", *payload_cols]]
-print(df.describe().T)
+)
 
 all_missing = pd.Series(True, index=df.index)
 for col in payload_cols:
-    all_missing = all_missing & (df[col].isna() | df[col] == "-9")
+    all_missing = all_missing & (df[col].isna() | df[col].isin(["-9", -9, "-8", -8]))
 if all_missing.any():
+    num_missing = all_missing.sum()
     logger.warning(
         "There are rows with all relevant columns missing.",
-        num_missing=str(all_missing.sum()),
+        num_missing=str(num_missing),
     )
+
+    for col in payload_cols:
+        second_col = (
+            "sic2007_employed_second_job"
+            if col == "sic2007_employee"
+            else col + "_second_job"
+        )
+        df.loc[all_missing, col] = df.loc[all_missing, second_col]
+
+    all_missing = pd.Series(True, index=df.index)
+    for col in payload_cols:
+        all_missing = all_missing & (
+            df[col].isna() | df[col].isin(["-9", -9, "-8", -8])
+        )
+
+    if num_missing > all_missing.sum():
+        logger.warning(
+            "Filled out missing values from second job information.",
+            num_filled=str(num_missing - all_missing.sum()),
+            num_missing=str(all_missing.sum()),
+        )
+
     print(df[all_missing])
+
+df = df[["unique_id", *payload_cols]]
+print(df.describe().T)
 
 input_data_file = work_folder + "/prep_input_data.parquet"
 df.to_parquet(input_data_file, index=False)
@@ -147,6 +177,13 @@ alt_msk = ~out_df["unambiguously_codable"]
 out_df["alt_sic_candidates"] = ""
 out_df.loc[alt_msk, "alt_sic_candidates"] = out_df.loc[alt_msk, "alt_codes"].apply(
     lambda x: [y["code"] for y in x]
+)
+
+out_df["source"] = out_df["unique_id"].str.split("_").str[0]
+stats = out_df.groupby("source")["unambiguously_codable"].value_counts()
+logger.info(
+    "Processed pipeline output.",
+    coded_stats=str(stats.to_dict()),
 )
 
 
