@@ -1,4 +1,4 @@
-"""Run classification for free text responses subset of Blaise SAYT pilot survey."""
+"""Analyse quality of classification for free text responses subset of Blaise SAYT pilot survey."""
 
 # pylint: disable=C0103,R0801,C0301
 
@@ -10,6 +10,7 @@ import plotly.express as px
 from dotenv import load_dotenv
 from survey_assist_utils.logging import get_logger
 
+from survey_assist_eval.data_cleaning.code_standard import SIC_EXPECTED_CODE_LENGTH
 from survey_assist_eval.data_cleaning.prep_data import (
     get_clean_n_digit_codes,
     prep_clerical_codes,
@@ -55,7 +56,7 @@ df_sayt_coded["unique_id"] = (
 )
 
 clerical_msk = ~df_sayt_coded["Clerical_code_mj"].isna()
-cims_msk = ~df_sayt_coded["sic2007_main_job_five_digit"].isin(["-9", -9])
+cims_msk = ~df_sayt_coded["sic2007_main_job_five_digit"].isin(["-9", -9, "-8", -8])
 sa_msk = (
     ~df_sayt_coded["initial_code"].isna() | ~df_sayt_coded["alt_sic_candidates"].isna()
 )
@@ -81,7 +82,7 @@ print(
 # records not covered by all three coding methods are missing sa codes
 # we supressed some input records, so take a subset based on sa codes present
 
-df_sub = df_sayt_coded[sa_msk].copy()
+df_sub = df_sayt_coded[sa_msk & clerical_msk & cims_msk].copy()
 
 # %%
 # Standardise codes
@@ -110,11 +111,11 @@ df_sub["clerical_codes"] = prep_clerical_codes(df_sub, clerical_col="clerical_fi
 
 
 df_sub["cims_combine"] = "-9"
-for num_dig, word in enumerate(["two", "three", "four", "five"]):
+for num_dig, word in enumerate(["two", "three", "four", "five"], start=2):
     msk = ~df_sub[f"sic2007_main_job_{word}_digit"].isin(["-9", -9, "-1", -1, "-8", -8])
     df_sub.loc[msk, "cims_combine"] = df_sub.loc[
         msk, f"sic2007_main_job_{word}_digit"
-    ] + "x" * (3 - num_dig)
+    ] + "x" * (SIC_EXPECTED_CODE_LENGTH - num_dig)
 df_sub["cims_codes"] = prep_clerical_codes(df_sub, clerical_col="cims_combine")[
     "clerical_codes"
 ]
