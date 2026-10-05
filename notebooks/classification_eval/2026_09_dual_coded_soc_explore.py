@@ -67,7 +67,6 @@ SA_SIC_DATA_PATH = (
 SA_SIC_ID_COL = "Unique_identifier"
 SA_SIC_CODES_COL = "initial_code"
 SA_SIC_ALT_CODES_COL = "alt_sic_candidates"
-SA_SIC_LIKELIHOOD_COL = "initial_likelihood"
 
 SIGNIFICANCE_LEVEL = 0.05
 
@@ -712,7 +711,7 @@ def blank_low_confidence_initial_code(  # pylint: disable=too-many-arguments
     df: pd.DataFrame,
     codes_col: str,
     alt_codes_col: str,
-    likelihood_col: str,
+    likelihood_col: str | None,
     label: str,
 ) -> pd.DataFrame:
     """Blank `codes_col` wherever its likelihood is below
@@ -721,7 +720,7 @@ def blank_low_confidence_initial_code(  # pylint: disable=too-many-arguments
     The likelihood is read from `likelihood_col` when present (one-prompt
     pipeline), otherwise from the best `alt_codes_col` candidate likelihood.
     """
-    if likelihood_col in df.columns:
+    if likelihood_col is not None and likelihood_col in df.columns:
         confidence = pd.to_numeric(df[likelihood_col], errors="coerce")
         source = likelihood_col
     else:
@@ -760,7 +759,7 @@ def run_sa_comparison(  # noqa: PLR0913  # pylint: disable=too-many-arguments,to
     sa_id_col: str,
     codes_col: str,
     alt_codes_col: str,
-    likelihood_col: str,
+    likelihood_col: str | None,
     digit_levels: list[int],
     build_truth,  # n -> DataFrame[unique_id, clerical_codes]
     group_label,  # set -> str, for the distribution table
@@ -993,7 +992,7 @@ run_sa_comparison(
     sa_id_col=SA_SIC_ID_COL,
     codes_col=SA_SIC_CODES_COL,
     alt_codes_col=SA_SIC_ALT_CODES_COL,
-    likelihood_col=SA_SIC_LIKELIHOOD_COL,
+    likelihood_col=None,
     digit_levels=SIC_DIGIT_LEVELS,
     build_truth=build_sic_truth,
     group_label=sic_section_label,
