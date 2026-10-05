@@ -252,6 +252,7 @@ fig.update_layout(height=500, width=1000)
 fig.write_html(f"{output_dir}/sayt_sic_ambiguity_decision_metrics.html")
 fig.show()
 
+
 # %%
 # Melt results dataframe and plot matching accuracy metrics
 plot_df_accu = plot_df.melt(
@@ -268,6 +269,25 @@ plot_df_accu[["accu_value", "matches", "total"]] = pd.DataFrame(
     plot_df_accu["value_tuple"].tolist(), index=plot_df_accu.index
 )
 
+
+# %%
+# Treat uncodable fairly (make sure we are not penalizing CIMS for records that are uncodable)
+# SurveyAssist always returns some candidates while clerical and CIMS may mark records as uncodable.
+# The overall trend in accuracy comparison doesn't change when these are excluded or treated differently,
+# but to give a fair comparison, we will consider CIMS uncodable records as extra matches for the MM Accuracy.
+
+cims_cc_uncodable_match = sum(
+    (df_sub.cims_codes == set()) & (df_sub.clerical_codes == set())
+)
+
+msk = (plot_df_accu["metrics"] == "MM Accuracy") & (plot_df_accu["method"] == "CIMS")
+plot_df_accu.loc[msk, "matches"] += cims_cc_uncodable_match
+plot_df_accu.loc[msk, "accu_value"] = (
+    plot_df_accu.loc[msk, "matches"] / plot_df_accu.loc[msk, "total"]
+)
+
+
+# %%
 fig = px.line(
     plot_df_accu,
     x="digits",
