@@ -487,44 +487,39 @@ def clerical_codes_to_set(raw: object) -> set:
     return {str(code) for code in raw}
 
 
-_code_standard_logger.setLevel(logging.ERROR)
-try:
-    # Computed on the merged dataframe; rows with no 2k match stay NaN.
-    merged["sic_codability_level"] = (
-        merged[TWO_K_CLERICAL_CODES]
-        .apply(
-            lambda codes: get_codability_level(
-                clerical_codes_to_set(codes), code_type="SIC"
-            )
+# Computed on the merged dataframe; rows with no 2k match stay NaN.
+merged["sic_codability_level"] = (
+    merged[TWO_K_CLERICAL_CODES]
+    .apply(
+        lambda codes: get_codability_level(
+            clerical_codes_to_set(codes), code_type="SIC"
         )
-        .where(merged[TWO_K_ID_COL].notna())
     )
+    .where(merged[TWO_K_ID_COL].notna())
+)
 
-    # Finest SOC digit level at which Coder1 and Coder2 agree, per row.
-    soc_codability = pd.Series(UNCODABLE_LABEL, index=merged.index)
-    already_resolved = pd.Series(False, index=merged.index)
-    for soc_digit_count in sorted(SOC_DIGIT_LEVELS, reverse=True):
-        coder1_labels = merged[CLERICALLY_CODED_SOC_CODER1_COL].apply(
-            lambda x, digits=soc_digit_count: soc_label_at_digits(x, n_digits=digits)
-        )
-        coder2_labels = merged[CLERICALLY_CODED_SOC_CODER2_COL].apply(
-            lambda x, digits=soc_digit_count: soc_label_at_digits(x, n_digits=digits)
-        )
-        either_uncodable = (coder1_labels == UNCODABLE_LABEL) | (
-            coder2_labels == UNCODABLE_LABEL
-        )
-        agree = (coder1_labels == coder2_labels) & ~either_uncodable
-        level_label = next(
-            label
-            for digits, label in SOC_CODABILITY_LEVELS
-            if digits == soc_digit_count
-        )
-        newly_resolved = agree & ~already_resolved
-        soc_codability[newly_resolved] = level_label
-        already_resolved = already_resolved | newly_resolved
-    merged["soc_codability_level"] = soc_codability
-finally:
-    _code_standard_logger.setLevel(_previous_log_level)
+# Finest SOC digit level at which Coder1 and Coder2 agree, per row.
+soc_codability = pd.Series(UNCODABLE_LABEL, index=merged.index)
+already_resolved = pd.Series(False, index=merged.index)
+for soc_digit_count in sorted(SOC_DIGIT_LEVELS, reverse=True):
+    coder1_labels = merged[CLERICALLY_CODED_SOC_CODER1_COL].apply(
+        lambda x, digits=soc_digit_count: soc_label_at_digits(x, n_digits=digits)
+    )
+    coder2_labels = merged[CLERICALLY_CODED_SOC_CODER2_COL].apply(
+        lambda x, digits=soc_digit_count: soc_label_at_digits(x, n_digits=digits)
+    )
+    either_uncodable = (coder1_labels == UNCODABLE_LABEL) | (
+        coder2_labels == UNCODABLE_LABEL
+    )
+    agree = (coder1_labels == coder2_labels) & ~either_uncodable
+    level_label = next(
+        label for digits, label in SOC_CODABILITY_LEVELS if digits == soc_digit_count
+    )
+    newly_resolved = agree & ~already_resolved
+    soc_codability[newly_resolved] = level_label
+    already_resolved = already_resolved | newly_resolved
+merged["soc_codability_level"] = soc_codability
+
 
 n_unmatched = merged["sic_codability_level"].isna().sum()
 if n_unmatched:
@@ -804,52 +799,49 @@ def run_sa_comparison(  # noqa: PLR0913  # pylint: disable=too-many-arguments,to
     top = max(digit_levels)
     summary = []
     full = pd.DataFrame()
-    _code_standard_logger.setLevel(logging.ERROR)
-    try:
-        for n in sorted(digit_levels, reverse=True):
-            truth = build_truth(n)
-            model = prep_model_codes(
-                sa,
-                codes_col=codes_col,
-                alt_codes_col=None,
-                code_type=code_type,
-                digits=n,
-                out_col="model_codes",
+
+    for n in sorted(digit_levels, reverse=True):
+        truth = build_truth(n)
+        model = prep_model_codes(
+            sa,
+            codes_col=codes_col,
+            alt_codes_col=None,
+            code_type=code_type,
+            digits=n,
+            out_col="model_codes",
+        )
+        combined = truth.merge(model, on="unique_id", how="inner")
+        n_missing = len(truth) - len(combined)
+        if n_missing:
+            print(
+                f"⚠️  {n_missing} clerical rows had no matching Survey Assist "
+                f"{code_type} record (ID mismatch) - excluded from this comparison."
             )
-            combined = truth.merge(model, on="unique_id", how="inner")
-            n_missing = len(truth) - len(combined)
-            if n_missing:
-                print(
-                    f"⚠️  {n_missing} clerical rows had no matching Survey Assist "
-                    f"{code_type} record (ID mismatch) - excluded from this comparison."
-                )
-            metrics = calc_simple_metrics(
-                combined,
-                truth_col="clerical_codes",
-                initial_model_col="model_codes",
-                final_model_col=None,
-            )
-            summary.append(
-                {
-                    "digits": n,
-                    "n_records": len(combined),
-                    "f1": round(metrics.ambiguity_metrics.f1, 4),
-                    "sa_codability": round(
-                        metrics.codability_metrics.initial_codable_prop, 4
-                    ),
-                    "MM_accuracy": round(
-                        metrics.initial_accuracy_metrics.accuracy_mm_total, 4
-                    ),
-                    "OO_accuracy": round(
-                        metrics.initial_accuracy_metrics.accuracy_oo_unambiguous, 4
-                    ),
-                }
-            )
-            if n == top:
-                print(metrics.report_metrics())
-                full = combined
-    finally:
-        _code_standard_logger.setLevel(_previous_log_level)
+        metrics = calc_simple_metrics(
+            combined,
+            truth_col="clerical_codes",
+            initial_model_col="model_codes",
+            final_model_col=None,
+        )
+        summary.append(
+            {
+                "digits": n,
+                "n_records": len(combined),
+                "f1": round(metrics.ambiguity_metrics.f1, 4),
+                "sa_codability": round(
+                    metrics.codability_metrics.initial_codable_prop, 4
+                ),
+                "MM_accuracy": round(
+                    metrics.initial_accuracy_metrics.accuracy_mm_total, 4
+                ),
+                "OO_accuracy": round(
+                    metrics.initial_accuracy_metrics.accuracy_oo_unambiguous, 4
+                ),
+            }
+        )
+        if n == top:
+            print(metrics.report_metrics())
+            full = combined
 
     print(f"\nSurvey Assist vs clerical truth, by {code_type} digit level:")
     print(pd.DataFrame(summary).to_string(index=False))
