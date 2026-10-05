@@ -120,6 +120,35 @@ def test_get_rank_of_first_matching_code_returns_none_when_code_not_found():
     )
 
 
+@pytest.mark.parametrize(
+    "retrieved_codes,correct_codes,expected_rank",
+    [
+        (["1111", "2222"], "2222", 2),
+        (["1111", "2222"], "3333", 3),
+        ([], "3333", 1),
+    ],
+    ids=["match_found", "not_found", "empty_retrieval"],
+)
+def test_get_rank_of_first_matching_code_penalises_when_not_found(
+    retrieved_codes, correct_codes, expected_rank
+):
+    """Penalisation should use one rank beyond the retrieved list when unmatched."""
+    rank = get_rank_of_first_matching_code(
+        retrieved_codes, correct_codes, penalise_if_not_found=True
+    )
+
+    assert rank == expected_rank
+
+
+def test_get_rank_of_first_matching_code_does_not_penalise_missing_ground_truth():
+    """Missing ground truth should remain None even when penalisation is enabled."""
+    rank = get_rank_of_first_matching_code(
+        ["1111", "2222"], None, penalise_if_not_found=True
+    )
+
+    assert rank is None
+
+
 def test_get_rank_of_first_matching_code_returns_none_when_list_has_no_match():
     """Rank should be None when no codes in the list are found."""
     rank = get_rank_of_first_matching_code(["1111", "2222", "3333"], ["4444", "5555"])
@@ -164,6 +193,7 @@ def test_get_rank_of_first_matching_code_with_none_in_retrieved(
         (["1111"], "1111", 1),
         (["2222"], "1111", None),
         ([None], "1111", None),
+        ([None, "2222", "1111"], [None, "2222"], 2),
     ],
     ids=[
         "empty_with_string",
@@ -172,6 +202,7 @@ def test_get_rank_of_first_matching_code_with_none_in_retrieved(
         "single_match",
         "single_no_match",
         "single_none",
+        "single_none_with_none_correct_codes",
     ],
 )
 def test_get_rank_of_first_matching_code_with_empty_or_single_element(
