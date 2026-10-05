@@ -66,7 +66,6 @@ SA_SIC_DATA_PATH = (
 )
 SA_SIC_ID_COL = "Unique_identifier"
 SA_SIC_CODES_COL = "initial_code"
-SA_SIC_ALT_CODES_COL = "alt_sic_candidates"
 
 SIGNIFICANCE_LEVEL = 0.05
 
@@ -707,19 +706,27 @@ def _max_candidate_likelihood(candidates: object) -> float:
     return max(likelihoods) if likelihoods else float("nan")
 
 
-def blank_low_confidence_initial_code(  # pylint: disable=too-many-arguments
+def blank_low_confidence_initial_code(  # pylint: disable=too-many-arguments,too-many-positional-arguments  # noqa: PLR0913
     df: pd.DataFrame,
     codes_col: str,
     alt_codes_col: str,
     likelihood_col: str | None,
     label: str,
+    apply_threshold: bool = True,
 ) -> pd.DataFrame:
     """Blank `codes_col` wherever its likelihood is below
     SA_CODABILITY_CONFIDENCE_THRESHOLD or missing (i.e. not unambiguously codable).
 
     The likelihood is read from `likelihood_col` when present (one-prompt
     pipeline), otherwise from the best `alt_codes_col` candidate likelihood.
+
+    When apply_threshold=False (e.g., for SIC), codes are not blanked based on
+    confidence thresholds; only returned as-is.
     """
+    if not apply_threshold:
+        # For code types like SIC with different strategies, return as-is
+        return df
+
     if likelihood_col is not None and likelihood_col in df.columns:
         confidence = pd.to_numeric(df[likelihood_col], errors="coerce")
         source = likelihood_col
@@ -765,6 +772,7 @@ def run_sa_comparison(  # noqa: PLR0913  # pylint: disable=too-many-arguments,to
     group_label,  # set -> str, for the distribution table
     group_name: str,
     sort_distribution: bool = False,
+    apply_threshold: bool = True,
 ) -> None:
     """Compare Survey Assist initial codes with clerical truth by digit level."""
     title = f"SURVEY ASSIST {code_type} PERFORMANCE COMPARISON"
@@ -793,6 +801,7 @@ def run_sa_comparison(  # noqa: PLR0913  # pylint: disable=too-many-arguments,to
         alt_codes_col,
         likelihood_col=likelihood_col,
         label=f"Survey Assist {code_type}",
+        apply_threshold=apply_threshold,
     )
 
     # Run performance evaluation with INITIAL_CODE only
@@ -991,13 +1000,14 @@ run_sa_comparison(
     sa_path=SA_SIC_DATA_PATH,
     sa_id_col=SA_SIC_ID_COL,
     codes_col=SA_SIC_CODES_COL,
-    alt_codes_col=SA_SIC_ALT_CODES_COL,
+    alt_codes_col=None,
     likelihood_col=None,
     digit_levels=SIC_DIGIT_LEVELS,
     build_truth=build_sic_truth,
     group_label=sic_section_label,
     group_name="SIC section",
     sort_distribution=True,
+    apply_threshold=False,
 )
 
 print("\n✓ Analysis complete!")
