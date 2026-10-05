@@ -17,7 +17,7 @@ from src.survey_assist_eval.pipeline.shared_components import _read_json
 GRID_SIZE = 10  # grid granuality (should be same as in TEST_FOLDER)
 TEST_FOLDER = "weights_grid_10_2k_sic_kb"
 LOCAL_DIR = f"data/sayt/{TEST_FOLDER}/"
-USE_BUCKET = False
+USE_BUCKET = True
 SAVE_PLOT = True
 
 os.makedirs(LOCAL_DIR, exist_ok=True)
