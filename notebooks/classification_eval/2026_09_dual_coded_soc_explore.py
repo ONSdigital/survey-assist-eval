@@ -327,6 +327,7 @@ TEXT_COL_PAIRS = {
         "soc2020_job_description_main_job",
         "soc2020_job_description",
     ),
+    "industry": ("sic2007_employed_main_job", TWO_K_SIC_COL),
 }
 
 
