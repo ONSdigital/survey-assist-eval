@@ -1,309 +1,365 @@
-"""Correct codes can appear multple times.
-AP_all is Average Precision (AP) calculated over all retrieved correct codes.
-AP is Average Precision (AP) calculated over the first retrieved of each correct code only.
-    We do bounded AP by letting the denominator be min(k, number of correct codes).
-Average Reciprocal Rank of Correct codes (ARR)
-Binary Normalised Discounted Cumulative Gain (NDCG)
-    Demoninator for NDCG will be the ideal DCG, which is the DCG value when
-    all correct codes are ranked at the top. This is defined per example and is
-    IDCG.
-"""
+"""Tests for additional performance metrics functions."""
 
-# pylint: disable=C0103
+# pylint: disable=redefined-outer-name
 
 import math
 
-####################
-# Single Clerical Code
-####################
-correct_code = ["code1"]
-"""
-All retrieved codes are of length 8
-AP_demonimator = min(len(correct_code), len(retrieved codes)) = 1
+import pytest
 
+from survey_assist_eval.evaluation.sayt.performance_metrics_functions import (
+    compute_normalized_discounted_cumulative_gain_at_k,
+    compute_reciprocal_rank_of_final_correct_code,
+)
 
-IDCG = (1/math.log2(2)) = 1
-"""
-IDCG = 1 / math.log2(2)
-
-retrieved_codes_1 = [
-    "code1",
-    "incorrect_code",
-    "incorrect_code",
-    "incorrect_code",
-    "incorrect_code",
-    "incorrect_code",
-    "incorrect_code",
-    "incorrect_code",
-    "incorrect_code",
+EXAMPLE_CASES = [
+    pytest.param(
+        {
+            "ranks_by_code_dict": {"1111": [1], "2222": [2]},
+            "k": 5,
+            "total_relevant_ranks": 2,
+            "rr_final_code": 1 / 2,
+            "ndcg_at_k": 1.0,
+            "ndcg_all_at_k": 1.0,
+        },
+        id="perfect_ranking",
+    ),
+    pytest.param(
+        {
+            "ranks_by_code_dict": {"1111": [3]},
+            "k": 5,
+            "total_relevant_ranks": 1,
+            "rr_final_code": 1 / 3,
+            "ndcg_at_k": 0.5,
+            "ndcg_all_at_k": 0.5,
+        },
+        id="single-code-at-later-rank",
+    ),
+    pytest.param(
+        {
+            "ranks_by_code_dict": {"1111": [2], "2222": [4]},
+            "k": 5,
+            "total_relevant_ranks": 2,
+            "rr_final_code": 1 / 4,
+            "ndcg_at_k": (1 / math.log2(3) + 1 / math.log2(5))
+            / sum(1 / math.log2(i + 1) for i in range(1, 3)),
+            "ndcg_all_at_k": (1 / math.log2(3) + 1 / math.log2(5))
+            / sum(1 / math.log2(i + 1) for i in range(1, 3)),
+        },
+        id="multiple-distinct-codes",
+    ),
+    pytest.param(
+        {
+            "ranks_by_code_dict": {"1111": [4, 1], "2222": [3]},
+            "k": 5,
+            "total_relevant_ranks": 3,
+            "rr_final_code": 1 / 3,
+            "ndcg_at_k": (1 + 1 / math.log2(4)) / (1 + 1 / math.log2(3)),
+            "ndcg_all_at_k": (1 + 1 / math.log2(4) + 1 / math.log2(5))
+            / (1 + 1 / math.log2(3) + 1 / math.log2(4)),
+        },
+        id="unsorted-ranks-use-earliest-hit-per-code",
+    ),
+    pytest.param(
+        {
+            "ranks_by_code_dict": {"1111": [1, 3], "2222": [4]},
+            "k": 5,
+            "total_relevant_ranks": 3,
+            "rr_final_code": 1 / 4,
+            "ndcg_at_k": (1 + 1 / math.log2(5))
+            / sum(1 / math.log2(i + 1) for i in range(1, 3)),
+            "ndcg_all_at_k": (1 + 1 / math.log2(4) + 1 / math.log2(5))
+            / sum(1 / math.log2(i + 1) for i in range(1, 4)),
+        },
+        id="duplicate-ranks-for-one-code",
+    ),
+    pytest.param(
+        {
+            "ranks_by_code_dict": {"1111": [1], "2222": [5]},
+            "k": 5,
+            "total_relevant_ranks": 2,
+            "rr_final_code": 1 / 5,
+            "ndcg_at_k": (1 + 1 / math.log2(6))
+            / sum(1 / math.log2(i + 1) for i in range(1, 3)),
+            "ndcg_all_at_k": (1 + 1 / math.log2(6))
+            / sum(1 / math.log2(i + 1) for i in range(1, 3)),
+        },
+        id="final_code_at_rank_five",
+    ),
+    pytest.param(
+        {
+            "ranks_by_code_dict": {"1111": [1, 2, 3]},
+            "k": 5,
+            "total_relevant_ranks": 3,
+            "rr_final_code": 1.0,
+            "ndcg_at_k": 1.0,
+            "ndcg_all_at_k": 1.0,
+        },
+        id="single_code_multiple_retrievals",
+    ),
+    pytest.param(
+        {
+            "ranks_by_code_dict": {"1111": [1, 2, 3]},
+            "k": 5,
+            "total_relevant_ranks": 4,
+            "rr_final_code": 1.0,
+            "ndcg_at_k": 1.0,
+            "ndcg_all_at_k": (1 + 1 / math.log2(3) + 1 / math.log2(4))
+            / sum(1 / math.log2(i + 1) for i in range(1, 5)),
+        },
+        id="missing_one_relevant_rank",
+    ),
+    pytest.param(
+        {
+            "ranks_by_code_dict": {
+                "1111": [1],
+                "2222": [2],
+                "3333": [3],
+            },
+            "k": 9,
+            "total_relevant_ranks": 3,
+            "rr_final_code": 1 / 3,
+            "ndcg_at_k": 1.0,
+            "ndcg_all_at_k": 1.0,
+        },
+        id="ideal-ranking-three-distinct-codes",
+    ),
+    pytest.param(
+        {
+            "ranks_by_code_dict": {
+                "1111": [1, 2],
+                "2222": [3],
+                "3333": [4],
+            },
+            "k": 9,
+            "total_relevant_ranks": 4,
+            "rr_final_code": 1 / 4,
+            "ndcg_at_k": (1 + 1 / math.log2(4) + 1 / math.log2(5))
+            / (1 + 1 / math.log2(3) + 1 / math.log2(4)),
+            "ndcg_all_at_k": 1.0,
+        },
+        id="duplicate-suggestion-with-all-codes-found",
+    ),
+    pytest.param(
+        {
+            "ranks_by_code_dict": {
+                "1111": [1],
+                "2222": [8],
+                "3333": [],
+            },
+            "k": 9,
+            "total_relevant_ranks": 3,
+            "rr_final_code": 0.0,
+            "ndcg_at_k": (1 + 1 / math.log2(9))
+            / (1 + 1 / math.log2(3) + 1 / math.log2(4)),
+            "ndcg_all_at_k": (1 + 1 / math.log2(9))
+            / (1 + 1 / math.log2(3) + 1 / math.log2(4)),
+        },
+        id="late-hit-with-one-correct-code-missing",
+    ),
+    pytest.param(
+        {
+            "ranks_by_code_dict": {
+                "1111": [2],
+                "2222": [5],
+                "3333": [7],
+            },
+            "k": 9,
+            "total_relevant_ranks": 3,
+            "rr_final_code": 1 / 7,
+            "ndcg_at_k": (1 / math.log2(3) + 1 / math.log2(6) + 1 / math.log2(8))
+            / (1 + 1 / math.log2(3) + 1 / math.log2(4)),
+            "ndcg_all_at_k": (1 / math.log2(3) + 1 / math.log2(6) + 1 / math.log2(8))
+            / (1 + 1 / math.log2(3) + 1 / math.log2(4)),
+        },
+        id="three-correct-codes-at-spaced-ranks",
+    ),
 ]
 
-"""
-AP_all = (1/1)/1 = 1
-AP = (1/1)/1 = 1
-ARR = 1/1 = 1
-NDCG = (1/math.log2(1 + 1))/IDCG = 1
-"""
-AP_all = 1
-AP = 1
-ARR = 1
-NDCG = 1
+
+@pytest.fixture(params=EXAMPLE_CASES)
+def example_case(request):
+    """Provide one non-empty performance-metric example."""
+    return request.param
 
 
-retrieved_codes_2 = [
-    "incorrect_code",
-    "incorrect_code",
-    "code1",
-    "incorrect_code",
-    "incorrect_code",
-    "incorrect_code",
-    "incorrect_code",
-    "incorrect_code",
-    "incorrect_code",
+EDGE_CASES = [
+    pytest.param(
+        {
+            "ranks_by_code_dict": {},
+            "k": 5,
+            "total_relevant_ranks": 5,
+            # metrics
+            "rr_final_code": 0.0,
+            "ndcg_at_k": 0.0,
+            "ndcg_all_at_k": 0.0,
+        },
+        id="empty_dict",
+    ),
+    pytest.param(
+        {
+            "ranks_by_code_dict": {"1111": []},
+            "k": 5,
+            "total_relevant_ranks": 5,
+            # metrics
+            "rr_final_code": 0.0,
+            "ndcg_at_k": 0.0,
+            "ndcg_all_at_k": 0.0,
+        },
+        id="single_code_no_ranks",
+    ),
+    pytest.param(
+        {
+            "ranks_by_code_dict": {"1111": [], "2222": []},
+            "k": 5,
+            "total_relevant_ranks": 5,
+            # metrics
+            "rr_final_code": 0.0,
+            "ndcg_at_k": 0.0,
+            "ndcg_all_at_k": 0.0,
+        },
+        id="multiple_codes_no_ranks",
+    ),
+    pytest.param(
+        {
+            "ranks_by_code_dict": {"1111": [], "2222": [1, 3]},
+            "k": 5,
+            "total_relevant_ranks": 5,
+            # metrics
+            "rr_final_code": 0.0,
+            "ndcg_at_k": (1 / math.log2(2))
+            / sum(1 / math.log2(i + 1) for i in range(1, 3)),
+            "ndcg_all_at_k": (1 / math.log2(2) + 1 / math.log2(4))
+            / sum(1 / math.log2(i + 1) for i in range(1, 6)),
+        },
+        id="final_code_missing_other_code_found",
+    ),
+    pytest.param(
+        {
+            "ranks_by_code_dict": {"1111": [], "2222": [6]},
+            "k": 5,
+            "total_relevant_ranks": 5,
+            "rr_final_code": 0.0,
+            "ndcg_at_k": 0.0,
+            "ndcg_all_at_k": 0.0,
+        },
+        id="final_code_missing_other_beyond_k",
+    ),
+    pytest.param(
+        {
+            "ranks_by_code_dict": {"1111": [6]},
+            "k": 5,
+            "total_relevant_ranks": 5,
+            "rr_final_code": 1 / 6,
+            "ndcg_at_k": 0.0,
+            "ndcg_all_at_k": 0.0,
+        },
+        id="single_relevant_rank_beyond_k",
+    ),
+    pytest.param(
+        {
+            "ranks_by_code_dict": {"1111": [1, 6]},
+            "k": 5,
+            "total_relevant_ranks": 5,
+            "rr_final_code": 1.0,
+            "ndcg_at_k": 1.0,
+            "ndcg_all_at_k": (1 / math.log2(2))
+            / sum(1 / math.log2(i + 1) for i in range(1, 6)),
+        },
+        id="only_in_cutoff_rank_contributes",
+    ),
+    pytest.param(
+        {
+            "ranks_by_code_dict": {"1111": [6], "2222": [7]},
+            "k": 5,
+            "total_relevant_ranks": 5,
+            "rr_final_code": 1 / 7,
+            "ndcg_at_k": 0.0,
+            "ndcg_all_at_k": 0.0,
+        },
+        id="all_relevant_ranks_beyond_k",
+    ),
 ]
 
-"""
-AP_all = (1/3)/1 = 0.3333333333333333
-AP = (1/3)/1 = 0.3333333333333333
-ARR = (1/3)/1 = 0.3333333333333333
-NDCG = (1/math.log2(1 + 3))/IDCG = 0.23463936301137822
-"""
-AP_all = 0.3333333333333333
-AP = 0.3333333333333333
-ARR = 0.3333333333333333
-NDCG = 0.23463936301137822
+
+@pytest.fixture(params=EDGE_CASES)
+def edge_case(request):
+    """Provide one empty-input or cutoff edge case."""
+    return request.param
 
 
-####################
-# Multiple Clerical Codes
-####################
-correct_codes = ["code1", "code2", "code3"]
-"""
-All retrieved codes are of length 8
-AP_demonimator = min(len(correct_code), len(retrieved codes)) = 3
-AP_all_denominator
+# ============================================================================
+# Test compute_reciprocal_rank_of_final_correct_code function
+# ============================================================================
+def test_compute_reciprocal_rank_of_final_correct_code_with_examples(example_case):
+    """Check final-code reciprocal rank for representative examples."""
+    reciprocal_rank = compute_reciprocal_rank_of_final_correct_code(
+        example_case["ranks_by_code_dict"]
+    )
 
-IDCG = (1/math.log2(1 + 1) + 1/math.log2(1 + 2) + 1/math.log2(1 + 3))
-     = 2.13093
-"""
-IDCG2 = 1 / math.log2(2) + 1 / math.log2(3) + 1 / math.log2(4)
-
-retrieved_codes_1 = [
-    "code1",
-    "code2",
-    "code3",
-    "incorrect_code",
-    "incorrect_code",
-    "incorrect_code",
-    "incorrect_code",
-    "incorrect_code",
-    "incorrect_code",
-]
-
-"""
-AP_all = (1/1 + 2/2 + 3/3)/3 = 1
-AP = (1/1 + 2/2 + 3/3)/3 = 1
-ARR = 1/1 + 1/2 + 1/3)/3 = 0.6111111111111111
-NDCG = (1/math.log2(1 + 1) + 1/math.log2(1 + 2) + 1/math.log2(1 + 3))/IDCG2 = 1
-"""
-AP_all = 1
-AP = 1
-ARR = 0.6111111111111111
-NDCG = 1
+    assert reciprocal_rank == pytest.approx(example_case["rr_final_code"])
 
 
-retrieved_codes_2 = [
-    "code1",
-    "code1",
-    "code2",
-    "code3",
-    "incorrect_code",
-    "incorrect_code",
-    "incorrect_code",
-    "incorrect_code",
-    "incorrect_code",
-]
+def test_compute_reciprocal_rank_of_final_correct_code_with_edge_cases(
+    edge_case,
+):
+    """Check final-code reciprocal rank for empty and boundary cases."""
+    reciprocal_rank = compute_reciprocal_rank_of_final_correct_code(
+        edge_case["ranks_by_code_dict"]
+    )
 
-"""
-AP_all = (1/1 + 2/2 + 3/3 + 4/4)/4 = 1
-AP = (1/1 + 2/3 + 3/4)/3 = 0.8055555555555555
-ARR = (1/1 + 1/3 + 1/4)/3 = 0.5277777777777778
-NDCG = (1/math.log2(1 + 1) + 1/math.log2(1 + 3) + 1/math.log2(1 + 4))/IDCG2 = 0.9060254355346823
-"""
-AP_all = 1
-AP = 0.8055555555555555
-ARR = 0.5277777777777778
-NDCG = 0.9060254355346823
+    assert reciprocal_rank == pytest.approx(edge_case["rr_final_code"])
 
 
-retrieved_codes_3 = [
-    "code1",
-    "code1",
-    "code2",
-    "incorrect_code",
-    "incorrect_code",
-    "incorrect_code",
-    "incorrect_code",
-    "incorrect_code",
-    "incorrect_code",
-    "incorrect_code",
-]
+# ============================================================================
+# Test compute_normalized_discounted_cumulative_gain_at_k function
+# ============================================================================
+def test_compute_normalized_discounted_cumulative_gain_at_k_with_examples(
+    example_case,
+):
+    """Check single-hit NDCG@k for representative examples."""
+    ranks_by_code = example_case["ranks_by_code_dict"]
+    ndcg_at_k = compute_normalized_discounted_cumulative_gain_at_k(
+        ranks_by_code, example_case["k"]
+    )
 
-"""
-AP_all = (1/1 + 2/2 + 3/3)/3 = 1
-AP = (1/1 + 2/3)/3 = 0.5555555555555555
-ARR = (1/1 + 1/3 + 0)/3 = 0.4444444444444444
-NDCG = (1/math.log2(1 + 1) + 1/math.log2(1 + 3))/IDCG2 = 0.7039180890341347
-"""
-AP_all = 1
-AP = 0.5555555555555555
-ARR = 0.4444444444444444
-NDCG = 0.7039180890341347
+    assert ndcg_at_k == pytest.approx(example_case["ndcg_at_k"])
 
 
-retrieved_codes_4 = [
-    "code1",
-    "incorrect_code",
-    "incorrect_code",
-    "incorrect_code",
-    "incorrect_code",
-    "incorrect_code",
-    "incorrect_code",
-    "code2",
-    "incorrect_code",
-]
+def test_compute_normalized_discounted_cumulative_gain_at_k_all_with_examples(
+    example_case,
+):
+    """Check all-ranks NDCG@k for representative examples."""
+    ranks_by_code = example_case["ranks_by_code_dict"]
+    ndcg_all_at_k = compute_normalized_discounted_cumulative_gain_at_k(
+        ranks_by_code,
+        example_case["k"],
+        include_all_relevant_ranks=True,
+        total_relevant_ranks=example_case["total_relevant_ranks"],
+    )
 
-"""
-AP_all = (1/1 + 2/8)/2 = 0.625
-AP = (1/1 + 2/8)/3 = 0.4166666666666667
-ARR = (1/1 + 1/8 + 0)/3 = 0.375
-NDCG = (1/math.log2(1 + 1) + 1/math.log2(1 + 8))/IDCG2 = 0.617319681505689
-"""
-AP_all = 0.625
-AP = 0.4166666666666667
-ARR = 0.375
-NDCG = 0.617319681505689
-
-retrieved_codes_5 = [
-    "incorrect_code",
-    "incorrect_code",
-    "incorrect_code",
-    "incorrect_code",
-    "incorrect_code",
-    "code1",
-    "incorrect_code",
-    "code2",
-    "incorrect_code",
-]
-"""
-AP_all = (1/6 + 2/8)/2 = 0.20833333333333331
-AP = (1/6 + 2/8)/3 = 0.13888888888888887
-ARR = (1/6 + 1/8 + 0)/3 = 0.09722222222222221
-NDCG = (1/math.log2(1 + 6) + 1/math.log2(1 + 8))/IDCG2 = 0.31520141044913487
-"""
-AP_all = 0.20833333333333331
-AP = 0.13888888888888887
-ARR = 0.09722222222222221
-NDCG = 0.31520141044913487
-
-retrieved_codes_6 = [
-    "incorrect_code",
-    "code1",
-    "code2",
-    "code3",
-    "incorrect_code",
-    "incorrect_code",
-    "incorrect_code",
-    "incorrect_code",
-    "incorrect_code",
-]
-"""
-AP_all = (1/2 + 2/3 + 3/4)/3 = 0.6388888888888888
-AP = (1/2 + 2/3 + 3/4)/3 = 0.6388888888888888
-ARR = (1/2 + 1/3 + 1/4)/3 = 0.3611111111111111
-NDCG = (1/math.log2(1 + 2) + 1/math.log2(1 + 3) + 1/math.log2(1 + 4))/IDCG2 = 0.7328286204777911
-"""
-AP_all = 0.6388888888888888
-AP = 0.6388888888888888
-ARR = 0.3611111111111111
-NDCG = 0.7328286204777911
-
-retrieved_codes_7 = [
-    "incorrect_code",
-    "code1",
-    "incorrect_code",
-    "incorrect_code",
-    "code2",
-    "incorrect_code",
-    "code3",
-    "incorrect_code",
-    "incorrect_code",
-]
-"""
-AP_all = (1/2 + 2/5 + 3/7)/3 = 0.44285714285714284
-AP = (1/2 + 2/5 + 3/7)/3 = 0.44285714285714284
-ARR = (1/2 + 1/5 + 1/7)/3 = 0.2809523809523809
-NDCG = (1/math.log2(1 + 2) + 1/math.log2(1 + 5) + 1/math.log2(1 + 7))/IDCG2 = 0.6131471927654584
-"""
-AP_all = 0.44285714285714284
-AP = 0.44285714285714284
-ARR = 0.2809523809523809
-NDCG = 0.6131471927654584
-
-retrieved_codes_8 = [
-    "incorrect_code",
-    "incorrect_code",
-    "incorrect_code",
-    "incorrect_code",
-    "code2",
-    "incorrect_code",
-    "code3",
-    "incorrect_code",
-    "incorrect_code",
-]
-"""
-AP_all = (1/5 + 2/7)/2 = 0.24285714285714285
-AP = (1/5 + 2/7)/3 = 0.24285714285714285
-ARR = (0 + 1/5 + 1/7)/3 = 0.11428571428571428
-NDCG = (1/math.log2(1 + 5) + 1/math.log2(1 + 7))/IDCG2 = 0.3379680345449381
-"""
-AP_all = 0.24285714285714285
-AP = 0.24285714285714285
-ARR = 0.11428571428571428
-NDCG = 0.3379680345449381
+    assert ndcg_all_at_k == pytest.approx(example_case["ndcg_all_at_k"])
 
 
-retrieved_codes_9 = [
-    "incorrect_code",
-    "code1",
-    "incorrect_code",
-    "incorrect_code",
-    "code2",
-    "incorrect_code",
-    "incorrect_code",
-    "incorrect_code",
-    "incorrect_code",
-]
-"""
-AP_all = (1/2 + 2/5)/2 = 0.45
-AP = (1/2 + 2/5)/3 = 0.3
-ARR = (1/2 + 1/5 + 0)/3 = 0.2333333333333333
-NDCG = (1/math.log2(1 + 2) + 1/math.log2(1 + 5))/IDCG2 = 0.4776237035032179
-"""
-AP_all = 0.45
-AP = 0.45
-ARR = 0.2333333333333333
-NDCG = 0.4776237035032179
+def test_compute_normalized_discounted_cumulative_gain_at_k_with_edge_cases(
+    edge_case,
+):
+    """Check single-hit NDCG@k for empty and boundary cases."""
+    ndcg_at_k = compute_normalized_discounted_cumulative_gain_at_k(
+        edge_case["ranks_by_code_dict"], edge_case["k"]
+    )
+
+    assert ndcg_at_k == pytest.approx(edge_case["ndcg_at_k"])
 
 
-"""
-Main note is that AP_all will either be higher or the same as AP and will
-perform better when correct codes appear
-multiple times, while MAP focuses only on the first occurrence of each
-correct code.
+def test_compute_normalized_discounted_cumulative_gain_at_k_all_with_edge_cases(
+    edge_case,
+):
+    """Check all-ranks NDCG@k for empty and boundary cases."""
+    ndcg_at_k = compute_normalized_discounted_cumulative_gain_at_k(
+        edge_case["ranks_by_code_dict"],
+        edge_case["k"],
+        include_all_relevant_ranks=True,
+        total_relevant_ranks=edge_case["total_relevant_ranks"],
+    )
 
-Should we segment the groups to 1 relevant item and multiple?
-MAP scales linearly.
-NDCG a missing item at the bottom of the list hurt significantly less
-than a missing item at the top.
-"""
+    assert ndcg_at_k == pytest.approx(edge_case["ndcg_all_at_k"])

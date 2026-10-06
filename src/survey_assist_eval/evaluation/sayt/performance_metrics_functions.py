@@ -269,12 +269,17 @@ def compute_normalized_discounted_cumulative_gain_at_k(
                 "include_all_relevant_ranks is True."
             )
         relevant_ranks = [
-            rank for ranks in correct_codes_ranks_dict.values() for rank in ranks
+            rank
+            for ranks in correct_codes_ranks_dict.values()
+            for rank in ranks
+            if rank <= k
         ]
         ideal_ranks = range(1, min(total_relevant_ranks, k) + 1)
     else:
         relevant_ranks = [
-            min(ranks) for ranks in correct_codes_ranks_dict.values() if ranks
+            min(ranks)
+            for ranks in correct_codes_ranks_dict.values()
+            if ranks and min(ranks) <= k
         ]
         ideal_ranks = range(1, min(len(correct_codes_ranks_dict), k) + 1)
 
