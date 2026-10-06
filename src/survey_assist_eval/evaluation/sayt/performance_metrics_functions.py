@@ -1,5 +1,7 @@
 """Performance metrics functions for SAYT evaluation."""
 
+import math
+
 import pandas as pd
 from pydantic import BaseModel
 
@@ -193,36 +195,6 @@ def compute_reciprocal_rank(
     return 0.0
 
 
-def compute_single_query_mean_rank(
-    correct_codes_ranks_dict: dict[str, list[int]],
-) -> float:
-    """Compute the mean of each correct code's minimum rank for one query.
-
-    Args:
-        correct_codes_ranks_dict: Mapping of each correct code to its retrieved ranks.
-
-    Returns:
-        float: Mean of minimum ranks, excluding codes without ranks (0 if none are available).
-    """
-    minimum_ranks = [min(ranks) for ranks in correct_codes_ranks_dict.values() if ranks]
-    return sum(minimum_ranks) / len(minimum_ranks) if minimum_ranks else 0.0
-
-
-def get_rank_of_final_correct_code(
-    correct_codes_ranks_dict: dict[str, list[int]],
-) -> int:
-    """Get the rank of the final correct code for one query.
-
-    Args:
-        correct_codes_ranks_dict: Mapping of each correct code to its retrieved ranks.
-
-    Returns:
-        int: Rank of the final correct code (0 if none are available).
-    """
-    first_ranks = [min(ranks) for ranks in correct_codes_ranks_dict.values() if ranks]
-    return max(first_ranks) if first_ranks else 0
-
-
 def compute_median_with_none_as_inf(
     values: list[float | None] | pd.Series,
 ) -> float:
@@ -235,6 +207,80 @@ def compute_median_with_none_as_inf(
         The median value, with None treated as infinity.
     """
     return float(pd.Series(values, dtype="float64").fillna(float("inf")).median())
+
+
+def compute_reciprocal_rank_of_final_correct_code(
+    correct_codes_ranks_dict: dict[str, list[int]],
+) -> float:
+    """Compute the reciprocal rank of the final distinct correct code retrieved.
+
+    Uses the first retrieved rank for each correct code, then takes the reciprocal
+    of the latest of those first-hit ranks. Returns 0.0 if any correct code has no
+    retrieved rank.
+
+    Args:
+        correct_codes_ranks_dict: Mapping of each correct code to its retrieved ranks.
+
+    Returns:
+        float: Reciprocal rank of the final correct code, or 0.0 if any code is
+            missing from the retrieved ranks.
+    """
+    if not correct_codes_ranks_dict:
+        return 0.0
+
+    first_ranks = []
+
+    for ranks in correct_codes_ranks_dict.values():
+        if ranks == []:
+            return 0.0
+
+        first_ranks.append(min(ranks))
+
+    return 1 / max(first_ranks) if first_ranks and max(first_ranks) > 0 else 0.0
+
+
+def compute_normalized_discounted_cumulative_gain_at_k(
+    correct_codes_ranks_dict: dict[str, list[int]],
+    k: int,
+    include_all_relevant_ranks: bool = False,
+    total_relevant_ranks: int | None = None,
+) -> float:
+    """Compute NDCG, optionally counting every relevant rank for each code.
+
+    Args:
+        correct_codes_ranks_dict: Mapping of every correct code to its retrieved ranks.
+            An empty rank list means that code was not retrieved.
+        k: The cutoff rank for computing NDCG.
+        include_all_relevant_ranks: Whether to count every matching rank instead of
+            only the first rank for each correct code.
+        total_relevant_ranks: Total relevant ranks for the ideal ranking. Required
+            when include_all_relevant_ranks is True.
+
+    Returns:
+        float: NDCG value (0.0 if no correct codes are retrieved).
+    """
+    if not correct_codes_ranks_dict:
+        return 0.0
+
+    if include_all_relevant_ranks:
+        if total_relevant_ranks is None:
+            raise ValueError(
+                "total_relevant_ranks must be provided when "
+                "include_all_relevant_ranks is True."
+            )
+        relevant_ranks = [
+            rank for ranks in correct_codes_ranks_dict.values() for rank in ranks
+        ]
+        ideal_ranks = range(1, min(total_relevant_ranks, k) + 1)
+    else:
+        relevant_ranks = [
+            min(ranks) for ranks in correct_codes_ranks_dict.values() if ranks
+        ]
+        ideal_ranks = range(1, min(len(correct_codes_ranks_dict), k) + 1)
+
+    dcg = sum(1 / math.log2(rank + 1) for rank in relevant_ranks)
+    idcg = sum(1 / math.log2(rank + 1) for rank in ideal_ranks)
+    return dcg / idcg if idcg > 0 else 0.0
 
 
 def add_sayt_metrics_columns(
