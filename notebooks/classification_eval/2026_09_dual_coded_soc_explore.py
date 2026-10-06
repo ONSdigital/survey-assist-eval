@@ -1011,3 +1011,237 @@ run_sa_comparison(
 )
 
 print("\n✓ Analysis complete!")
+
+# %%
+
+# CROSS-MODEL ERROR CORRELATION ANALYSIS
+# Question: when Survey Assist is wrong in SOC, is it more likely wrong in SIC?
+
+print(f"\n{'='*70}")
+print("CROSS-MODEL ERROR CORRELATION ANALYSIS")
+print(f"{'='*70}")
+
+SOC_TOP_DIGITS = max(SOC_DIGIT_LEVELS)
+SIC_TOP_DIGITS = max(SIC_DIGIT_LEVELS)
+
+
+def load_sa_output(
+    path: str, id_col: str, codes_col: str, alt_codes_col: str | None, **blank_kwargs
+) -> pd.DataFrame:
+    """Read a Survey Assist parquet, standardise IDs and apply confidence blanking."""
+    sa = pd.read_parquet(path, dtype_backend="numpy_nullable").rename(
+        columns={id_col: TWO_K_ID_COL}
+    )
+    sa[TWO_K_ID_COL] = sa[TWO_K_ID_COL].astype(str)
+
+    return blank_low_confidence_initial_code(
+        sa, codes_col, alt_codes_col, **blank_kwargs
+    )
+
+
+def score_records(
+    truth: pd.DataFrame, model: pd.DataFrame, prefix: str
+) -> pd.DataFrame:
+    """Per-record match / answered / truth-codable flags for one code type."""
+    combined = truth.merge(model, on="unique_id", how="inner")
+    answered = combined["model_codes"].apply(len) == 1
+
+    return pd.DataFrame(
+        {
+            "unique_id": combined["unique_id"],
+            f"{prefix}_match": answered
+            & combined.apply(
+                lambda row: row["model_codes"] <= row["clerical_codes"], axis=1
+            ),
+            f"{prefix}_answered": answered,
+            f"{prefix}_truth_codable": combined["clerical_codes"].apply(len) > 0,
+        }
+    )
+
+
+# SOC: adjudicated consensus code vs Survey Assist (low-confidence codes blanked)
+
+soc_truth = prep_clerical_codes(
+    truth_input_df,
+    clerical_col="consensus_code",
+    code_type="SOC",
+    digits=SOC_TOP_DIGITS,
+    out_col="clerical_codes",
+)
+
+soc_model = prep_model_codes(
+    load_sa_output(
+        SA_DATA_PATH,
+        SA_SOC_ID_COL,
+        SA_SOC_CODES_COL,
+        SA_SOC_ALT_CODES_COL,
+        likelihood_col=SA_SOC_LIKELIHOOD_COL,
+        label="Survey Assist SOC",
+        apply_threshold=True,
+    ),
+    codes_col=SA_SOC_CODES_COL,
+    alt_codes_col=None,
+    code_type="SOC",
+    digits=SOC_TOP_DIGITS,
+    out_col="model_codes",
+)
+
+soc_scores = score_records(soc_truth, soc_model, "soc")
+
+
+# SIC: 2k clerical candidate codes vs Survey Assist (used as is, no threshold)
+
+sic_model = prep_model_codes(
+    load_sa_output(
+        SA_SIC_DATA_PATH,
+        SA_SIC_ID_COL,
+        SA_SIC_CODES_COL,
+        None,
+        likelihood_col=None,
+        label="Survey Assist SIC",
+        apply_threshold=False,
+    ),
+    codes_col=SA_SIC_CODES_COL,
+    alt_codes_col=None,
+    code_type="SIC",
+    digits=SIC_TOP_DIGITS,
+    out_col="model_codes",
+)
+
+sic_scores = score_records(build_sic_truth(SIC_TOP_DIGITS), sic_model, "sic")
+cross_analysis = soc_scores.merge(sic_scores, on="unique_id", how="inner")
+
+print(
+    f"\nCombined dataset: {len(cross_analysis)} records with both SOC and SIC "
+    f"results (SOC {SOC_TOP_DIGITS}-digit, SIC {SIC_TOP_DIGITS}-digit)"
+)
+
+
+def report_cross_errors(  # pylint: disable=too-many-locals
+    df: pd.DataFrame, label: str
+) -> None:
+    """Contingency table, conditional error rates, effect sizes and tests."""
+    print(f"\n{'-'*70}")
+    print(f"{label} (n={len(df)})")
+    print(f"{'-'*70}")
+
+    if df.empty:
+        print("No records.")
+        return
+
+    soc_wrong = ~df["soc_match"].astype(bool)
+    sic_wrong = ~df["sic_match"].astype(bool)
+
+    # Rows/columns fixed as [wrong, correct] so labels never shift
+
+    table = pd.crosstab(soc_wrong, sic_wrong).reindex(
+        index=[True, False], columns=[True, False], fill_value=0
+    )
+    table.index = ["SOC wrong", "SOC correct"]
+    table.columns = ["SIC wrong", "SIC correct"]
+    both_wrong, soc_only_wrong = table.iloc[0]
+    sic_only_wrong, both_correct = table.iloc[1]
+
+    print("\nContingency table:")
+    print(table.assign(All=table.sum(axis=1)).to_string())
+    print("\nRow percentages (given SOC result, % of SIC results):")
+    print((table.div(table.sum(axis=1), axis=0) * 100).round(1).to_string())
+
+    n = len(df)
+    print("\nError pattern distribution:")
+
+    for name, count in [
+        ("Both correct", both_correct),
+        ("Both wrong", both_wrong),
+        ("SOC only wrong", soc_only_wrong),
+        ("SIC only wrong", sic_only_wrong),
+    ]:
+
+        print(f"  {name + ':':<16}{count:5d} ({100 * count / n:5.1f}%)")
+
+    n_soc_wrong = both_wrong + soc_only_wrong
+    n_soc_correct = sic_only_wrong + both_correct
+
+    if n_soc_wrong == 0 or n_soc_correct == 0:
+
+        print("\nSOC is all correct or all wrong - cannot compare SIC error rates.")
+
+        return
+
+    p_sic_wrong_given_soc_wrong = both_wrong / n_soc_wrong
+    p_sic_wrong_given_soc_correct = sic_only_wrong / n_soc_correct
+
+    print("\nConditional error probabilities:")
+    print(f"  P(SIC wrong | SOC wrong)   = {p_sic_wrong_given_soc_wrong:.1%}")
+    print(f"  P(SIC wrong | SOC correct) = {p_sic_wrong_given_soc_correct:.1%}")
+    print(f"  P(SIC wrong) overall       = {sic_wrong.mean():.1%}")
+    print("\nEffect size:")
+
+    risk_difference = p_sic_wrong_given_soc_wrong - p_sic_wrong_given_soc_correct
+
+    print(f"  Risk difference = {risk_difference:+.1%} points")
+
+    if p_sic_wrong_given_soc_correct > 0:
+
+        relative_risk = p_sic_wrong_given_soc_wrong / p_sic_wrong_given_soc_correct
+
+        print(
+            f"  Relative risk   = {relative_risk:.2f}x "
+            f"(SIC is {abs(relative_risk - 1):.0%} "
+            f"{'more' if relative_risk >= 1 else 'less'} likely to be wrong "
+            "when SOC is wrong than when SOC is correct)"
+        )
+
+    if soc_wrong.nunique() > 1 and sic_wrong.nunique() > 1:
+        phi = np.corrcoef(soc_wrong, sic_wrong)[0, 1]
+        print(f"  Phi correlation = {phi:.3f}")
+
+    if (table.sum(axis=0) == 0).any():
+        print("\nSIC is all correct or all wrong - cannot test association.")
+        return
+
+    chi2, chi2_p, dof, expected = chi2_contingency(table)
+
+    print("\nTests for independence:")
+    print(f"  Chi-square: chi2={chi2:.2f}, dof={dof}, p={chi2_p:.4g}")
+
+    if expected.min() < 5:  # noqa: PLR2004
+        print(
+            "  (Expected count < 5 in some cells - chi-square result may be unreliable.)"
+        )
+
+    if chi2_p >= SIGNIFICANCE_LEVEL:
+        print(
+            f"=> No significant association between SOC and SIC errors "
+            f"(p >= {SIGNIFICANCE_LEVEL})."
+        )
+
+    else:
+        print(
+            f"=> SOC and SIC errors are significantly associated (p < "
+            f"{SIGNIFICANCE_LEVEL})."
+        )
+
+
+report_cross_errors(cross_analysis, "ALL RECORDS")
+
+# Genuine misses only: model gave one code for both, truth codable for both.
+
+strict_mask = cross_analysis[
+    ["soc_answered", "sic_answered", "soc_truth_codable", "sic_truth_codable"]
+].all(axis=1)
+
+print(
+    f"\nStrict subset keeps {strict_mask.sum()} of {len(cross_analysis)} records "
+    f"(dropped: {(~cross_analysis['soc_answered']).sum()} SOC not answered, "
+    f"{(~cross_analysis['sic_answered']).sum()} SIC not answered, "
+    f"{(~cross_analysis['soc_truth_codable']).sum()} SOC truth uncodable, "
+    f"{(~cross_analysis['sic_truth_codable']).sum()} SIC truth uncodable; "
+    "categories overlap)"
+)
+report_cross_errors(
+    cross_analysis[strict_mask],
+    "STRICT: model answered both, clerical truth codable for both",
+)
+
+print("\n✓ Cross-model analysis complete!")
