@@ -634,7 +634,7 @@ for char in characters_list:
     data_by_character[char] = data_weights
 
 # %%
-score_metric_label = "mean_rank"
+score_metric_label = "mrr"
 k_value = 1
 
 faceted_plot = generate_faceted_heatmap(
@@ -669,7 +669,7 @@ def get_best_scores_values(data: dict, metric: str, k: str | None = None):
 # %%
 # Mean square - distance from the best performing setup
 
-characters_list = list(range(5, 9))
+characters_list = list(range(5, 10))
 
 y_true = {}
 setup_dict = {}
@@ -731,7 +731,9 @@ msq = pd.DataFrame(
         for column_name in column_names
     }
 )
-
-msq.sort_values("mrr")  # change those depending on which metric you want to use
+print(f"Characters: {characters_list}")
+msq.sort_values("mrr").head(
+    10
+)  # change those depending on which metric you want to use
 
 # %%
