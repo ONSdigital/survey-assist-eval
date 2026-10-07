@@ -593,6 +593,7 @@ def generate_faceted_heatmap(
 # %%
 # Best performing setup for each character count
 characters_list = list(range(4, 10))
+metric_to_check = "mrr"
 for char in characters_list:
     data_weights = get_weight_by_char_dicts(
         characters=char,
@@ -601,8 +602,10 @@ for char in characters_list:
         local_path=LOCAL_DIR,
     )
 
-    mrr_score, best_dict = find_best_performing_setup(data=data_weights, metric="mrr")
-    print(f"Best MRR for {char} characters: {mrr_score}")
+    metric_score, best_dict = find_best_performing_setup(
+        data=data_weights, metric=metric_to_check
+    )
+    print(f"Best score for {char} characters using {metric_to_check}: {metric_score}")
     print(f"Best setup for {char} characters: {best_dict.keys()}\n")
 
 # %%
