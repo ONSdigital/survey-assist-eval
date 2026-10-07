@@ -63,6 +63,28 @@ def get_weight_by_char_dicts(
 
 
 # %%
+def get_best_scores_values(data: dict, metric: str, k: str | None = None):
+    """Return the best score for a metric, optionally at a cutoff.
+
+    Args:
+        data: Results keyed by setup, with metric scores and optional cutoff scores.
+        metric: Metric name to compare, such as ``mrr`` or ``recall_at_k``.
+        k: Cutoff key required for precision and recall metrics.
+
+    Returns:
+        The highest score across all setups for the requested metric.
+    """
+    if metric in ["precision_at_k", "recall_at_k"]:
+        best_score = max(d[metric][k] for d in data.values())
+    elif metric == "mean_rank":
+        best_score = min(d[metric] for d in data.values())
+    else:
+        best_score = max(d[metric] for d in data.values())
+
+    return best_score
+
+
+# %%
 def find_best_performing_setup(data: dict, metric: str, k: str | None = None):
     """Return the highest score and all setups tied at that score.
 
@@ -75,14 +97,11 @@ def find_best_performing_setup(data: dict, metric: str, k: str | None = None):
         A tuple containing the best score and all matching setup results.
     """
     # find best score and those tests that achieved that score
+    best_score = get_best_scores_values(data=data, metric=metric, k=k)
+
     if metric in ["precision_at_k", "recall_at_k"]:
-        best_score = max(d[metric][k] for d in data.values())
         best_dicts = {i: v for i, v in data.items() if v[metric][k] == best_score}
-    elif metric == "mean_rank":
-        best_score = min(d[metric] for d in data.values())
-        best_dicts = {i: v for i, v in data.items() if v[metric] == best_score}
     else:
-        best_score = max(d[metric] for d in data.values())
         best_dicts = {i: v for i, v in data.items() if v[metric] == best_score}
     return best_score, best_dicts
 
@@ -657,29 +676,13 @@ faceted_plot.show()
 
 
 # %%
-def get_best_scores_values(data: dict, metric: str, k: str | None = None):
-    """Return the best score for a metric, optionally at a cutoff.
-
-    Args:
-        data: Results keyed by setup, with metric scores and optional cutoff scores.
-        metric: Metric name to compare, such as ``mrr`` or ``recall_at_k``.
-        k: Cutoff key required for precision and recall metrics.
-
-    Returns:
-        The highest score across all setups for the requested metric.
-    """
-    best_score, _ = find_best_performing_setup(data=data, metric=metric, k=k)
-    return best_score
-
-
-# %%
 # Mean square - distance from the best performing setup
 
 characters_list = list(range(5, 10))
 
 y_true = {}
 setup_dict = {}
-score_metric_labels = ["mrr", "precision_at_k", "recall_at_k"]
+score_metric_labels = ["mrr", "precision_at_k", "recall_at_k", "mean_rank"]
 k_values = ["3", "5", "9"]
 column_names = []
 
