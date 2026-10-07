@@ -173,6 +173,18 @@ EXAMPLE_CASES = [
         },
         id="three-correct-codes-at-spaced-ranks",
     ),
+    pytest.param(
+        {
+            "ranks_by_code_dict": {"1111": [1, 6], "2222": [3]},
+            "k": 5,
+            "total_relevant_ranks": 7,
+            "rr_final_code": 1 / 3,
+            "ndcg_at_k": (1 + 1 / math.log2(4)) / (1 + 1 / math.log2(3)),
+            "ndcg_all_at_k": (1 + 1 / math.log2(4))
+            / sum(1 / math.log2(i + 1) for i in range(1, 6)),
+        },
+        id="total-relevant-ranks-exceed-k",
+    ),
 ]
 
 
