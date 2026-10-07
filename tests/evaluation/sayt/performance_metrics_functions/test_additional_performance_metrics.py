@@ -1,14 +1,17 @@
-"""Tests for additional performance metrics functions."""
+"""Tests for additional performance metrics functions in performance_metrics_functions."""
 
 # pylint: disable=redefined-outer-name
 
 import math
 
+import pandas as pd
 import pytest
 
 from survey_assist_eval.evaluation.sayt.performance_metrics_functions import (
     compute_normalized_discounted_cumulative_gain_at_k,
     compute_reciprocal_rank_of_final_correct_code,
+    get_sayt_corpus_code_counts,
+    get_total_relevant_ranks,
 )
 
 EXAMPLE_CASES = [
@@ -375,3 +378,77 @@ def test_compute_normalized_discounted_cumulative_gain_at_k_all_with_edge_cases(
     )
 
     assert ndcg_at_k == pytest.approx(edge_case["ndcg_all_at_k"])
+
+
+def test_compute_normalized_discounted_cumulative_gain_at_k_all_requires_total_relevant_ranks():
+    """All-ranks NDCG requires the corpus total used to form its ideal ranking."""
+    with pytest.raises(
+        ValueError,
+        match="total_relevant_ranks must be provided",
+    ):
+        compute_normalized_discounted_cumulative_gain_at_k(
+            {"1111": [1]},
+            k=5,
+            include_all_relevant_ranks=True,
+        )
+
+
+# ============================================================================
+# Test get_total_relevant_ranks function
+# ============================================================================
+
+
+def test_get_total_relevant_ranks_sums_counts_for_correct_codes():
+    """The helper should sum corpus counts for all correct codes."""
+    total = get_total_relevant_ranks(
+        ["1111", "2222", "3333"],
+        {"1111": 3, "2222": 2, "3333": 1},
+    )
+
+    assert total == 6
+
+
+@pytest.mark.parametrize(
+    "correct_codes,total_relevant_ranks_dict,expected_total",
+    [
+        (["1111", "2222"], {"1111": 4}, 4),
+        (["1111"], None, 0),
+        ([], {"1111": 4}, 0),
+    ],
+    ids=[
+        "missing-code-count-defaults-to-zero",
+        "none-counts-dictionary",
+        "no-correct-codes",
+    ],
+)
+def test_get_total_relevant_ranks_handles_partial_or_missing_counts(
+    correct_codes, total_relevant_ranks_dict, expected_total
+):
+    """Missing counts contribute zero while available counts are still summed."""
+    assert (
+        get_total_relevant_ranks(correct_codes, total_relevant_ranks_dict)
+        == expected_total
+    )
+
+
+# ============================================================================
+# Test get_sayt_corpus_code_counts function
+# ============================================================================
+
+
+def test_get_sayt_corpus_code_counts_counts_each_code_in_given_column():
+    """The helper should count repeated values from the requested corpus column."""
+    corpus_df = pd.DataFrame(
+        {"clean_code": ["1111", "2222", "1111", "3333", "2222", "1111"]}
+    )
+
+    counts = get_sayt_corpus_code_counts(corpus_df, code_col="clean_code")
+
+    assert counts == {"1111": 3, "2222": 2, "3333": 1}
+
+
+def test_get_sayt_corpus_code_counts_returns_empty_dict_for_empty_column():
+    """An empty corpus column should produce no code counts."""
+    corpus_df = pd.DataFrame({"code": pd.Series(dtype=str)})
+
+    assert get_sayt_corpus_code_counts(corpus_df, code_col="code") == {}
