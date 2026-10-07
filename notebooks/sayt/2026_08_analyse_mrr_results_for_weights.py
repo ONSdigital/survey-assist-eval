@@ -76,12 +76,15 @@ def find_best_performing_setup(data: dict, metric: str, k: str | None = None):
     """
     # find best score and those tests that achieved that score
     if metric in ["precision_at_k", "recall_at_k"]:
-        max_score = max(d[metric][k] for d in data.values())
-        best_dics = {i: v for i, v in data.items() if v[metric][k] == max_score}
+        best_score = max(d[metric][k] for d in data.values())
+        best_dicts = {i: v for i, v in data.items() if v[metric][k] == best_score}
+    elif metric == "mean_rank":
+        best_score = min(d[metric] for d in data.values())
+        best_dicts = {i: v for i, v in data.items() if v[metric] == best_score}
     else:
-        max_score = max(d[metric] for d in data.values())
-        best_dics = {i: v for i, v in data.items() if v[metric] == max_score}
-    return max_score, best_dics
+        best_score = max(d[metric] for d in data.values())
+        best_dicts = {i: v for i, v in data.items() if v[metric] == best_score}
+    return best_score, best_dicts
 
 
 # %%
@@ -662,8 +665,8 @@ def get_best_scores_values(data: dict, metric: str, k: str | None = None):
     Returns:
         The highest score across all setups for the requested metric.
     """
-    highest_score, _ = find_best_performing_setup(data=data, metric=metric, k=k)
-    return highest_score
+    best_score, _ = find_best_performing_setup(data=data, metric=metric, k=k)
+    return best_score
 
 
 # %%
