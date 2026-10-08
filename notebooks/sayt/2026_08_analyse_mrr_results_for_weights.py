@@ -108,7 +108,7 @@ def find_best_performing_setup(data: dict, metric: str, k: str | None = None):
 
 # %%
 def get_ranked_setups(data: dict):
-    """Get all tests orgered descending by MRR score.
+    """Get all tests ordered descending by MRR score.
 
     Args:
         data (dict): A dictionary containing the test results with MRR scores.
@@ -410,7 +410,7 @@ def _prepare_faceted_heatmap_data(
 
     Args:
         character_weight_results (dict[int, dict]): Results keyed by character count.
-        grid_size (int): the granuality of the grid.
+        grid_size (int): the granularity of the grid.
         score_metric (str): Score metric to visualise.
         k (int | None): Rank cutoff used for precision and recall metrics.
 
@@ -545,7 +545,7 @@ def generate_faceted_heatmap(
 
     Args:
         character_weight_results (dict): Weight test results keyed by character count.
-        grid_size (int): the granuality of the grid.
+        grid_size (int): the granularity of the grid.
         score_metric (str): The metric used for assessing the performance.
         k (int | optional): rank k for recall and precision.
 
@@ -697,7 +697,7 @@ for char in characters_list:
             else weights_df[metric_name].max()
         )
 
-        weights_df[f"{metric_name}_msq"] = (
+        weights_df[f"{metric_name}_mse"] = (
             weights_df[metric_name] - metric_best_score
         ) ** 2
 
@@ -714,7 +714,7 @@ character_group_by_char = {
     char: group_name for group_name, chars in character_groups.items() for char in chars
 }
 
-mse_columns = [f"{metric_name}_msq" for metric_name in score_metrics_cols]
+mse_columns = [f"{metric_name}_mse" for metric_name in score_metrics_cols]
 
 means_by_setup = (
     all_weights_df.assign(
@@ -727,7 +727,7 @@ means_by_setup = (
 
 # %%
 means_by_setup[means_by_setup["character_group"] == "low_characters"].sort_values(
-    "mrr_msq"
+    "mrr_mse"
 ).head(
     10
 )  # change those depending on which metric you want to use
