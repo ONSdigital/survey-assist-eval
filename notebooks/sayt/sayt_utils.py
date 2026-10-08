@@ -133,6 +133,7 @@ def build_sayt_corpus_from_df(  # noqa: PLR0913, pylint: disable=R0917,R0913
     """
     output_df = df.copy()
 
+    output_df = output_df.rename(columns={code_col: "code"})
     output_df[code_col] = output_df[code_col].apply(
         lambda x: parse_numerical_code(x, code_type=code_type).pop(),
     )

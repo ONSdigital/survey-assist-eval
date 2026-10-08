@@ -33,6 +33,7 @@ def run_eval_for_suggesters(  # noqa: PLR0913 pylint: disable=R0913, R0914
     suggestions_limit: int = 9,
     hard_suggestions_limit: bool = False,
     only_unambiguous_correct_codes: bool = False,
+    sayt_corpus_df: pd.DataFrame | None = None,
 ):
     """Use functions necessary to create a dataframe that allows for grouping by
         rank and suggester type. Create plots.
@@ -51,6 +52,7 @@ def run_eval_for_suggesters(  # noqa: PLR0913 pylint: disable=R0913, R0914
             with unambiguous correct codes.
         code_digit_match_length (int | None): Length of the code digit match
             to consider (default is None).
+        sayt_corpus_df (pd.DataFrame | None): optional dataframe containing the SAYT corpus.
 
     Return:
         pd.DataFrame: dataframe containing suggestions.
@@ -124,6 +126,7 @@ def run_eval_for_suggesters(  # noqa: PLR0913 pylint: disable=R0913, R0914
         k_values=suggestions_list,
         ave_time_per_query_dict=avg_ms_dict,
         code_digit_match_length=code_digit_match_length,
+        sayt_corpus_df=sayt_corpus_df,
     )
 
     return suggestions_df, fig, compare_performance_metrics

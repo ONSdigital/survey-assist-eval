@@ -7,6 +7,7 @@ from survey_assist_eval.evaluation.sayt.suggestion_ranking_functions import (
     clean_codes_columns,
     get_codes_from_suggestions,
     get_rank_of_first_matching_code,
+    get_ranks_of_correct_codes,
     is_correct_codes_empty,
     rank_of_correct_code_in_suggestions,
 )
@@ -241,6 +242,73 @@ def test_get_rank_of_first_matching_code_with_none_or_empty_correct_codes(
         f"Expected rank {expected_rank} for retrieved_codes={retrieved_codes} "
         f"and correct_codes={correct_codes}, but got {rank}."
     )
+
+
+# ============================================================================
+# Test get_ranks_of_correct_codes function
+# ============================================================================
+
+
+def test_get_ranks_of_correct_codes_returns_all_ranks_in_correct_code_order():
+    """Each correct code should be paired with every matching retrieval rank."""
+    ranks = get_ranks_of_correct_codes(
+        ["1111", "2222", "1111"], ["2222", "1111", "3333"]
+    )
+
+    assert ranks == {"2222": [2], "1111": [1, 3], "3333": []}
+
+
+def test_get_ranks_of_correct_codes_penalises_missing_codes_after_retrieved_list():
+    """An unmatched code should receive a rank after all retrieved results."""
+    ranks = get_ranks_of_correct_codes(
+        ["1111", "1111"], ["2222", "1111"], penalise_if_not_found=True
+    )
+
+    assert ranks == {"2222": [3], "1111": [1, 2]}
+
+
+@pytest.mark.parametrize(
+    "correct_codes",
+    [None, [], set(), "", [None]],
+)
+def test_get_ranks_of_correct_codes_returns_empty_dict_for_empty_correct_codes(
+    correct_codes,
+):
+    """Missing or empty ground truth should produce no rank entries."""
+    assert get_ranks_of_correct_codes(["1111", None], correct_codes) == {}
+
+
+@pytest.mark.parametrize(
+    "penalise_if_not_found,expected_ranks",
+    [
+        (False, {"1111": [], "2222": []}),
+        (True, {"1111": [1], "2222": [1]}),
+    ],
+    ids=["no-penalty", "penalise-after-empty-retrieval"],
+)
+def test_get_ranks_of_correct_codes_handles_empty_retrieved_codes(
+    penalise_if_not_found, expected_ranks
+):
+    """Empty retrievals yield empty ranks or rank one when penalized."""
+    ranks = get_ranks_of_correct_codes(
+        [], ["1111", "2222"], penalise_if_not_found=penalise_if_not_found
+    )
+
+    assert ranks == expected_ranks
+
+
+def test_get_ranks_of_correct_codes_sorts_set_input_for_stable_order():
+    """Set inputs should produce rank entries in deterministic sorted order."""
+    ranks = get_ranks_of_correct_codes([], {"2222", "1111"})
+
+    assert list(ranks) == ["1111", "2222"]
+
+
+def test_get_ranks_of_correct_codes_deduplicates_list_input_preserving_order():
+    """Duplicate correct codes should yield one entry in first-seen order."""
+    ranks = get_ranks_of_correct_codes(["1111", "2222"], ["2222", "1111", "2222"])
+
+    assert list(ranks) == ["2222", "1111"]
 
 
 # ============================================================================

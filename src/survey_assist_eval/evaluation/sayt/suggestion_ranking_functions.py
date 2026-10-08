@@ -61,6 +61,50 @@ def get_rank_of_first_matching_code(
     return len(retrieved_codes) + 1 if penalise_if_not_found else None
 
 
+def get_ranks_of_correct_codes(
+    retrieved_codes: list[str],
+    correct_codes: str | list[str] | set[str] | None,
+    penalise_if_not_found: bool = False,
+) -> dict[str, list[int]]:
+    """Get all retrieved ranks for each correct code.
+
+    Args:
+        retrieved_codes: List of codes retrieved by the system (ordered by relevance).
+        correct_codes: A correct code or collection of codes to match against.
+        penalise_if_not_found: Whether to return a penalised rank if no match is found.
+            Defaults to False.
+
+    Returns:
+        dict[str, list[int]]: Each correct code paired with its 1-based
+            retrieval ranks. Missing codes have an empty rank list, or a single
+            penalised rank when penalise_if_not_found is True.
+    """
+    if correct_codes is None or is_correct_codes_empty(correct_codes):
+        return {}
+    if isinstance(correct_codes, str):
+        correct_code_list = [correct_codes]
+    elif isinstance(correct_codes, set):
+        correct_code_list = sorted(correct_codes)
+    else:
+        correct_code_list = list(dict.fromkeys(correct_codes))
+
+    ranks_by_code: dict[str, list[int]] = {
+        code: [] for code in correct_code_list if code is not None
+    }
+    for rank, code in enumerate(retrieved_codes, start=1):
+        if code in ranks_by_code:
+            ranks_by_code[code].append(rank)
+
+    if penalise_if_not_found:
+        penalised_rank = len(retrieved_codes) + 1
+        ranks_by_code = {
+            code: ranks if ranks else [penalised_rank]
+            for code, ranks in ranks_by_code.items()
+        }
+
+    return {code: ranks_by_code[code] for code in correct_code_list if code is not None}
+
+
 def is_correct_codes_empty(codes: str | list[str] | set[str] | None) -> bool:
     """Check whether a correct-codes value represents missing ground truth.
 

@@ -132,12 +132,12 @@ else:
         f"lookup_file_name {lookup_file_name} does not match expected file names."
     )
 
-sayt_corpus = build_sayt_corpus_from_df(
+sayt_corpus_df, sayt_corpus = build_sayt_corpus_from_df(
     df=sayt_df,
     search_text_col=search_text_col,
     display_text_col=display_text_col,
     code_col=code_col,
-)[1]
+)
 
 save_folder = FOLDER_PREFIX + df_size + kb
 blob_name = f"evaluation-pipeline/SAYT/weights_by_character/{save_folder}/"
@@ -223,6 +223,7 @@ with ngram={ngram}, prefix={prefix}, semantic={semantic}."""
                 suggestions_col=suggestions_col_to_compare,
                 ave_time_per_query=avg_ms_dict[suggestions_col_to_compare],
                 k_values=list(range(1, MAX_SUGGESTIONS + 1)),
+                sayt_corpus_df=sayt_corpus_df,
             )
 
             data = {
