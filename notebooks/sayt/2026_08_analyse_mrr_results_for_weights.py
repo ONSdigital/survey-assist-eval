@@ -18,7 +18,7 @@ GRID_SIZE = 10  # grid granuality (should be same as in TEST_FOLDER)
 TEST_FOLDER = "weights_grid_10_2k_sic_kb"
 LOCAL_DIR = f"data/sayt/{TEST_FOLDER}/"
 USE_BUCKET = True
-SAVE_PLOT = True
+SAVE_PLOT = False
 
 os.makedirs(LOCAL_DIR, exist_ok=True)
 
@@ -444,11 +444,13 @@ def _prepare_faceted_heatmap_data(
     elif score_metric in ("precision_at_k", "recall_at_k"):
 
         weight_results_df = weight_results_df.assign(
-            metric_value=weight_results_df[score_metric].apply(lambda x: x.get(str(k))),
+            metric_value=weight_results_df[score_metric].apply(
+                lambda x: x.get(str(k)) * 100
+            ),
         )
         weight_results_df = weight_results_df.assign(
             label_text=weight_results_df["metric_value"].map(
-                lambda value: f"{value:.2f}" if value != 0 else ""
+                lambda value: f"{value:.0f}" if value != 0 else ""
             ),
         )
     else:
@@ -610,44 +612,8 @@ def generate_faceted_heatmap(
 
 
 # %%
-# Best performing setup for each character count
 characters_list = list(range(4, 10))
-metric_to_check = "mrr"
-for char in characters_list:
-    data_weights = get_weight_by_char_dicts(
-        characters=char,
-        use_bucket=USE_BUCKET,
-        bucket_path=f"gs://{bucket_name}/{blob_name}",
-        local_path=LOCAL_DIR,
-    )
 
-    metric_score, best_dict = find_best_performing_setup(
-        data=data_weights, metric=metric_to_check
-    )
-    print(f"Best score for {char} characters using {metric_to_check}: {metric_score}")
-    print(f"Best setup for {char} characters: {best_dict.keys()}\n")
-
-# %%
-# Top 5 performing setups for specific characters
-char = 9
-
-data_weights = get_weight_by_char_dicts(
-    characters=char,
-    use_bucket=USE_BUCKET,
-    bucket_path=f"gs://{bucket_name}/{blob_name}",
-    local_path=LOCAL_DIR,
-)
-
-rankings_by_weight = get_ranked_setups(data_weights)
-
-for rank, (individual_score, setups) in enumerate(rankings_by_weight.items(), start=1):
-    print(f"Rank {rank}: MRR={individual_score}")
-    print(f"  {list(setups.keys())}\n")
-    if rank == 5:  # noqa: PLR2004
-        break
-# %%
-# create heatmaps for specific character
-characters_list = list(range(4, 10))
 data_by_character = {}
 for char in characters_list:
     data_weights = get_weight_by_char_dicts(
@@ -659,7 +625,31 @@ for char in characters_list:
     data_by_character[char] = data_weights
 
 # %%
-score_metric_label = "mrr"
+# Best performing setup for each character count
+metric_to_check = "mrr"
+
+for char in characters_list:
+
+    metric_score, best_dict = find_best_performing_setup(
+        data=data_by_character[char], metric=metric_to_check
+    )
+    print(f"Best score for {char} characters using {metric_to_check}: {metric_score}")
+    print(f"Best setup for {char} characters: {best_dict.keys()}\n")
+
+# %%
+# Top 5 performing setups for specific characters
+char = 9
+
+rankings_by_weight = get_ranked_setups(data_by_character[char])
+
+for rank, (individual_score, setups) in enumerate(rankings_by_weight.items(), start=1):
+    print(f"Rank {rank}: MRR={individual_score}")
+    print(f"  {list(setups.keys())}\n")
+    if rank == 5:  # noqa: PLR2004
+        break
+
+# %%
+score_metric_label = "mean_rank"
 k_value = 1
 
 faceted_plot = generate_faceted_heatmap(
