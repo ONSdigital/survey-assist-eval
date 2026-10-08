@@ -48,14 +48,17 @@ TWO_K_PATH = (
     "sic_2k_test_data.parquet"
 )
 
-TWO_K_ID_COL = "unique_id"
+# Standard ID column name - every dataset is renamed to this on load
+ID_COL = "unique_id"
+# Raw ID column name in the clerical sheet and Survey Assist outputs
+RAW_ID_COL = "Unique_identifier"
+
 TWO_K_CLERICAL_CODES = "clerical_codes"  # List of candidate codes
 
 # Survey Assist's own SOC output for this same subset
 SA_DATA_PATH = (
     f"gs://{bucket_name}/evaluation-pipeline/dual_coded_2k/soc/" "STG2.parquet"
 )  # Pipeline run by Peter
-SA_SOC_ID_COL = "Unique_identifier"
 SA_SOC_CODES_COL = "initial_code"
 SA_SOC_ALT_CODES_COL = "alt_soc_candidates"
 SA_SOC_LIKELIHOOD_COL = "initial_likelihood"
@@ -64,7 +67,6 @@ SA_SOC_LIKELIHOOD_COL = "initial_likelihood"
 SA_SIC_DATA_PATH = (
     f"gs://{bucket_name}/evaluation-pipeline/dual_coded_2k/sic/" "STG2.parquet"
 )
-SA_SIC_ID_COL = "Unique_identifier"
 SA_SIC_CODES_COL = "initial_code"
 
 SIGNIFICANCE_LEVEL = 0.05
@@ -156,6 +158,28 @@ CLERICALLY_CODED_SOC_SHEET = "Comparisons"
 clerically_coded_soc_df = clerically_coded_soc_sheets[CLERICALLY_CODED_SOC_SHEET]
 two_k_df = pd.read_parquet(TWO_K_PATH, dtype_backend="numpy_nullable")
 
+
+def load_sa_output(path: str, label: str) -> pd.DataFrame | None:
+    """Read a Survey Assist parquet and standardise its ID column, or None if missing."""
+    try:
+        sa = pd.read_parquet(path, dtype_backend="numpy_nullable")
+    except FileNotFoundError:
+        print(f"⚠️  {label} output '{path}' not found - comparison will be skipped.")
+        return None
+    sa = sa.rename(columns={RAW_ID_COL: ID_COL})
+    sa[ID_COL] = sa[ID_COL].astype(str)
+    return sa
+
+
+# Survey Assist outputs - loaded once here and reused by every later cell
+sa_soc_df = load_sa_output(SA_DATA_PATH, "Survey Assist SOC")
+sa_sic_df = load_sa_output(SA_SIC_DATA_PATH, "Survey Assist SIC")
+
+# Standardise the ID column name and type across datasets
+clerically_coded_soc_df = clerically_coded_soc_df.rename(columns={RAW_ID_COL: ID_COL})
+clerically_coded_soc_df[ID_COL] = clerically_coded_soc_df[ID_COL].astype(str)
+two_k_df[ID_COL] = two_k_df[ID_COL].astype(str)
+
 # Drop fully-empty junk columns left over from the Excel export (e.g. "Unnamed: 10").
 empty_cols = [
     col
@@ -188,7 +212,6 @@ clerically_coded_soc_df[code_cols] = clerically_coded_soc_df[code_cols].replace(
 # %%
 # Clean every clerical SOC code column once, treat them as full-length SOC codes for rest
 
-CLERICALLY_CODED_SOC_ID_COL = "Unique_identifier"
 CLERICALLY_CODED_SOC_CODER1_COL = "Coder1"
 CLERICALLY_CODED_SOC_CODER2_COL = "Coder2"
 FINAL_CODE_COL = "Final code"
@@ -307,13 +330,13 @@ show_value_counts(
 
 merged = clerically_coded_soc_df.merge(
     two_k_df,
-    left_on=CLERICALLY_CODED_SOC_ID_COL,
-    right_on=TWO_K_ID_COL,
+    on=ID_COL,
     how="left",
     suffixes=("", "_2k"),
     validate="one_to_one",
+    indicator=True,
 )
-is_matched = merged[TWO_K_ID_COL].notna()
+is_matched = merged.pop("_merge").eq("both")
 print(f"\nNumber of matching unique identifiers: {is_matched.sum()}")
 print(f"Number of non-matching unique identifiers: {(~is_matched).sum()}")
 
@@ -360,7 +383,7 @@ for text_type, (clerical_col, two_k_col) in TEXT_COL_PAIRS.items():
         print(
             merged.loc[
                 is_matched & ~text_match,
-                [CLERICALLY_CODED_SOC_ID_COL, clerical_col, two_k_col],
+                [ID_COL, clerical_col, two_k_col],
             ]
             .head(5)
             .to_string(index=False)
@@ -460,10 +483,10 @@ if "Agree" in clerically_coded_soc_df.columns:
 check_id_overlap(
     (
         clerically_coded_soc_df,
-        CLERICALLY_CODED_SOC_ID_COL,
+        ID_COL,
         f"clerically_coded_soc :: {CLERICALLY_CODED_SOC_SHEET}",
     ),
-    (two_k_df, TWO_K_ID_COL, "2k.parquet"),
+    (two_k_df, ID_COL, "2k.parquet"),
 )
 
 # %%
@@ -494,7 +517,7 @@ merged["sic_codability_level"] = (
             clerical_codes_to_set(codes), code_type="SIC"
         )
     )
-    .where(merged[TWO_K_ID_COL].notna())
+    .where(is_matched)
 )
 
 # Finest SOC digit level at which Coder1 and Coder2 agree, per row.
@@ -631,7 +654,7 @@ merged["disagree"] = (
 )
 
 EXAMPLE_COLS = [
-    CLERICALLY_CODED_SOC_ID_COL,
+    ID_COL,
     "soc2020_job_title_main_job",
     "soc2020_job_description_main_job",
     CLERICALLY_CODED_SOC_CODER1_COL,
@@ -706,27 +729,19 @@ def _max_candidate_likelihood(candidates: object) -> float:
     return max(likelihoods) if likelihoods else float("nan")
 
 
-def blank_low_confidence_initial_code(  # pylint: disable=too-many-arguments,too-many-positional-arguments  # noqa: PLR0913
+def blank_low_confidence_initial_code(
     df: pd.DataFrame,
     codes_col: str,
     alt_codes_col: str,
     likelihood_col: str | None,
     label: str,
-    apply_threshold: bool = True,
 ) -> pd.DataFrame:
     """Blank `codes_col` wherever its likelihood is below
     SA_CODABILITY_CONFIDENCE_THRESHOLD or missing (i.e. not unambiguously codable).
 
     The likelihood is read from `likelihood_col` when present (one-prompt
     pipeline), otherwise from the best `alt_codes_col` candidate likelihood.
-
-    When apply_threshold=False (e.g., for SIC), codes are not blanked based on
-    confidence thresholds; only returned as-is.
     """
-    if not apply_threshold:
-        # For code types like SIC with different strategies, return as-is
-        return df
-
     if likelihood_col is not None and likelihood_col in df.columns:
         confidence = pd.to_numeric(df[likelihood_col], errors="coerce")
         source = likelihood_col
@@ -752,6 +767,17 @@ def blank_low_confidence_initial_code(  # pylint: disable=too-many-arguments,too
     return df
 
 
+# Apply the confidence threshold once to SOC; SIC output is used as is
+if sa_soc_df is not None:
+    sa_soc_df = blank_low_confidence_initial_code(
+        sa_soc_df,
+        SA_SOC_CODES_COL,
+        SA_SOC_ALT_CODES_COL,
+        likelihood_col=SA_SOC_LIKELIHOOD_COL,
+        label="Survey Assist SOC",
+    )
+
+
 def soc_major_group_label(code_set: set) -> str:
     """SOC major group title for a single-code set, else Ambiguous/Uncodable."""
     if len(code_set) != 1:
@@ -762,47 +788,29 @@ def soc_major_group_label(code_set: set) -> str:
 def run_sa_comparison(  # noqa: PLR0913  # pylint: disable=too-many-arguments,too-many-locals
     *,
     code_type: str,
-    sa_path: str,
-    sa_id_col: str,
+    sa: pd.DataFrame | None,
     codes_col: str,
-    alt_codes_col: str,
-    likelihood_col: str | None,
     digit_levels: list[int],
     build_truth,  # n -> DataFrame[unique_id, clerical_codes]
     group_label,  # set -> str, for the distribution table
     group_name: str,
     sort_distribution: bool = False,
-    apply_threshold: bool = True,
 ) -> None:
-    """Compare Survey Assist initial codes with clerical truth by digit level."""
+    """Compare prepared Survey Assist initial codes with clerical truth by digit level."""
     title = f"SURVEY ASSIST {code_type} PERFORMANCE COMPARISON"
-    try:
-        sa = pd.read_parquet(sa_path, dtype_backend="numpy_nullable")
-    except FileNotFoundError:
+    if sa is None:
         print(f"\n{'='*70}")
         print(f"{title} - SKIPPED")
         print(f"{'='*70}")
         print(
-            f"'{sa_path}' not found. Update the SA_{code_type} path/column "
-            f"constants in the CONFIGURATION section once Survey Assist's "
-            f"{code_type} output for this subset is available, then re-run."
+            f"Survey Assist {code_type} output not found. Update the SA_{code_type} "
+            f"path/column constants in the CONFIGURATION section once it is "
+            f"available, then re-run."
         )
         return
     print(f"\n{'='*70}")
     print(title)
     print(f"{'='*70}")
-
-    # Standardise column names
-    sa = sa.rename(columns={sa_id_col: TWO_K_ID_COL})
-    sa[TWO_K_ID_COL] = sa[TWO_K_ID_COL].astype(str)
-    sa = blank_low_confidence_initial_code(
-        sa,
-        codes_col,
-        alt_codes_col,
-        likelihood_col=likelihood_col,
-        label=f"Survey Assist {code_type}",
-        apply_threshold=apply_threshold,
-    )
 
     # Run performance evaluation with INITIAL_CODE only
     top = max(digit_levels)
@@ -901,18 +909,14 @@ def run_sa_comparison(  # noqa: PLR0913  # pylint: disable=too-many-arguments,to
 # %%
 # SURVEY ASSIST PERFORMANCE COMPARISON - SOC
 
-truth_input_df = merged[["unique_id"]].copy()
-truth_input_df["unique_id"] = truth_input_df["unique_id"].astype(str)
+truth_input_df = merged[[ID_COL]].copy()
 # Already-clean full-length codes (or the Uncodable sentinel)
 truth_input_df["consensus_code"] = merged.apply(primary_soc_code, axis=1)
 
 run_sa_comparison(
     code_type="SOC",
-    sa_path=SA_DATA_PATH,
-    sa_id_col=SA_SOC_ID_COL,
+    sa=sa_soc_df,
     codes_col=SA_SOC_CODES_COL,
-    alt_codes_col=SA_SOC_ALT_CODES_COL,
-    likelihood_col=SA_SOC_LIKELIHOOD_COL,
     digit_levels=SOC_DIGIT_LEVELS,
     build_truth=lambda n: prep_clerical_codes(
         truth_input_df,
@@ -979,15 +983,14 @@ def sic_section_label(code_set: set) -> str:
 
 
 # SIC clerical truth comes from the 2k parquet, so only matched rows have it
-sic_truth_input_df = merged.loc[is_matched, [TWO_K_ID_COL, TWO_K_CLERICAL_CODES]].copy()
-sic_truth_input_df[TWO_K_ID_COL] = sic_truth_input_df[TWO_K_ID_COL].astype(str)
+sic_truth_input_df = merged.loc[is_matched, [ID_COL, TWO_K_CLERICAL_CODES]].copy()
 
 
 def build_sic_truth(n: int) -> pd.DataFrame:
     """SIC clerical truth as sets of n-digit codes, keyed by unique_id."""
     return pd.DataFrame(
         {
-            "unique_id": sic_truth_input_df[TWO_K_ID_COL],
+            "unique_id": sic_truth_input_df[ID_COL],
             "clerical_codes": sic_truth_input_df[TWO_K_CLERICAL_CODES].apply(
                 lambda raw: sic_truth_at_digits(raw, n_digits=n)
             ),
@@ -997,17 +1000,13 @@ def build_sic_truth(n: int) -> pd.DataFrame:
 
 run_sa_comparison(
     code_type="SIC",
-    sa_path=SA_SIC_DATA_PATH,
-    sa_id_col=SA_SIC_ID_COL,
+    sa=sa_sic_df,
     codes_col=SA_SIC_CODES_COL,
-    alt_codes_col=None,
-    likelihood_col=None,
     digit_levels=SIC_DIGIT_LEVELS,
     build_truth=build_sic_truth,
     group_label=sic_section_label,
     group_name="SIC section",
     sort_distribution=True,
-    apply_threshold=False,
 )
 
 print("\n✓ Analysis complete!")
@@ -1023,20 +1022,6 @@ print(f"{'='*70}")
 
 SOC_TOP_DIGITS = max(SOC_DIGIT_LEVELS)
 SIC_TOP_DIGITS = max(SIC_DIGIT_LEVELS)
-
-
-def load_sa_output(
-    path: str, id_col: str, codes_col: str, alt_codes_col: str | None, **blank_kwargs
-) -> pd.DataFrame:
-    """Read a Survey Assist parquet, standardise IDs and apply confidence blanking."""
-    sa = pd.read_parquet(path, dtype_backend="numpy_nullable").rename(
-        columns={id_col: TWO_K_ID_COL}
-    )
-    sa[TWO_K_ID_COL] = sa[TWO_K_ID_COL].astype(str)
-
-    return blank_low_confidence_initial_code(
-        sa, codes_col, alt_codes_col, **blank_kwargs
-    )
 
 
 def score_records(
@@ -1070,15 +1055,7 @@ soc_truth = prep_clerical_codes(
 )
 
 soc_model = prep_model_codes(
-    load_sa_output(
-        SA_DATA_PATH,
-        SA_SOC_ID_COL,
-        SA_SOC_CODES_COL,
-        SA_SOC_ALT_CODES_COL,
-        likelihood_col=SA_SOC_LIKELIHOOD_COL,
-        label="Survey Assist SOC",
-        apply_threshold=True,
-    ),
+    sa_soc_df,
     codes_col=SA_SOC_CODES_COL,
     alt_codes_col=None,
     code_type="SOC",
@@ -1092,15 +1069,7 @@ soc_scores = score_records(soc_truth, soc_model, "soc")
 # SIC: 2k clerical candidate codes vs Survey Assist (used as is, no threshold)
 
 sic_model = prep_model_codes(
-    load_sa_output(
-        SA_SIC_DATA_PATH,
-        SA_SIC_ID_COL,
-        SA_SIC_CODES_COL,
-        None,
-        likelihood_col=None,
-        label="Survey Assist SIC",
-        apply_threshold=False,
-    ),
+    sa_sic_df,
     codes_col=SA_SIC_CODES_COL,
     alt_codes_col=None,
     code_type="SIC",
