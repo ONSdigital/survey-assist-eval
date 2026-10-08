@@ -616,13 +616,12 @@ characters_list = list(range(4, 10))
 
 data_by_character = {}
 for char in characters_list:
-    data_weights = get_weight_by_char_dicts(
+    data_by_character[char] = get_weight_by_char_dicts(
         characters=char,
         use_bucket=USE_BUCKET,
         bucket_path=f"gs://{bucket_name}/{blob_name}",
         local_path=LOCAL_DIR,
     )
-    data_by_character[char] = data_weights
 
 # %%
 # Best performing setup for each character count
@@ -667,9 +666,6 @@ faceted_plot.show()
 
 # %%
 # Mean square - distance from the best performing setup
-
-characters_list = list(range(4, 10))
-
 score_metric_labels = ["mrr", "mean_rank"]
 score_metrics_at_k = ["precision_at_k", "recall_at_k"]
 k_values = ["3", "5", "9"]
