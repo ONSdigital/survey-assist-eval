@@ -822,7 +822,8 @@ def run_sa_comparison(  # noqa: PLR0913  # pylint: disable=too-many-arguments,to
         model = prep_model_codes(
             sa,
             codes_col=codes_col,
-            alt_codes_col=None,
+            alt_codes_col=(SA_SOC_ALT_CODES_COL if code_type == "SOC" else None),
+            threshold=SA_CODABILITY_CONFIDENCE_THRESHOLD,
             code_type=code_type,
             digits=n,
             out_col="model_codes",
@@ -1057,7 +1058,8 @@ soc_truth = prep_clerical_codes(
 soc_model = prep_model_codes(
     sa_soc_df,
     codes_col=SA_SOC_CODES_COL,
-    alt_codes_col=None,
+    alt_codes_col=SA_SOC_ALT_CODES_COL,
+    threshold=SA_CODABILITY_CONFIDENCE_THRESHOLD,
     code_type="SOC",
     digits=SOC_TOP_DIGITS,
     out_col="model_codes",
