@@ -668,71 +668,69 @@ faceted_plot.show()
 # %%
 # Mean square - distance from the best performing setup
 
-characters_list = list(range(5, 10))
+characters_list = list(range(4, 10))
 
-y_true = {}
-setup_dict = {}
-score_metric_labels = ["mrr", "precision_at_k", "recall_at_k", "mean_rank"]
+score_metric_labels = ["mrr", "mean_rank"]
+score_metrics_at_k = ["precision_at_k", "recall_at_k"]
 k_values = ["3", "5", "9"]
-column_names = []
 
-for name in score_metric_labels:
-    if "at_k" in name:
-        for position in k_values:
-            column_names.append(f"{name.removesuffix('_at_k')}_at_{position}")
-    else:
-        column_names.append(name)
+score_metrics_cols = score_metric_labels + [
+    f"{metric_name.removesuffix('_at_k')}_at_{position}"
+    for metric_name in score_metrics_at_k
+    for position in k_values
+]
 
-for column_name in column_names:
-    y_true[column_name] = []
-    setup_dict[column_name] = {}
+all_weights_df = pd.DataFrame()
 
 for char in characters_list:
-    data_weights = get_weight_by_char_dicts(
-        characters=char,
-        use_bucket=USE_BUCKET,
-        bucket_path=f"gs://{bucket_name}/{blob_name}",
-        local_path=LOCAL_DIR,
+    weights_df = pd.DataFrame.from_dict(data_by_character[char], orient="index")
+    weights_df["char"] = char
+    weights_df.index.name = "setup"
+
+    for metric_name in score_metrics_at_k:
+        scores = pd.DataFrame(
+            weights_df.pop(metric_name).tolist(), index=weights_df.index
+        )
+        scores = scores.add_prefix(f"{metric_name.removesuffix('_at_k')}_at_")
+        weights_df = weights_df.join(scores)
+
+    for metric_name in score_metrics_cols:
+        highest_score = (
+            weights_df[metric_name].min()
+            if metric_name == "mean_rank"
+            else weights_df[metric_name].max()
+        )
+
+        weights_df[f"{metric_name}"] = (weights_df[metric_name] - highest_score) ** 2
+
+    all_weights_df = pd.concat(
+        [all_weights_df, weights_df.reset_index()], ignore_index=True
     )
 
-    for score_metric_name in score_metric_labels:
-        if score_metric_name in ["precision_at_k", "recall_at_k"]:
-            for position in k_values:
-                column_name = f"{score_metric_name.removesuffix('_at_k')}_at_{position}"
-                y_true[column_name].append(
-                    get_best_scores_values(
-                        data=data_weights, metric=score_metric_name, k=position
-                    )
-                )
-                for setup, result in data_weights.items():
-                    setup_dict[column_name].setdefault(setup, []).append(
-                        result[score_metric_name][position]
-                    )
-        else:
-            y_true[score_metric_name].append(
-                get_best_scores_values(data=data_weights, metric=score_metric_name)
-            )
-            for setup, result in data_weights.items():
-                setup_dict[score_metric_name].setdefault(setup, []).append(
-                    result[score_metric_name]
-                )
+# %%
+character_groups = {
+    "low_characters": list(range(4, 6)),
+    "high_characters": list(range(6, 10)),
+}
+character_group_by_char = {
+    char: group_name for group_name, chars in character_groups.items() for char in chars
+}
 
+mse_columns = [f"{metric_name}" for metric_name in score_metrics_cols]
+
+means_by_setup = (
+    all_weights_df.assign(
+        character_group=all_weights_df["char"].map(character_group_by_char)
+    )
+    .groupby(["character_group", "setup"], as_index=False)[mse_columns]
+    .mean()
+    .rename(columns={column: f"{column}" for column in mse_columns})
+)
 
 # %%
-msq = pd.DataFrame(
-    {
-        column_name: {
-            setup_key: np.mean(
-                (np.asarray(y_true[column_name]) - np.asarray(predicted_values)) ** 2
-            )
-            for setup_key, predicted_values in setup_dict[column_name].items()
-        }
-        for column_name in column_names
-    }
-)
-print(f"Characters: {characters_list}")
-msq.sort_values("mrr").head(
+means_by_setup[means_by_setup["character_group"] == "low_characters"].sort_values(
+    "mrr"
+).head(
     10
 )  # change those depending on which metric you want to use
-
 # %%
