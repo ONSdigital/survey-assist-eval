@@ -691,13 +691,15 @@ for char in characters_list:
         weights_df = weights_df.join(scores)
 
     for metric_name in score_metrics_cols:
-        highest_score = (
+        metric_best_score = (
             weights_df[metric_name].min()
             if metric_name == "mean_rank"
             else weights_df[metric_name].max()
         )
 
-        weights_df[f"{metric_name}"] = (weights_df[metric_name] - highest_score) ** 2
+        weights_df[f"{metric_name}_msq"] = (
+            weights_df[metric_name] - metric_best_score
+        ) ** 2
 
     all_weights_df = pd.concat(
         [all_weights_df, weights_df.reset_index()], ignore_index=True
@@ -712,7 +714,7 @@ character_group_by_char = {
     char: group_name for group_name, chars in character_groups.items() for char in chars
 }
 
-mse_columns = [f"{metric_name}" for metric_name in score_metrics_cols]
+mse_columns = [f"{metric_name}_msq" for metric_name in score_metrics_cols]
 
 means_by_setup = (
     all_weights_df.assign(
@@ -725,7 +727,7 @@ means_by_setup = (
 
 # %%
 means_by_setup[means_by_setup["character_group"] == "low_characters"].sort_values(
-    "mrr"
+    "mrr_msq"
 ).head(
     10
 )  # change those depending on which metric you want to use
