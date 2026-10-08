@@ -78,7 +78,7 @@ sic_kb_for_classifai = pd.read_csv(
     f"gs://{bucket_name}/sic_knowledgebase/sic_kb_for_sayt.csv", dtype=str
 )
 
-_, sayt2_corpus = build_sayt_corpus_from_df(
+sayt2_corpus_df, sayt2_corpus = build_sayt_corpus_from_df(
     df=sic_kb_for_classifai,
     search_text_col="search_text",
     display_text_col="display_text",
@@ -110,6 +110,7 @@ suggestions_df, fig, metrics_table = run_eval_for_suggesters(
     correct_codes_col=correct_codes_col,
     output_dir=f"{OUTPUT_DIR}_all",
     code_type=CODE_TYPE,
+    sayt_corpus_df=sayt2_corpus_df,
 )
 
 metrics_table.head()
@@ -125,6 +126,7 @@ suggestions_df_digit2, fig_digit2, metrics_table_digit2 = run_eval_for_suggester
     output_dir=f"{OUTPUT_DIR}_digit2",
     code_type=CODE_TYPE,
     code_digit_match_length=2,
+    sayt_corpus_df=sayt2_corpus_df,
 )
 
 metrics_table_digit2.head()
@@ -161,6 +163,7 @@ suggestions_df_unambiguous, fig_unambiguous, metrics_table_unambiguous = (
         output_dir=f"{OUTPUT_DIR}_all_list_codes",
         code_type=CODE_TYPE,
         only_unambiguous_correct_codes=True,
+        sayt_corpus_df=sayt2_corpus_df,
     )
 )
 
@@ -181,6 +184,7 @@ metrics_table_unambiguous.head()
     output_dir=f"{OUTPUT_DIR}_digit2_list_codes",
     code_type=CODE_TYPE,
     code_digit_match_length=2,
+    sayt_corpus_df=sayt2_corpus_df,
 )
 
 metrics_table_list_codes_digit2.head()

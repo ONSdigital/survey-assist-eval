@@ -11,6 +11,8 @@ import pandas as pd
 from dotenv import load_dotenv
 from survey_assist_embed_core.sayt import (
     NgramRetrieverSpec,
+    PrefixRetrieverSpec,
+    SemanticRetrieverSpec,
 )
 from survey_assist_utils.logging import get_logger
 
@@ -85,12 +87,12 @@ suggesters = {
     "Ngrams only": build_lookup_suggester(
         sayt2_corpus, retrievers=[NgramRetrieverSpec()]
     ),
-    # "Prefix only": build_lookup_suggester(
-    #     sayt2_corpus, retrievers=[PrefixRetrieverSpec()]
-    # ),
-    # "Semantic only": build_lookup_suggester(
-    #     sayt2_corpus, retrievers=[SemanticRetrieverSpec()]
-    # ),
+    "Prefix only": build_lookup_suggester(
+        sayt2_corpus, retrievers=[PrefixRetrieverSpec()]
+    ),
+    "Semantic only": build_lookup_suggester(
+        sayt2_corpus, retrievers=[SemanticRetrieverSpec()]
+    ),
 }
 
 # %%
@@ -196,6 +198,7 @@ compare_performance_metrics = build_sayt_metrics_comparison_table(
     code_type=CODE_TYPE,
     k_values=[1, 3, 5, MAX_SUGGESTIONS],
     ave_time_per_query_dict=avg_ms_dict,
+    sayt_corpus_df=sayt2_corpus_df,
 )
 
 compare_performance_metrics.head()
@@ -209,6 +212,7 @@ compare_performance_metrics = build_sayt_metrics_comparison_table(
     code_digit_match_length=2,
     k_values=[1, 3, 5, MAX_SUGGESTIONS],
     ave_time_per_query_dict=avg_ms_dict,
+    sayt_corpus_df=sayt2_corpus_df,
 )
 
 compare_performance_metrics.head()
