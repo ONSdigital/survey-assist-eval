@@ -223,7 +223,7 @@ SOC_FULL_DIGITS = max(digits for digits, _label in SOC_CODABILITY_LEVELS)
 _code_standard_logger = logging.getLogger(
     "survey_assist_eval.data_cleaning.code_standard"
 )
-_previous_log_level = _code_standard_logger.level
+
 
 unrecognised_values: set = set()
 
