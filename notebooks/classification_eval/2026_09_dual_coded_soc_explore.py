@@ -41,22 +41,18 @@ pd.set_option("display.max_rows", 10)
 load_dotenv()
 bucket_name = os.getenv("EVALUATION_BUCKET_NAME")
 
-CLERICALLY_CODED_SOC_PATH = (
+clerically_coded_soc_path = (
     f"gs://{bucket_name}/evaluation-pipeline/original_datasets/sic_2k/"
     "comparison_soc_2k.xlsx"
 )
-CLERICALLY_CODED_SIC_PATH = (
+clerically_coded_sic_path = (
     f"gs://{bucket_name}/evaluation-pipeline/original_datasets/sic_2k/"
     "sic_2k_test_data.parquet"
 )
-
-# Survey Assist's own SOC output for this same subset
-SA_CODED_SOC_PATH = (
+sa_coded_soc_path = (
     f"gs://{bucket_name}/evaluation-pipeline/dual_coded_2k/soc/" "STG2.parquet"
 )
-
-# Survey Assist's own SIC output for this same subset
-SA_CODED_SIC_PATH = (
+sa_coded_sic_path = (
     f"gs://{bucket_name}/evaluation-pipeline/dual_coded_2k/sic/" "STG2.parquet"
 )
 
@@ -83,7 +79,7 @@ def show_value_counts(
         )
         all_codes = []
         for item in df[column].dropna():
-            if isinstance(item, list | tuple | np.ndarray):
+            if isinstance(item, list | tuple | set | np.ndarray):
                 all_codes.extend(item)
             else:
                 all_codes.append(item)
@@ -91,62 +87,23 @@ def show_value_counts(
         print(counts.to_string())
 
 
-def check_id_overlap(dataset_a: tuple, dataset_b: tuple) -> None:
-    """Compare IDs between two datasets.
-
-    Each argument is a (df, id_col, name) tuple.
-    """
-    df_a, id_col_a, name_a = dataset_a
-    df_b, id_col_b, name_b = dataset_b
-
-    if id_col_a not in df_a.columns:
-        print(f"⚠️  Column '{id_col_a}' not found in {name_a}")
-        return
-    if id_col_b not in df_b.columns:
-        print(f"⚠️  Column '{id_col_b}' not found in {name_b}")
-        return
-
-    ids_a = set(df_a[id_col_a].dropna().astype(str))
-    ids_b = set(df_b[id_col_b].dropna().astype(str))
-    common = ids_a & ids_b
-    only_a = ids_a - ids_b
-    only_b = ids_b - ids_a
-
-    print(f"\n{'='*70}")
-    print(f"ID Overlap: {name_a}.{id_col_a} vs {name_b}.{id_col_b}")
-    print(f"{'='*70}")
-    print(f"{name_a}: {len(ids_a):>6} unique IDs")
-    print(f"{name_b}: {len(ids_b):>6} unique IDs")
-    print(f"Common:  {len(common):>6}")
-    print(f"Only in {name_a}: {len(only_a):>6}")
-    print(f"Only in {name_b}: {len(only_b):>6}")
-
-    if only_a:
-        print(f"\nExamples from {name_a}: {list(only_a)[:5]}")
-    if only_b:
-        print(f"Examples from {name_b}: {list(only_b)[:5]}")
-
-    overlap_pct = 100 * len(common) / max(len(ids_a), len(ids_b))
-    print(f"\n✓ Overlap: {overlap_pct:.1f}%")
-
-
 # %%
 # DATA LOADING
 print("Loading data...")
 clerically_coded_soc_df = pd.read_excel(
-    CLERICALLY_CODED_SOC_PATH, sheet_name="Comparisons", dtype=str
+    clerically_coded_soc_path, sheet_name="Comparisons", dtype=str
 ).rename(columns={"Unique_identifier": "unique_id"})
 
 clerically_coded_sic_df = pd.read_parquet(
-    CLERICALLY_CODED_SIC_PATH, dtype_backend="numpy_nullable"
+    clerically_coded_sic_path, dtype_backend="numpy_nullable"
 )
 
 # Survey Assist outputs - loaded once here and reused by every later cell
 sa_coded_soc_df = pd.read_parquet(
-    SA_CODED_SOC_PATH, dtype_backend="numpy_nullable"
+    sa_coded_soc_path, dtype_backend="numpy_nullable"
 ).rename(columns={"Unique_identifier": "unique_id"})
 sa_coded_sic_df = pd.read_parquet(
-    SA_CODED_SIC_PATH, dtype_backend="numpy_nullable"
+    sa_coded_sic_path, dtype_backend="numpy_nullable"
 ).rename(columns={"Unique_identifier": "unique_id"})
 
 # %%
@@ -161,34 +118,24 @@ if empty_cols:
     clerically_coded_soc_df = clerically_coded_soc_df.drop(columns=empty_cols)
 
 # Replace the two clerical coders with generic labels
-CLERICALLY_CODED_SOC_CODER1_COL = "Coder1"
-CLERICALLY_CODED_SOC_CODER2_COL = "Coder2"
-FINAL_CODE_COL = "Final code"
-
 clerically_coded_soc_df = clerically_coded_soc_df.rename(
     columns={
-        "Carol": CLERICALLY_CODED_SOC_CODER1_COL,
-        "Carol_Comments": f"{CLERICALLY_CODED_SOC_CODER1_COL}_Comments",
-        "Lynne": CLERICALLY_CODED_SOC_CODER2_COL,
-        "Lynne_Comments": f"{CLERICALLY_CODED_SOC_CODER2_COL}_Comments",
+        "Carol": "coder1",
+        "Carol_Comments": "coder1_Comments",
+        "Lynne": "coder2",
+        "Lynne_Comments": "coder2_Comments",
+        "Final code": "final_code",
     }
-)
-# Replace '6321' with '6231' in the clerical SOC code columns only
-code_cols = [
-    CLERICALLY_CODED_SOC_CODER1_COL,
-    CLERICALLY_CODED_SOC_CODER2_COL,
-    FINAL_CODE_COL,
-]
-clerically_coded_soc_df[code_cols] = clerically_coded_soc_df[code_cols].replace(
-    {"6321": "6231"}
 )
 
 
 # %%
 # Clean every clerical SOC code column once, treat them as full-length SOC codes for rest
-def clean_soc_code(raw: object) -> str:
+def clean_soc_code(raw: object) -> set[str]:
     """Return the full-length clean SOC code for a coder's cell."""
-    if raw == "uncodeable":  # surpress invalid codes logging
+    if pd.isna(raw) or (
+        raw in ["uncodeable", "Uncodeable", "0000"]
+    ):  # surpress invalid codes logging
         return set()
     cleaned, _ = get_clean_n_digit_codes(
         raw, n=SOC_EXPECTED_CODE_LENGTH, code_type="SOC"
@@ -196,30 +143,33 @@ def clean_soc_code(raw: object) -> str:
     return cleaned
 
 
+for col in (
+    "coder1",
+    "coder2",
+    "final_code",
+):
+    clerically_coded_soc_df[f"{col}_clean"] = (
+        clerically_coded_soc_df[col]
+        .replace({"6321": "6231"})  # Correct typo
+        .apply(clean_soc_code)
+    )
+
+coder1_clean_col = "coder1_clean"
+coder2_clean_col = "coder2_clean"
+final_clean_col = "final_code_clean"
 clerically_coded_soc_df["clerical_agreement_soc"] = (
-    clerically_coded_soc_df[CLERICALLY_CODED_SOC_CODER1_COL].str.lower()
-    == clerically_coded_soc_df[CLERICALLY_CODED_SOC_CODER2_COL].str.lower()
+    clerically_coded_soc_df[coder1_clean_col]
+    == clerically_coded_soc_df[coder2_clean_col]
 )
 clerically_coded_soc_df.loc[
-    clerically_coded_soc_df["clerical_agreement_soc"], FINAL_CODE_COL
+    clerically_coded_soc_df["clerical_agreement_soc"], final_clean_col
 ] = clerically_coded_soc_df.loc[
-    clerically_coded_soc_df["clerical_agreement_soc"], CLERICALLY_CODED_SOC_CODER1_COL
+    clerically_coded_soc_df["clerical_agreement_soc"], coder1_clean_col
 ]
-
-for col in (
-    CLERICALLY_CODED_SOC_CODER1_COL,
-    CLERICALLY_CODED_SOC_CODER2_COL,
-    FINAL_CODE_COL,
-):
-    clerically_coded_soc_df[f"{col}_clean"] = clerically_coded_soc_df[col].apply(
-        clean_soc_code
-    )
 
 
 # %%
-# ============================================================================
 # CLERICALLY CODED SOC - PREVIEW & PROFILE
-# ============================================================================
 
 print(f"\n{'='*70}")
 print("CLERICALLY CODED SOC PREVIEW: Comparisons Sheet")
@@ -275,13 +225,13 @@ print(f"{'='*70}")
 
 show_value_counts(
     clerically_coded_soc_df,
-    CLERICALLY_CODED_SOC_CODER1_COL,
+    coder1_clean_col,
     "clerically_coded_soc :: Coder 1",
     top_n=15,
 )
 show_value_counts(
     clerically_coded_soc_df,
-    CLERICALLY_CODED_SOC_CODER2_COL,
+    coder2_clean_col,
     "clerically_coded_soc :: Coder 2",
     top_n=15,
 )
@@ -306,13 +256,14 @@ print(
 
 # Check the job title / description text agrees between the two files for each ID.
 # (clerical column, 2k column) - confirm the 2k names against the column listing above.
-TEXT_COL_PAIRS = {
+text_col_pairs = {
     "job title": ("soc2020_job_title_main_job", "soc2020_job_title"),
     "job description": (
         "soc2020_job_description_main_job",
         "soc2020_job_description",
     ),
-    "industry": ("sic2007_employed_main_job", "sic2007_employee"),
+    "industry1": ("sic2007_employed_main_job", "sic2007_employee"),
+    "industry2": ("sic2007_self_employed_main_job", "sic2007_self_employed"),
 }
 
 
@@ -330,7 +281,7 @@ def _normalise_text(s: pd.Series) -> pd.Series:
 print(f"\n{'='*70}")
 print("JOB TITLE / DESCRIPTION MATCH (clerical vs 2k, matched IDs only)")
 print(f"{'='*70}")
-for text_type, (soc_col, sic_col) in TEXT_COL_PAIRS.items():
+for text_type, (soc_col, sic_col) in text_col_pairs.items():
     if (
         soc_col not in clerically_coded_merged.columns
         or sic_col not in clerically_coded_merged.columns
@@ -361,13 +312,12 @@ for text_type, (soc_col, sic_col) in TEXT_COL_PAIRS.items():
 # at each SOC digit level (1/2/3/4-digit), treating "uncodable" as a
 # genuine category rather than missing data.
 
-SOC_DIGIT_LEVELS = sorted(
+soc_digit_levels = sorted(
     {digits for digits, _label in SOC_CODABILITY_LEVELS if digits >= 0}
 )
-SIC_DIGIT_LEVELS = sorted(
+sic_digit_levels = sorted(
     {digits for digits, _label in SIC_CODABILITY_LEVELS if digits >= 0}
 )
-
 
 print(f"\n{'='*70}")
 print("INTER-RATER RELIABILITY: Coder1 vs Coder2 (by SOC digit level)")
@@ -378,17 +328,13 @@ digit_level_summary = []
 coder1_full = pd.Series(dtype=object)
 coder2_full = pd.Series(dtype=object)
 
-for soc_digit_count in SOC_DIGIT_LEVELS:
-    coder1_labels = clerically_coded_merged[
-        f"{CLERICALLY_CODED_SOC_CODER1_COL}_clean"
-    ].apply(
+for soc_digit_count in soc_digit_levels:
+    coder1_labels = clerically_coded_merged[coder1_clean_col].apply(
         lambda x, n=soc_digit_count: next(
             iter(get_clean_n_digit_codes(x, n=n, code_type="soc")[0]), "uncodable"
         )
     )
-    coder2_labels = clerically_coded_merged[
-        f"{CLERICALLY_CODED_SOC_CODER2_COL}_clean"
-    ].apply(
+    coder2_labels = clerically_coded_merged[coder2_clean_col].apply(
         lambda x, n=soc_digit_count: next(
             iter(get_clean_n_digit_codes(x, n=n, code_type="soc")[0]), "uncodable"
         )
@@ -408,7 +354,7 @@ for soc_digit_count in SOC_DIGIT_LEVELS:
         }
     )
 
-    if soc_digit_count == max(SOC_DIGIT_LEVELS):
+    if soc_digit_count == max(soc_digit_levels):
         # keep the full 4-digit labels around for the "Agree" cross-check below
         coder1_full = coder1_labels
         coder2_full = coder2_labels
@@ -443,9 +389,7 @@ clerically_coded_merged["clerical_sic_codability_level"] = clerically_coded_merg
     "clerical_codes"
 ].apply(lambda codes: get_codability_level(codes, code_type="SIC"))
 clerically_coded_merged["clerical_codes_soc"] = clerically_coded_merged.apply(
-    lambda row: row[f"{CLERICALLY_CODED_SOC_CODER1_COL}_clean"].union(
-        row[f"{CLERICALLY_CODED_SOC_CODER2_COL}_clean"]
-    ),
+    lambda row: row[coder1_clean_col].union(row[coder2_clean_col]),
     axis=1,
 )
 clerically_coded_merged["clerical_soc_codability_level"] = clerically_coded_merged[
@@ -456,16 +400,16 @@ print(f"\n{'='*70}")
 print("SIC vs SOC CODABILITY")
 print(f"{'='*70}")
 
-SIC_LEVEL_ORDER = [label for _digits, label in SIC_CODABILITY_LEVELS]
-SOC_LEVEL_ORDER = [label for _digits, label in SOC_CODABILITY_LEVELS]
+sic_level_order = [label for _digits, label in SIC_CODABILITY_LEVELS]
+soc_level_order = [label for _digits, label in SOC_CODABILITY_LEVELS]
 sic_cat = pd.Categorical(
     clerically_coded_merged["clerical_sic_codability_level"],
-    categories=SIC_LEVEL_ORDER,
+    categories=sic_level_order,
     ordered=True,
 )
 soc_cat = pd.Categorical(
     clerically_coded_merged["clerical_soc_codability_level"],
-    categories=SOC_LEVEL_ORDER,
+    categories=soc_level_order,
     ordered=True,
 )
 codability_crosstab = pd.crosstab(sic_cat, soc_cat, dropna=False)
@@ -532,14 +476,14 @@ SECTION_MIN_N = 15  # groups smaller than this are noisy - shown but flagged
 
 
 clerically_coded_merged["soc_major_group_digit"] = clerically_coded_merged[
-    f"{FINAL_CODE_COL}_clean"
+    final_clean_col
 ].apply(
     lambda code, n=1: next(
         iter(get_clean_n_digit_codes(code, n=1, code_type="soc")[0]), "uncodable"
     )
 )
 
-SOC_MAJOR_GROUP_TITLES = {
+soc_major_group_titles = {
     "1": "1 Managers, Directors and Senior Officials",
     "2": "2 Professional Occupations",
     "3": "3 Associate Professional Occupations",
@@ -552,17 +496,17 @@ SOC_MAJOR_GROUP_TITLES = {
 }
 clerically_coded_merged["soc_major_group"] = (
     clerically_coded_merged["soc_major_group_digit"]
-    .map(SOC_MAJOR_GROUP_TITLES)
+    .map(soc_major_group_titles)
     .fillna("Uncodable")
 )
 
-EXAMPLE_COLS = [
+example_cols = [
     "unique_id",
     "soc2020_job_title_main_job",
     "soc2020_job_description_main_job",
-    CLERICALLY_CODED_SOC_CODER1_COL,
-    CLERICALLY_CODED_SOC_CODER2_COL,
-    FINAL_CODE_COL,
+    coder1_clean_col,
+    coder2_clean_col,
+    final_clean_col,
 ]
 
 
@@ -609,7 +553,7 @@ def disagreement_by(
         worst = eligible.index[0]
         print(f"\nExample disagreements in worst {what} group ({worst}):")
         print(
-            merged[(merged[group_col] == worst) & ~merged[agreement_col]][EXAMPLE_COLS]
+            merged[(merged[group_col] == worst) & ~merged[agreement_col]][example_cols]
             .head(5)
             .to_string(index=False)
         )
@@ -688,7 +632,7 @@ def run_sa_comparison(
 
     # Run performance evaluation with INITIAL_CODE only
     top = SIC_EXPECTED_CODE_LENGTH if code_type == "SIC" else SOC_EXPECTED_CODE_LENGTH
-    digit_levels = SIC_DIGIT_LEVELS if code_type == "SIC" else SOC_DIGIT_LEVELS
+    digit_levels = sic_digit_levels if code_type == "SIC" else soc_digit_levels
     clerical_col = "clerical_codes" if code_type == "SIC" else "clerical_codes_soc"
     alt_codes_col = "alt_sic_candidates" if code_type == "SIC" else "alt_soc_candidates"
     high_level_name = "SOC major group" if code_type == "SOC" else "SIC section"
