@@ -845,23 +845,20 @@ def report_cross_errors(  # pylint: disable=too-many-locals
     print(f"{label} (n={len(df)})")
     print(f"{'-'*70}")
 
-    # Rows/columns fixed as [wrong, correct] so labels never shift
-    table3 = pd.crosstab(df["soc_scores"], df["sic_scores"]).fillna(0)
+    score_levels = ["exact_match", "partial_match", "mismatch"]
+    table3 = pd.crosstab(df["soc_scores"], df["sic_scores"]).reindex(
+        index=score_levels, columns=score_levels, fill_value=0
+    )
     print("\nContingency table:")
     print(table3.assign(All=table3.sum(axis=1)).to_string())
     print("\nRow percentages (given SOC result, % of SIC results):")
     print((table3.div(table3.sum(axis=1), axis=0) * 100).round(1).to_string())
 
-    soc_wrong = df["soc_scores"] != "exact_match"
-    sic_wrong = df["sic_scores"] != "exact_match"
-
-    table2 = pd.crosstab(soc_wrong, sic_wrong).reindex(
-        index=[True, False], columns=[True, False], fill_value=0
-    )
-    table2.index = ["SOC wrong", "SOC correct"]
-    table2.columns = ["SIC wrong", "SIC correct"]
-    both_wrong, soc_only_wrong = table2.iloc[0]
-    sic_only_wrong, both_correct = table2.iloc[1]
+    non_exact_levels = ["partial_match", "mismatch"]
+    both_correct = table3.loc["exact_match", "exact_match"]
+    both_wrong = table3.loc[non_exact_levels, non_exact_levels].to_numpy().sum()
+    soc_only_wrong = table3.loc[non_exact_levels, "exact_match"].sum()
+    sic_only_wrong = table3.loc["exact_match", non_exact_levels].sum()
 
     n = len(df)
     print("\nError pattern distribution:")
@@ -890,12 +887,19 @@ def report_cross_errors(  # pylint: disable=too-many-locals
     print("\nConditional error probabilities:")
     print(f"  P(SIC wrong | SOC wrong)   = {p_sic_wrong_given_soc_wrong:.1%}")
     print(f"  P(SIC wrong | SOC correct) = {p_sic_wrong_given_soc_correct:.1%}")
-    print(f"  P(SIC wrong) overall       = {sic_wrong.mean():.1%}")
+    sic_wrong_count = table3.loc[:, non_exact_levels].to_numpy().sum()
+    print(f"  P(SIC wrong) overall       = {sic_wrong_count / n:.1%}")
     print("\nEffect size:")
 
     risk_difference = p_sic_wrong_given_soc_wrong - p_sic_wrong_given_soc_correct
 
     print(f"  Risk difference = {risk_difference:+.1%} points")
+
+    soc_wrong = df["soc_scores"] != "exact_match"
+    sic_wrong = df["sic_scores"] != "exact_match"
+    if soc_wrong.nunique() > 1 and sic_wrong.nunique() > 1:
+        phi = np.corrcoef(soc_wrong, sic_wrong)[0, 1]
+        print(f"  Phi correlation (exact vs non-exact) = {phi:.3f}")
 
     if p_sic_wrong_given_soc_correct > 0:
 
@@ -908,15 +912,7 @@ def report_cross_errors(  # pylint: disable=too-many-locals
             "when SOC is wrong than when SOC is correct)"
         )
 
-    if soc_wrong.nunique() > 1 and sic_wrong.nunique() > 1:
-        phi = np.corrcoef(soc_wrong, sic_wrong)[0, 1]
-        print(f"  Phi correlation = {phi:.3f}")
-
-    if (table2.sum(axis=0) == 0).any():
-        print("\nSIC is all correct or all wrong - cannot test association.")
-        return
-
-    chi2, chi2_p, dof, expected = chi2_contingency(table2)
+    chi2, chi2_p, dof, expected = chi2_contingency(table3)
 
     print("\nTests for independence:")
     print(f"  Chi-square: chi2={chi2:.2f}, dof={dof}, p={chi2_p:.4g}")
