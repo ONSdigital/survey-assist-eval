@@ -618,6 +618,21 @@ def blank_low_confidence_initial_code(
 sa_coded_soc_df = blank_low_confidence_initial_code(sa_coded_soc_df)
 
 
+def soc_major_group_label(code_set: set) -> str:
+    """SOC major group title for a single-code set, else Ambiguous/Uncodable."""
+    if len(code_set) != 1:
+        return "Ambiguous/Uncodable"
+    return soc_major_group_titles.get(next(iter(code_set))[:1], "Uncodable")
+
+
+def sic_section_label(code_set: set) -> str:
+    """SIC 2007 section letter for a single-code set, else Ambiguous/Uncodable."""
+    if len(code_set) != 1:
+        return "Ambiguous/Uncodable"
+    section = get_clean_n_digit_codes(code_set, n=0, code_type="SIC")[0]
+    return next(iter(section)) if len(section) == 1 else "Uncodable"
+
+
 def run_sa_comparison(
     sa: pd.DataFrame,
     clerical: pd.DataFrame,
@@ -636,10 +651,10 @@ def run_sa_comparison(
     clerical_col = "clerical_codes" if code_type == "SIC" else "clerical_codes_soc"
     alt_codes_col = "alt_sic_candidates" if code_type == "SIC" else "alt_soc_candidates"
     high_level_name = "SOC major group" if code_type == "SOC" else "SIC section"
+    group_label = soc_major_group_label if code_type == "SOC" else sic_section_label
 
     summary = []
     full = pd.DataFrame()
-    high_level = pd.DataFrame()
 
     for n in sorted(digit_levels, reverse=True):
         truth = prep_clerical_codes(
@@ -688,8 +703,6 @@ def run_sa_comparison(
         if n == top:
             print(metrics.report_metrics())
             full = combined
-        if n == min(digit_levels):
-            high_level = combined
 
     print(f"\nSurvey Assist vs clerical truth, by {code_type} digit level:")
     print(pd.DataFrame(summary).to_string(index=False))
@@ -698,12 +711,12 @@ def run_sa_comparison(
     dist = (
         pd.concat(
             [
-                high_level["clerical_codes"]
-                .map(lambda x: next(iter(x), "Uncodable"))
+                full["clerical_codes"]
+                .map(group_label)
                 .value_counts(normalize=True)
                 .rename("Clerical truth"),
-                high_level["model_codes"]
-                .map(lambda x: next(iter(x), "Uncodable"))
+                full["model_codes"]
+                .map(group_label)
                 .value_counts(normalize=True)
                 .rename("Survey Assist"),
             ],
