@@ -962,7 +962,7 @@ def test_summarise_performance_metrics_stores_suggestions_col(sayt_metrics_df):
 def test_summarise_performance_metrics_defaults_k_values_to_empty_when_none(
     sayt_metrics_df,
 ):
-    """k_values=None should default to an empty list, yielding empty precision/recall dicts."""
+    """Omitting k_values should yield empty cutoff-based metric dictionaries."""
     result = summarise_performance_metrics(
         sayt_metrics_df,
         suggestions_col="suggestions",
@@ -977,6 +977,12 @@ def test_summarise_performance_metrics_defaults_k_values_to_empty_when_none(
     assert (
         result.recall_at_k == {}
     ), "Expected recall_at_k to be an empty dict when k_values is None."
+    assert (
+        result.ndcg_at_k == {}
+    ), "Expected ndcg_at_k to be an empty dict when k_values is None."
+    assert (
+        result.ndcg_all_at_k == {}
+    ), "Expected ndcg_all_at_k to be an empty dict when k_values is None."
 
 
 def test_summarise_performance_metrics_with_prefix_reads_prefixed_columns():
@@ -1526,6 +1532,7 @@ def test_sayt_performance_metrics_report_metrics_includes_all_fields():
     assert "NDCG@3" in report
     assert "NDCG_All@1" in report
     assert "NDCG_All@3" in report
+    assert "Metrics at k not available" not in report
     assert (
         "Queries with ground truth: 95" in report
     ), "Expected queries_with_ground_truth in report."
@@ -1558,6 +1565,11 @@ def test_sayt_performance_metrics_report_metrics_returns_string():
     report = metrics.report_metrics()
 
     assert isinstance(report, str), "Expected report_metrics to return a string."
+    assert (
+        "NDCG (all relevant ranks) not available, please provide a sayt_corpus_df."
+        in report
+    )
+    assert "Metrics at k not available" not in report
 
 
 def test_sayt_performance_metrics_report_metrics_starts_with_header():
@@ -1673,7 +1685,7 @@ def test_sayt_performance_metrics_report_metrics_with_multiple_k_values():
 
 
 def test_sayt_performance_metrics_report_metrics_with_empty_k_dicts():
-    """report_metrics should handle empty precision_at_k and recall_at_k gracefully."""
+    """When no k values are supplied, show guidance instead of empty sections."""
     metrics = SAYTPerformanceMetrics(
         code_digit_match_length=5,
         suggestions_col="suggestions",
@@ -1704,7 +1716,62 @@ def test_sayt_performance_metrics_report_metrics_with_empty_k_dicts():
     assert (
         "Total queries: 50" in report
     ), "Expected basic metrics even with empty k dicts."
-    assert "NDCG (all relevant ranks) not available" in report
+    assert "Metrics at k not available, please provide k_values." in report
+    assert "\nPrecision\n" not in report
+    assert "\nRecall\n" not in report
+    assert "\nNDCG (first rank per code)\n" not in report
+    assert "NDCG (all relevant ranks) not available" not in report
+
+
+@pytest.mark.parametrize(
+    ("populated_field", "heading", "metric"),
+    [
+        ("precision_at_k", "Precision", " Precision@1: 0.7500"),
+        ("recall_at_k", "Recall", " Recall@1: 0.7500"),
+        ("ndcg_at_k", "NDCG (first rank per code)", " NDCG@1: 0.7500"),
+        ("ndcg_all_at_k", "NDCG (all relevant ranks)", " NDCG_All@1: 0.7500"),
+    ],
+)
+def test_sayt_performance_metrics_report_metrics_with_one_k_metric(
+    populated_field, heading, metric
+):
+    """Print a section only when its metric dictionary is populated."""
+    metrics = SAYTPerformanceMetrics(
+        code_digit_match_length=5,
+        suggestions_col="suggestions",
+        total_queries=1,
+        queries_with_ground_truth=1,
+        queries_missing_ground_truth=0,
+        ave_time_per_query_ms=1.0,
+        matched_query_count=1,
+        unmatched_query_count=0,
+        mrr=1.0,
+        mean_last_reciprocal_rank=1.0,
+        mean_rank=1.0,
+        mean_rank_penalised=1.0,
+        median_rank=1.0,
+        precision_at_k={},
+        recall_at_k={},
+        ndcg_at_k={},
+        ndcg_all_at_k={},
+    )
+    report = metrics.model_copy(update={populated_field: {1: 0.75}}).report_metrics()
+
+    assert f"\n{heading}\n" in report
+    assert metric in report
+    assert "Metrics at k not available" not in report
+    for other_heading in (
+        "Precision",
+        "Recall",
+        "NDCG (first rank per code)",
+        "NDCG (all relevant ranks)",
+    ):
+        if other_heading != heading:
+            assert f"\n{other_heading}\n" not in report
+    if populated_field == "ndcg_all_at_k":
+        assert "please provide a sayt_corpus_df." not in report
+    else:
+        assert "please provide a sayt_corpus_df." in report
 
 
 def test_sayt_performance_metrics_validates_field_types():

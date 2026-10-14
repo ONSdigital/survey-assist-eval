@@ -60,25 +60,36 @@ class SAYTPerformanceMetrics(BaseModel):
             f"  Mean rank (penalised): {self.mean_rank_penalised:.2f}",
             f"  Median rank: {self.median_rank:.2f}\n",
         ]
-        lines.append("Precision")
-        for k, val in sorted(self.precision_at_k.items()):
-            lines.append(f" Precision@{k}: {val:.4f}")
-        lines.append("")
-        lines.append("Recall")
-        for k, val in sorted(self.recall_at_k.items()):
-            lines.append(f" Recall@{k}: {val:.4f}")
+        if not any(
+            (self.precision_at_k, self.recall_at_k, self.ndcg_at_k, self.ndcg_all_at_k)
+        ):
+            lines.append("Metrics at k not available, please provide k_values.")
+            return "\n".join(lines)
 
-        lines.append("")
-        lines.append("NDCG (first rank per code)")
-        for k, val in sorted(self.ndcg_at_k.items()):
-            lines.append(f" NDCG@{k}: {val:.4f}")
+        if self.precision_at_k:
+            lines.append("Precision")
+            for k, val in sorted(self.precision_at_k.items()):
+                lines.append(f" Precision@{k}: {val:.4f}")
 
-        lines.append("")
+        if self.recall_at_k:
+            lines.append("")
+            lines.append("Recall")
+            for k, val in sorted(self.recall_at_k.items()):
+                lines.append(f" Recall@{k}: {val:.4f}")
+
+        if self.ndcg_at_k:
+            lines.append("")
+            lines.append("NDCG (first rank per code)")
+            for k, val in sorted(self.ndcg_at_k.items()):
+                lines.append(f" NDCG@{k}: {val:.4f}")
+
         if self.ndcg_all_at_k:
+            lines.append("")
             lines.append("NDCG (all relevant ranks)")
             for k, val in sorted(self.ndcg_all_at_k.items()):
                 lines.append(f" NDCG_All@{k}: {val:.4f}")
         else:
+            lines.append("")
             lines.append(
                 "NDCG (all relevant ranks) not available, "
                 "please provide a sayt_corpus_df."
