@@ -26,6 +26,7 @@ class SAYTPerformanceMetrics(BaseModel):
     queries_with_ground_truth: int
     queries_missing_ground_truth: int
     ave_time_per_query_ms: float
+    matched_query_count: int
     unmatched_query_count: int
     mrr: float
     mean_last_reciprocal_rank: float
@@ -41,28 +42,24 @@ class SAYTPerformanceMetrics(BaseModel):
         """Pretty print the performance metrics."""
         lines = [
             f"\nSAYT Performance Metrics for column {self.suggestions_col}",
-            "=" * 50,
-            "",
+            "=" * 70 + "\n",
             "Configuration",
-            f"  Code digit match length: {self.code_digit_match_length}",
-            "",
+            f"  Code digit match length: {self.code_digit_match_length}\n",
             "Dataset",
             f"  Total queries: {self.total_queries}",
             f"  Queries with ground truth: {self.queries_with_ground_truth}",
             f"  Queries missing ground truth: {self.queries_missing_ground_truth}",
-            f"  Unmatched query count: {self.unmatched_query_count}",
-            "",
+            f"  Matched query count: {self.matched_query_count}",
+            f"  Unmatched query count: {self.unmatched_query_count}\n",
             "Performance",
-            f"  Average time per query: {self.ave_time_per_query_ms:.2f} ms",
-            "",
+            f"  Average time per query: {self.ave_time_per_query_ms:.2f} ms\n",
             "Ranking Metrics",
             f"  MRR: {self.mrr:.4f}",
             f"  Mean last reciprocal rank: {self.mean_last_reciprocal_rank:.4f}",
             f"  Mean rank: {self.mean_rank:.2f}",
             f"  Mean rank (penalised): {self.mean_rank_penalised:.2f}",
-            f"  Median rank: {self.median_rank:.2f}",
+            f"  Median rank: {self.median_rank:.2f}\n",
         ]
-        lines.append("")
         lines.append("Precision")
         for k, val in sorted(self.precision_at_k.items()):
             lines.append(f" Precision@{k}: {val:.4f}")
@@ -76,13 +73,12 @@ class SAYTPerformanceMetrics(BaseModel):
         for k, val in sorted(self.ndcg_at_k.items()):
             lines.append(f" NDCG@{k}: {val:.4f}")
 
+        lines.append("")
         if self.ndcg_all_at_k:
-            lines.append("")
             lines.append("NDCG (all relevant ranks)")
             for k, val in sorted(self.ndcg_all_at_k.items()):
                 lines.append(f" NDCG_All@{k}: {val:.4f}")
         else:
-            lines.append("")
             lines.append(
                 "NDCG (all relevant ranks) not available, "
                 "please provide a sayt_corpus_df."
@@ -525,6 +521,7 @@ def summarise_performance_metrics(  # noqa: PLR0913 pylint: disable = R0913, R09
         "queries_with_ground_truth": len(df),
         "queries_missing_ground_truth": total_queries - len(df),
         "ave_time_per_query_ms": ave_time_per_query,
+        "matched_query_count": df[f"{prefix}correct_code_rank"].notna().sum(),
         "unmatched_query_count": df[f"{prefix}correct_code_rank"].isna().sum(),
         "mrr": df[f"{prefix}reciprocal_rank"].mean(),
         "mean_last_reciprocal_rank": df[f"{prefix}last_reciprocal_rank"].mean(),

@@ -692,7 +692,7 @@ def test_summarise_performance_metrics_stores_ave_time_per_query(
 def test_summarise_performance_metrics_counts_rows_with_zero_correct_code_rank(
     sayt_metrics_df,
 ):
-    """unmatched_query_count should equal the number of rows where correct_code_rank is None."""
+    """Matched and unmatched counts should reflect whether each rank is present."""
     result = summarise_performance_metrics(
         sayt_metrics_df,
         suggestions_col="suggestions",
@@ -702,6 +702,7 @@ def test_summarise_performance_metrics_counts_rows_with_zero_correct_code_rank(
         ave_time_per_query=0.0,
     )
 
+    assert result.matched_query_count == 2
     assert (
         result.unmatched_query_count == 1
     ), "Expected unmatched_query_count to count rows where correct_code_rank is None."
@@ -830,7 +831,7 @@ def test_summarise_performance_metrics_builds_ndcg_at_k_dict(sayt_metrics_df):
 
 
 def test_summarise_performance_metrics_all_matched():
-    """unmatched_query_count should be zero when every row has a non-zero rank."""
+    """All rows with a rank should count as matched."""
     df = pd.DataFrame(
         {
             "reciprocal_rank": [1.0, 0.5],
@@ -853,6 +854,7 @@ def test_summarise_performance_metrics_all_matched():
         ave_time_per_query=0.0,
     )
 
+    assert result.matched_query_count == 2
     assert (
         result.unmatched_query_count == 0
     ), "Expected unmatched_query_count to be 0 when all rows have a non-zero rank."
@@ -882,6 +884,7 @@ def test_summarise_performance_metrics_all_unmatched():
         ave_time_per_query=0.0,
     )
 
+    assert result.matched_query_count == 0
     assert (
         result.unmatched_query_count == 2
     ), "Expected unmatched_query_count to equal total_queries when no code is found."
@@ -923,6 +926,7 @@ def test_summarise_performance_metrics_single_row():
     assert (
         result.total_queries == 1
     ), "Expected total_queries to be 1 for a single-row DataFrame."
+    assert result.matched_query_count == 1
     assert (
         result.unmatched_query_count == 0
     ), "Expected unmatched_query_count to be 0 when the single row has a non-zero rank."
@@ -1003,6 +1007,7 @@ def test_summarise_performance_metrics_with_prefix_reads_prefixed_columns():
     assert (
         result.total_queries == 2
     ), "Expected total_queries to equal the number of rows."
+    assert result.matched_query_count == 1
     assert (
         result.unmatched_query_count == 1
     ), "Expected one unmatched query from the prefixed correct_code_rank column."
@@ -1064,6 +1069,8 @@ def test_summarise_performance_metrics_splits_queries_missing_ground_truth():
     assert (
         result.queries_missing_ground_truth == 2
     ), "Expected queries_missing_ground_truth to count empty-string and None rows."
+    assert result.matched_query_count == 1
+    assert result.unmatched_query_count == 0
     assert result.mrr == pytest.approx(
         1.0
     ), "Expected mrr to be computed only over rows with ground truth present."
@@ -1282,6 +1289,7 @@ def test_build_sayt_metrics_comparison_table_computes_metrics_per_column(
     assert result.loc[result["suggestions_col"] == "suggestions_model_b", "mrr"].iloc[
         0
     ] == pytest.approx(0.0), "Expected MRR of 0.0 for model_b where no row matches."
+    assert result["matched_query_count"].tolist() == [1, 0]
 
 
 def test_build_sayt_metrics_comparison_table_single_column(sayt_comparison_df):
@@ -1379,6 +1387,7 @@ def test_sayt_performance_metrics_instantiation_with_valid_data():
         queries_with_ground_truth=95,
         queries_missing_ground_truth=5,
         ave_time_per_query_ms=15.5,
+        matched_query_count=90,
         unmatched_query_count=5,
         mrr=0.85,
         mean_last_reciprocal_rank=0.7,
@@ -1397,6 +1406,7 @@ def test_sayt_performance_metrics_instantiation_with_valid_data():
     assert metrics.ave_time_per_query_ms == pytest.approx(
         15.5
     ), "Expected ave_time_per_query_ms to be stored as provided."
+    assert metrics.matched_query_count == 90
     assert (
         metrics.unmatched_query_count == 5
     ), "Expected unmatched_query_count to be stored as provided."
@@ -1425,6 +1435,7 @@ def test_sayt_performance_metrics_instantiation_with_empty_k_dicts():
         queries_with_ground_truth=50,
         queries_missing_ground_truth=0,
         ave_time_per_query_ms=10.0,
+        matched_query_count=50,
         unmatched_query_count=0,
         mrr=1.0,
         mean_last_reciprocal_rank=1.0,
@@ -1452,6 +1463,7 @@ def test_sayt_performance_metrics_instantiation_with_zero_values():
         queries_with_ground_truth=0,
         queries_missing_ground_truth=0,
         ave_time_per_query_ms=0.0,
+        matched_query_count=0,
         unmatched_query_count=0,
         mrr=0.0,
         mean_last_reciprocal_rank=0.0,
@@ -1479,6 +1491,7 @@ def test_sayt_performance_metrics_report_metrics_includes_all_fields():
         queries_with_ground_truth=95,
         queries_missing_ground_truth=5,
         ave_time_per_query_ms=15.5,
+        matched_query_count=90,
         unmatched_query_count=5,
         mrr=0.85,
         mean_last_reciprocal_rank=0.65,
@@ -1497,6 +1510,7 @@ def test_sayt_performance_metrics_report_metrics_includes_all_fields():
         "Code digit match length: 5" in report
     ), "Expected code_digit_match_length in report."
     assert "15.50" in report, "Expected ave_time_per_query_ms value in report."
+    assert "Matched query count: 90" in report
     assert "5" in report, "Expected unmatched_query_count in report."
     assert "0.8500" in report, "Expected mrr value in report."
     assert "Mean last reciprocal rank: 0.6500" in report
@@ -1529,6 +1543,7 @@ def test_sayt_performance_metrics_report_metrics_returns_string():
         queries_with_ground_truth=50,
         queries_missing_ground_truth=0,
         ave_time_per_query_ms=10.0,
+        matched_query_count=50,
         unmatched_query_count=0,
         mrr=0.5,
         mean_last_reciprocal_rank=0.25,
@@ -1554,6 +1569,7 @@ def test_sayt_performance_metrics_report_metrics_starts_with_header():
         queries_with_ground_truth=10,
         queries_missing_ground_truth=0,
         ave_time_per_query_ms=5.0,
+        matched_query_count=9,
         unmatched_query_count=1,
         mrr=0.9,
         mean_last_reciprocal_rank=0.9,
@@ -1581,6 +1597,7 @@ def test_sayt_performance_metrics_report_metrics_contains_formatted_numbers():
         queries_with_ground_truth=100,
         queries_missing_ground_truth=0,
         ave_time_per_query_ms=12.3456,
+        matched_query_count=92,
         unmatched_query_count=8,
         mrr=0.123456,
         mean_last_reciprocal_rank=0.234567,
@@ -1621,6 +1638,7 @@ def test_sayt_performance_metrics_report_metrics_with_multiple_k_values():
         queries_with_ground_truth=100,
         queries_missing_ground_truth=0,
         ave_time_per_query_ms=10.0,
+        matched_query_count=100,
         unmatched_query_count=0,
         mrr=0.8,
         mean_last_reciprocal_rank=0.6,
@@ -1663,6 +1681,7 @@ def test_sayt_performance_metrics_report_metrics_with_empty_k_dicts():
         queries_with_ground_truth=50,
         queries_missing_ground_truth=0,
         ave_time_per_query_ms=8.0,
+        matched_query_count=48,
         unmatched_query_count=2,
         mrr=0.6,
         mean_last_reciprocal_rank=0.4,
@@ -1698,6 +1717,7 @@ def test_sayt_performance_metrics_validates_field_types():
             queries_with_ground_truth=100,
             queries_missing_ground_truth=0,
             ave_time_per_query_ms=10.0,
+            matched_query_count=100,
             unmatched_query_count=0,
             mrr=0.8,
             mean_last_reciprocal_rank=0.8,
@@ -1721,6 +1741,7 @@ def test_sayt_performance_metrics_validates_required_fields():
             queries_with_ground_truth=100,
             queries_missing_ground_truth=0,
             ave_time_per_query_ms=10.0,
+            matched_query_count=100,
             unmatched_query_count=0,
             mrr=0.8,
             mean_last_reciprocal_rank=0.8,
@@ -1743,6 +1764,7 @@ def test_sayt_performance_metrics_report_metrics_sorts_k_values():
         queries_with_ground_truth=100,
         queries_missing_ground_truth=0,
         ave_time_per_query_ms=10.0,
+        matched_query_count=100,
         unmatched_query_count=0,
         mrr=0.8,
         mean_last_reciprocal_rank=0.6,
@@ -1861,6 +1883,7 @@ def test_compute_performance_metrics_from_suggestions_extracts_codes_by_code_typ
     )
 
     # Row 0: '1111' found at rank 1, row 1: '2222' found at rank 2, row 2: unmatched
+    assert result.matched_query_count == 2
     assert (
         result.unmatched_query_count == 1
     ), "Expected one unmatched query when code_type is 'soc' (4 chars)."
@@ -1926,6 +1949,7 @@ def test_compute_performance_metrics_from_suggestions_all_unmatched():
         ave_time_per_query=0.0,
     )
 
+    assert result.matched_query_count == 0
     assert (
         result.unmatched_query_count == 2
     ), "Expected unmatched_query_count to equal total_queries when no suggestion matches."
@@ -1955,6 +1979,7 @@ def test_compute_performance_metrics_from_suggestions_all_matched_at_rank_1():
         ave_time_per_query=0.0,
     )
 
+    assert result.matched_query_count == 2
     assert (
         result.unmatched_query_count == 0
     ), "Expected no unmatched queries when all correct codes appear first."
@@ -2034,6 +2059,7 @@ def test_compute_performance_metrics_from_suggestions_applies_code_digit_match_l
         code_digit_match_length=2,
     )
 
+    assert without_truncation.matched_query_count == 0
     assert (
         without_truncation.unmatched_query_count == 1
     ), "Expected query to be unmatched when full 4-digit codes are compared."
@@ -2041,6 +2067,7 @@ def test_compute_performance_metrics_from_suggestions_applies_code_digit_match_l
         0.0
     ), "Expected MRR to be 0.0 when full 4-digit codes do not match."
 
+    assert with_truncation.matched_query_count == 1
     assert (
         with_truncation.unmatched_query_count == 0
     ), "Expected truncation to make the query matched."
