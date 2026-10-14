@@ -22,7 +22,7 @@ CODE_TYPE = "sic"
 MAX_SUGGESTIONS = 9
 CORRECT_CODE_COL = "correct_sic_code"
 NUM_CHARACTERS_LIST = list(range(4, 10))
-OUTPUT_DIR = "data/figures/sayt/SA_898_semantic_model/search_doc_only_sa_embed_core"
+OUTPUT_DIR = "data/figures/sayt/SA_898_semantic_model/extra_checks"
 
 # %%
 if not os.path.exists(OUTPUT_DIR):
@@ -77,7 +77,7 @@ suggesters = {
             SemanticRetrieverSpec(weight=1.0, model="all-MiniLM-L6-v2"),
         ],
     ),
-    "nomic_embed_text_v1_5": build_lookup_suggester(
+    "nomic_embed_plain": build_lookup_suggester(
         corpus=sayt2_corpus,
         retrievers=[
             PrefixRetrieverSpec(weight=1.0),
@@ -85,7 +85,97 @@ suggesters = {
             SemanticRetrieverSpec(weight=1.0, model="nomic-ai/nomic-embed-text-v1.5"),
         ],
     ),
+    "nomic_embed_search_doc": build_lookup_suggester(
+        corpus=sayt2_corpus,
+        retrievers=[
+            PrefixRetrieverSpec(weight=1.0),
+            NgramRetrieverSpec(weight=1.0),
+            SemanticRetrieverSpec(
+                weight=1.0,
+                model="nomic-ai/nomic-embed-text-v1.5",
+                corpus_prefix="search_document: ",
+            ),
+        ],
+    ),
+    "nomic_embed_search_query": build_lookup_suggester(
+        corpus=sayt2_corpus,
+        retrievers=[
+            PrefixRetrieverSpec(weight=1.0),
+            NgramRetrieverSpec(weight=1.0),
+            SemanticRetrieverSpec(
+                weight=1.0,
+                query_prefix="search_query: ",
+                model="nomic-ai/nomic-embed-text-v1.5",
+            ),
+        ],
+    ),
+    "nomic_embed_search_doc_and_query": build_lookup_suggester(
+        corpus=sayt2_corpus,
+        retrievers=[
+            PrefixRetrieverSpec(weight=1.0),
+            NgramRetrieverSpec(weight=1.0),
+            SemanticRetrieverSpec(
+                weight=1.0,
+                model="nomic-ai/nomic-embed-text-v1.5",
+                corpus_prefix="search_document: ",
+                query_prefix="search_query: ",
+            ),
+        ],
+    ),
+    "nomic_embed_classification": build_lookup_suggester(
+        corpus=sayt2_corpus,
+        retrievers=[
+            PrefixRetrieverSpec(weight=1.0),
+            NgramRetrieverSpec(weight=1.0),
+            SemanticRetrieverSpec(
+                weight=1.0,
+                corpus_prefix="classification: ",
+                query_prefix="classification: ",
+                model="nomic-ai/nomic-embed-text-v1.5",
+            ),
+        ],
+    ),
+    "nomic_embed_clustering": build_lookup_suggester(
+        corpus=sayt2_corpus,
+        retrievers=[
+            PrefixRetrieverSpec(weight=1.0),
+            NgramRetrieverSpec(weight=1.0),
+            SemanticRetrieverSpec(
+                weight=1.0,
+                model="nomic-ai/nomic-embed-text-v1.5",
+                corpus_prefix="clustering: ",
+                query_prefix="clustering: ",
+            ),
+        ],
+    ),
+    "nomic_embed_search_document_both": build_lookup_suggester(
+        corpus=sayt2_corpus,
+        retrievers=[
+            PrefixRetrieverSpec(weight=1.0),
+            NgramRetrieverSpec(weight=1.0),
+            SemanticRetrieverSpec(
+                weight=1.0,
+                model="nomic-ai/nomic-embed-text-v1.5",
+                corpus_prefix="search_document: ",
+                query_prefix="search_document: ",
+            ),
+        ],
+    ),
+    "nomic_embed_search_query_both": build_lookup_suggester(
+        corpus=sayt2_corpus,
+        retrievers=[
+            PrefixRetrieverSpec(weight=1.0),
+            NgramRetrieverSpec(weight=1.0),
+            SemanticRetrieverSpec(
+                weight=1.0,
+                model="nomic-ai/nomic-embed-text-v1.5",
+                corpus_prefix="search_query: ",
+                query_prefix="search_query: ",
+            ),
+        ],
+    ),
 }
+
 
 # %%
 suggestions_df, fig, metrics_table = run_eval_for_suggesters(
@@ -94,10 +184,10 @@ suggestions_df, fig, metrics_table = run_eval_for_suggesters(
     num_chars=NUM_CHARACTERS_LIST,
     suggestions_limit=MAX_SUGGESTIONS,
     correct_codes_col=CORRECT_CODE_COL,
-    output_dir=f"{OUTPUT_DIR}_all",
+    output_dir=f"{OUTPUT_DIR}",
     code_type=CODE_TYPE,
 )
 
 metrics_table.head()
-metrics_table.to_csv(f"{OUTPUT_DIR}_all/metrics_table.csv")
+metrics_table.to_csv(f"{OUTPUT_DIR}/metrics_table.csv")
 # %%

@@ -108,6 +108,8 @@ def run_eval_for_suggesters(  # noqa: PLR0913 pylint: disable=R0913, R0914
         hard_suggestions_limit=hard_suggestions_limit,
     )
 
+    suggestions_df.to_csv(output_dir + "/suggestions.csv")
+
     melt = melt_results_for_analysis(df=suggestions_df)
 
     fig = create_figure(melt, output_dir=output_dir)
