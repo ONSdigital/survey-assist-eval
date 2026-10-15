@@ -22,7 +22,7 @@ CODE_TYPE = "sic"
 MAX_SUGGESTIONS = 9
 CORRECT_CODE_COL = "correct_sic_code"
 NUM_CHARACTERS_LIST = list(range(4, 10))
-OUTPUT_DIR = "data/figures/sayt/SA_898_semantic_model/extra_checks"
+OUTPUT_DIR = "data/figures/sayt/SA_898_semantic_model"
 
 # %%
 if not os.path.exists(OUTPUT_DIR):
@@ -190,4 +190,84 @@ suggestions_df, fig, metrics_table = run_eval_for_suggesters(
 
 metrics_table.head()
 metrics_table.to_csv(f"{OUTPUT_DIR}/metrics_table.csv")
+
+# import ast
+
+# metrics_table["precision_at_k"] = metrics_table["precision_at_k"].apply(ast.literal_eval)
+# metrics_table["recall_at_k"] = metrics_table["recall_at_k"].apply(ast.literal_eval)
+
+# # %%
+# import plotly.express as px
+
+# plot_df = metrics_table.copy()
+
+# parts = plot_df["suggestions_col"].str.extract(
+#     r"^suggestions_(\d+)chars_(.+)$"
+# )
+# plot_df["char_count"] = parts[0].astype(int)
+# plot_df["suggester"] = parts[1]
+
+
+# metric = 'unmatched_query_count'  # Or "ave_time_per_query_ms", "matched_query_count", etc.
+
+# fig = px.line(
+#     plot_df.sort_values("char_count"),
+#     x="char_count",
+#     y=metric,
+#     color="suggester",
+#     markers=True,
+#     labels={"char_count": "Characters typed", metric: metric},
+# )
+# fig.show()
+
+# # %%
+# plot_df = plot_df.copy()
+
+# for k in range(1,MAX_SUGGESTIONS):
+#     plot_df[f"precision_at_{k}"] = plot_df["precision_at_k"].apply(
+#         lambda values: values[k]
+#     )
+#     plot_df[f"recall_at_{k}"] = plot_df["recall_at_k"].apply(
+#         lambda values: values[k]
+#     )
+
+# metrics = [
+#     "ave_time_per_query_ms",
+#     "unmatched_query_count",
+#     "mrr",
+#     "precision_at_1",
+#     "recall_at_1",
+#     "precision_at_3",
+#     "recall_at_3",
+#     "precision_at_5",
+#     "recall_at_5",
+#     "precision_at_8",
+#     "recall_at_8",
+
+# ]
+
+# long_df = plot_df.melt(
+#     id_vars=["char_count", "suggester"],
+#     value_vars=metrics,
+#     var_name="metric",
+#     value_name="value",
+# )
+
+# fig = px.line(
+#     long_df.sort_values("char_count"),
+#     x="char_count",
+#     y="value",
+#     color="suggester",
+#     facet_col="metric",
+#     facet_col_wrap=2,
+#     markers=True,
+#     category_orders={"metric": metrics},
+#     labels={"char_count": "Characters typed", "value": "Metric value"},
+# )
+# fig.update_yaxes(matches=None)  # Each metric needs its own y-axis scale.
+# fig.update_xaxes(dtick=1)
+# fig.for_each_annotation(lambda annotation: annotation.update(
+#     text=annotation.text.split("=", 1)[-1]
+# ))
+# fig.show()
 # %%
