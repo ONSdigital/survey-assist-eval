@@ -18,7 +18,7 @@ GRID_SIZE = 10  # grid granuality (should be same as in TEST_FOLDER)
 TEST_FOLDER = "weights_grid_10_2k_sic_kb"
 LOCAL_DIR = f"data/sayt/{TEST_FOLDER}/"
 USE_BUCKET = True
-SAVE_PLOT = True
+SAVE_PLOT = False
 
 os.makedirs(LOCAL_DIR, exist_ok=True)
 
@@ -63,25 +63,52 @@ def get_weight_by_char_dicts(
 
 
 # %%
-def find_best_performing_setup(data: dict):
-    """Finds best performing setup measured by MRR.
+def get_best_scores_values(data: dict, metric: str, k: str | None = None):
+    """Return the best score for a metric, optionally at a cutoff.
 
     Args:
-        data (dict): A dictionary containing the test results with MRR scores.
+        data: Results keyed by setup, with metric scores and optional cutoff scores.
+        metric: Metric name to compare, such as ``mrr`` or ``recall_at_k``.
+        k: Cutoff key required for precision and recall metrics.
 
     Returns:
-        max_score (float): the highest MRR score achieved.
-        best_dict (dict): a dictionary with those entries that achieved highest MRR.
+        The highest score across all setups for the requested metric.
+    """
+    if metric in ["precision_at_k", "recall_at_k"]:
+        best_score = max(d[metric][k] for d in data.values())
+    elif metric == "mean_rank":
+        best_score = min(d[metric] for d in data.values())
+    else:
+        best_score = max(d[metric] for d in data.values())
+
+    return best_score
+
+
+# %%
+def find_best_performing_setup(data: dict, metric: str, k: str | None = None):
+    """Return the highest score and all setups tied at that score.
+
+    Args:
+        data: Results keyed by setup, with metric scores and optional cutoff scores.
+        metric: Metric name to compare, such as ``mrr`` or ``precision_at_k``.
+        k: Cutoff key required for precision and recall metrics.
+
+    Returns:
+        A tuple containing the best score and all matching setup results.
     """
     # find best score and those tests that achieved that score
-    max_score = max(d["mrr"] for d in data.values())
-    best_dics = {k: v for k, v in data.items() if v["mrr"] == max_score}
-    return max_score, best_dics
+    best_score = get_best_scores_values(data=data, metric=metric, k=k)
+
+    if metric in ["precision_at_k", "recall_at_k"]:
+        best_dicts = {i: v for i, v in data.items() if v[metric][k] == best_score}
+    else:
+        best_dicts = {i: v for i, v in data.items() if v[metric] == best_score}
+    return best_score, best_dicts
 
 
 # %%
 def get_ranked_setups(data: dict):
-    """Get all tests orgered descending by MRR score.
+    """Get all tests ordered descending by MRR score.
 
     Args:
         data (dict): A dictionary containing the test results with MRR scores.
@@ -383,7 +410,7 @@ def _prepare_faceted_heatmap_data(
 
     Args:
         character_weight_results (dict[int, dict]): Results keyed by character count.
-        grid_size (int): the granuality of the grid.
+        grid_size (int): the granularity of the grid.
         score_metric (str): Score metric to visualise.
         k (int | None): Rank cutoff used for precision and recall metrics.
 
@@ -417,11 +444,13 @@ def _prepare_faceted_heatmap_data(
     elif score_metric in ("precision_at_k", "recall_at_k"):
 
         weight_results_df = weight_results_df.assign(
-            metric_value=weight_results_df[score_metric].apply(lambda x: x.get(str(k))),
+            metric_value=weight_results_df[score_metric].apply(
+                lambda x: x.get(str(k)) * 100
+            ),
         )
         weight_results_df = weight_results_df.assign(
             label_text=weight_results_df["metric_value"].map(
-                lambda value: f"{value:.2f}" if value != 0 else ""
+                lambda value: f"{value:.0f}" if value != 0 else ""
             ),
         )
     else:
@@ -516,7 +545,7 @@ def generate_faceted_heatmap(
 
     Args:
         character_weight_results (dict): Weight test results keyed by character count.
-        grid_size (int): the granuality of the grid.
+        grid_size (int): the granularity of the grid.
         score_metric (str): The metric used for assessing the performance.
         k (int | optional): rank k for recall and precision.
 
@@ -583,50 +612,40 @@ def generate_faceted_heatmap(
 
 
 # %%
-# Best performing setup for each character count
 characters_list = list(range(4, 10))
+
+data_by_character = {}
 for char in characters_list:
-    data_weights = get_weight_by_char_dicts(
+    data_by_character[char] = get_weight_by_char_dicts(
         characters=char,
         use_bucket=USE_BUCKET,
         bucket_path=f"gs://{bucket_name}/{blob_name}",
         local_path=LOCAL_DIR,
     )
 
-    mrr_score, best_dict = find_best_performing_setup(data_weights)
-    print(f"Best MRR for {char} characters: {mrr_score}")
+# %%
+# Best performing setup for each character count
+metric_to_check = "mrr"
+
+for char in characters_list:
+
+    metric_score, best_dict = find_best_performing_setup(
+        data=data_by_character[char], metric=metric_to_check
+    )
+    print(f"Best score for {char} characters using {metric_to_check}: {metric_score}")
     print(f"Best setup for {char} characters: {best_dict.keys()}\n")
 
 # %%
 # Top 5 performing setups for specific characters
 char = 9
 
-data_weights = get_weight_by_char_dicts(
-    characters=char,
-    use_bucket=USE_BUCKET,
-    bucket_path=f"gs://{bucket_name}/{blob_name}",
-    local_path=LOCAL_DIR,
-)
-
-rankings_by_weight = get_ranked_setups(data_weights)
+rankings_by_weight = get_ranked_setups(data_by_character[char])
 
 for rank, (individual_score, setups) in enumerate(rankings_by_weight.items(), start=1):
     print(f"Rank {rank}: MRR={individual_score}")
     print(f"  {list(setups.keys())}\n")
     if rank == 5:  # noqa: PLR2004
         break
-# %%
-# create heatmaps for specific character
-characters_list = list(range(4, 10))
-data_by_character = {}
-for char in characters_list:
-    data_weights = get_weight_by_char_dicts(
-        characters=char,
-        use_bucket=USE_BUCKET,
-        bucket_path=f"gs://{bucket_name}/{blob_name}",
-        local_path=LOCAL_DIR,
-    )
-    data_by_character[char] = data_weights
 
 # %%
 score_metric_label = "mean_rank"
@@ -647,38 +666,69 @@ faceted_plot.show()
 
 # %%
 # Mean square - distance from the best performing setup
+score_metric_labels = ["mrr", "mean_rank"]
+score_metrics_at_k = ["precision_at_k", "recall_at_k"]
+k_values = ["3", "5", "9"]
 
-characters_list = list(range(5, 10))
+score_metrics_cols = score_metric_labels + [
+    f"{metric_name.removesuffix('_at_k')}_at_{position}"
+    for metric_name in score_metrics_at_k
+    for position in k_values
+]
 
-y_true = []
-setup_dict = {}
+all_weights_df = pd.DataFrame()
 
 for char in characters_list:
-    data_weights = get_weight_by_char_dicts(
-        characters=char,
-        use_bucket=USE_BUCKET,
-        bucket_path=f"gs://{bucket_name}/{blob_name}",
-        local_path=LOCAL_DIR,
+    weights_df = pd.DataFrame.from_dict(data_by_character[char], orient="index")
+    weights_df["char"] = char
+    weights_df.index.name = "setup"
+
+    for metric_name in score_metrics_at_k:
+        scores = pd.DataFrame(
+            weights_df.pop(metric_name).tolist(), index=weights_df.index
+        )
+        scores = scores.add_prefix(f"{metric_name.removesuffix('_at_k')}_at_")
+        weights_df = weights_df.join(scores)
+
+    for metric_name in score_metrics_cols:
+        metric_best_score = (
+            weights_df[metric_name].min()
+            if metric_name == "mean_rank"
+            else weights_df[metric_name].max()
+        )
+
+        weights_df[f"{metric_name}_mse"] = (
+            weights_df[metric_name] - metric_best_score
+        ) ** 2
+
+    all_weights_df = pd.concat(
+        [all_weights_df, weights_df.reset_index()], ignore_index=True
     )
 
-    mrr_score, _ = find_best_performing_setup(data_weights)
-    y_true.append(mrr_score)
+# %%
+character_groups = {
+    "low_characters": list(range(4, 6)),
+    "high_characters": list(range(6, 10)),
+}
+character_group_by_char = {
+    char: group_name for group_name, chars in character_groups.items() for char in chars
+}
 
-    for setup in data_weights:
-        if setup not in setup_dict:
-            setup_dict[setup] = []
-        setup_dict[setup].append(data_weights[setup]["mrr"])
+mse_columns = [f"{metric_name}_mse" for metric_name in score_metrics_cols]
 
-y_true = np.array(y_true)
+means_by_setup = (
+    all_weights_df.assign(
+        character_group=all_weights_df["char"].map(character_group_by_char)
+    )
+    .groupby(["character_group", "setup"], as_index=False)[mse_columns]
+    .mean()
+    .rename(columns={column: f"{column}" for column in mse_columns})
+)
 
 # %%
-msq = {}
-for setup_key, y_pred in setup_dict.items():
-    msq[setup_key] = np.mean((y_true - y_pred) ** 2)
-
-top_five_setups = sorted(msq.items(), key=lambda item: item[1])[:5]
-for rank, (setup_key, mse) in enumerate(top_five_setups, start=1):
-    print(f"{rank}. {setup_key}: {mse}")
-
-
+means_by_setup[means_by_setup["character_group"] == "low_characters"].sort_values(
+    "mrr_mse"
+).head(
+    10
+)  # change those depending on which metric you want to use
 # %%

@@ -1,4 +1,14 @@
-"""Load and demo a SAYT artifact built from the IT3 lookup.
+"""Note:
+This example uses a repository that is no longer actively maintained.
+
+The SAYT functionality has since been migrated to the
+`survey-assist-embed-core` repository. This script is retained for
+reference purposes only and may not reflect the latest implementation.
+
+For an up-to-date example using the new repository, see:
+`notebooks/sayt/2026_09_sayt_artifact_loader_example.py`
+
+Load and demo a SAYT artifact built from the IT3 lookup.
 
 Run ``2026_06_01_sayt_artifact_builder_example.py`` before this notebook.
 """
