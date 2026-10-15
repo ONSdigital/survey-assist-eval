@@ -5,22 +5,19 @@
 # %%
 import json
 import os
+from copy import copy
 
 import numpy as np
 import pandas as pd
 from dotenv import load_dotenv
 from google.cloud import storage as gcs
-from survey_assist_embed_core.sayt import (
-    NgramRetrieverSpec,
-    PrefixRetrieverSpec,
-    SemanticRetrieverSpec,
-)
 from survey_assist_utils.logging import get_logger
 
 from notebooks.sayt.sayt_utils import (
     build_lookup_suggester,
     build_sayt_corpus_from_df,
     get_suggestions_by_chars,
+    update_suggester_weights,
 )
 from src.survey_assist_eval.pipeline.shared_components import _write_json
 from survey_assist_eval.evaluation.sayt.performance_metrics_functions import (
@@ -33,7 +30,7 @@ CORRECT_CODE_COL = "correct_sic_code"
 SUGGESTERS_NAME = "ngram_prefix_semantic"
 NUM_CHARACTERS_LIST = list(range(4, 10))
 HARD_LIMIT = False
-USE_2K = True  # If flase, use 100 sample
+USE_2K = True  # If false, use 100 sample
 
 GRID_GRANULARITY = 10
 OUTPUT_DIR = "data/sayt/"
@@ -149,6 +146,8 @@ if not os.path.exists(OUTPUT_DIR + save_folder):
     print(f"Created folder: {OUTPUT_DIR + save_folder}")
 
 # %%
+default_suggester = build_lookup_suggester(sayt_corpus)
+
 characters_to_run = NUM_CHARACTERS_LIST.copy()
 for characters in NUM_CHARACTERS_LIST.copy():
 
@@ -182,20 +181,12 @@ for ngram in range(0, GRID_GRANULARITY + 1):
             )
             continue
 
-        retrievers_list = []
-        if ngram > 0:
-            retrievers_list.append(NgramRetrieverSpec(weight=ngram))
-        if prefix > 0:
-            retrievers_list.append(PrefixRetrieverSpec(weight=prefix))
-        if semantic > 0:
-            retrievers_list.append(SemanticRetrieverSpec(weight=semantic))
-
-        suggesters_three = {
-            SUGGESTERS_NAME: build_lookup_suggester(
-                sayt_corpus,
-                retrievers=retrievers_list,
-            ),
-        }
+        suggester = update_suggester_weights(
+            copy(default_suggester),
+            prefix_weights=prefix,
+            ngram_weights=ngram,
+            semantic_weights=semantic,
+        )
 
         for characters in characters_to_run2:
             print(
@@ -206,7 +197,7 @@ with ngram={ngram}, prefix={prefix}, semantic={semantic}."""
 
             suggestions_df, avg_ms_dict = get_suggestions_by_chars(
                 df=test_df,
-                suggesters_dict=suggesters_three,
+                suggesters_dict={SUGGESTERS_NAME: suggester},
                 correct_codes_col=CORRECT_CODE_COL,
                 num_chars=[characters],
                 suggestions_limit=MAX_SUGGESTIONS,
