@@ -21,8 +21,8 @@ EXAMPLE_CASES = [
             "k": 5,
             "total_relevant_ranks": 2,
             "rr_final_code": 1 / 2,
-            "ndcg_at_k": 1.0,
-            "ndcg_all_at_k": 1.0,
+            "ndcg_code_at_k": 1.0,
+            "ndcg_display_text_at_k": 1.0,
         },
         id="perfect_ranking",
     ),
@@ -32,8 +32,8 @@ EXAMPLE_CASES = [
             "k": 5,
             "total_relevant_ranks": 1,
             "rr_final_code": 1 / 3,
-            "ndcg_at_k": 0.5,
-            "ndcg_all_at_k": 0.5,
+            "ndcg_code_at_k": 0.5,
+            "ndcg_display_text_at_k": 0.5,
         },
         id="single-code-at-later-rank",
     ),
@@ -43,9 +43,9 @@ EXAMPLE_CASES = [
             "k": 5,
             "total_relevant_ranks": 2,
             "rr_final_code": 1 / 4,
-            "ndcg_at_k": (1 / math.log2(3) + 1 / math.log2(5))
+            "ndcg_code_at_k": (1 / math.log2(3) + 1 / math.log2(5))
             / sum(1 / math.log2(i + 1) for i in range(1, 3)),
-            "ndcg_all_at_k": (1 / math.log2(3) + 1 / math.log2(5))
+            "ndcg_display_text_at_k": (1 / math.log2(3) + 1 / math.log2(5))
             / sum(1 / math.log2(i + 1) for i in range(1, 3)),
         },
         id="multiple-distinct-codes",
@@ -56,8 +56,8 @@ EXAMPLE_CASES = [
             "k": 5,
             "total_relevant_ranks": 3,
             "rr_final_code": 1 / 3,
-            "ndcg_at_k": (1 + 1 / math.log2(4)) / (1 + 1 / math.log2(3)),
-            "ndcg_all_at_k": (1 + 1 / math.log2(4) + 1 / math.log2(5))
+            "ndcg_code_at_k": (1 + 1 / math.log2(4)) / (1 + 1 / math.log2(3)),
+            "ndcg_display_text_at_k": (1 + 1 / math.log2(4) + 1 / math.log2(5))
             / (1 + 1 / math.log2(3) + 1 / math.log2(4)),
         },
         id="unsorted-ranks-use-earliest-hit-per-code",
@@ -68,9 +68,9 @@ EXAMPLE_CASES = [
             "k": 5,
             "total_relevant_ranks": 3,
             "rr_final_code": 1 / 4,
-            "ndcg_at_k": (1 + 1 / math.log2(5))
+            "ndcg_code_at_k": (1 + 1 / math.log2(5))
             / sum(1 / math.log2(i + 1) for i in range(1, 3)),
-            "ndcg_all_at_k": (1 + 1 / math.log2(4) + 1 / math.log2(5))
+            "ndcg_display_text_at_k": (1 + 1 / math.log2(4) + 1 / math.log2(5))
             / sum(1 / math.log2(i + 1) for i in range(1, 4)),
         },
         id="duplicate-ranks-for-one-code",
@@ -81,9 +81,9 @@ EXAMPLE_CASES = [
             "k": 5,
             "total_relevant_ranks": 2,
             "rr_final_code": 1 / 5,
-            "ndcg_at_k": (1 + 1 / math.log2(6))
+            "ndcg_code_at_k": (1 + 1 / math.log2(6))
             / sum(1 / math.log2(i + 1) for i in range(1, 3)),
-            "ndcg_all_at_k": (1 + 1 / math.log2(6))
+            "ndcg_display_text_at_k": (1 + 1 / math.log2(6))
             / sum(1 / math.log2(i + 1) for i in range(1, 3)),
         },
         id="final_code_at_rank_five",
@@ -94,8 +94,8 @@ EXAMPLE_CASES = [
             "k": 5,
             "total_relevant_ranks": 3,
             "rr_final_code": 1.0,
-            "ndcg_at_k": 1.0,
-            "ndcg_all_at_k": 1.0,
+            "ndcg_code_at_k": 1.0,
+            "ndcg_display_text_at_k": 1.0,
         },
         id="single_code_multiple_retrievals",
     ),
@@ -105,8 +105,8 @@ EXAMPLE_CASES = [
             "k": 5,
             "total_relevant_ranks": 4,
             "rr_final_code": 1.0,
-            "ndcg_at_k": 1.0,
-            "ndcg_all_at_k": (1 + 1 / math.log2(3) + 1 / math.log2(4))
+            "ndcg_code_at_k": 1.0,
+            "ndcg_display_text_at_k": (1 + 1 / math.log2(3) + 1 / math.log2(4))
             / sum(1 / math.log2(i + 1) for i in range(1, 5)),
         },
         id="missing_one_relevant_rank",
@@ -121,8 +121,8 @@ EXAMPLE_CASES = [
             "k": 9,
             "total_relevant_ranks": 3,
             "rr_final_code": 1 / 3,
-            "ndcg_at_k": 1.0,
-            "ndcg_all_at_k": 1.0,
+            "ndcg_code_at_k": 1.0,
+            "ndcg_display_text_at_k": 1.0,
         },
         id="ideal-ranking-three-distinct-codes",
     ),
@@ -136,9 +136,9 @@ EXAMPLE_CASES = [
             "k": 9,
             "total_relevant_ranks": 4,
             "rr_final_code": 1 / 4,
-            "ndcg_at_k": (1 + 1 / math.log2(4) + 1 / math.log2(5))
+            "ndcg_code_at_k": (1 + 1 / math.log2(4) + 1 / math.log2(5))
             / (1 + 1 / math.log2(3) + 1 / math.log2(4)),
-            "ndcg_all_at_k": 1.0,
+            "ndcg_display_text_at_k": 1.0,
         },
         id="duplicate-suggestion-with-all-codes-found",
     ),
@@ -152,9 +152,9 @@ EXAMPLE_CASES = [
             "k": 9,
             "total_relevant_ranks": 3,
             "rr_final_code": 0.0,
-            "ndcg_at_k": (1 + 1 / math.log2(9))
+            "ndcg_code_at_k": (1 + 1 / math.log2(9))
             / (1 + 1 / math.log2(3) + 1 / math.log2(4)),
-            "ndcg_all_at_k": (1 + 1 / math.log2(9))
+            "ndcg_display_text_at_k": (1 + 1 / math.log2(9))
             / (1 + 1 / math.log2(3) + 1 / math.log2(4)),
         },
         id="late-hit-with-one-correct-code-missing",
@@ -169,9 +169,11 @@ EXAMPLE_CASES = [
             "k": 9,
             "total_relevant_ranks": 3,
             "rr_final_code": 1 / 7,
-            "ndcg_at_k": (1 / math.log2(3) + 1 / math.log2(6) + 1 / math.log2(8))
+            "ndcg_code_at_k": (1 / math.log2(3) + 1 / math.log2(6) + 1 / math.log2(8))
             / (1 + 1 / math.log2(3) + 1 / math.log2(4)),
-            "ndcg_all_at_k": (1 / math.log2(3) + 1 / math.log2(6) + 1 / math.log2(8))
+            "ndcg_display_text_at_k": (
+                1 / math.log2(3) + 1 / math.log2(6) + 1 / math.log2(8)
+            )
             / (1 + 1 / math.log2(3) + 1 / math.log2(4)),
         },
         id="three-correct-codes-at-spaced-ranks",
@@ -182,8 +184,8 @@ EXAMPLE_CASES = [
             "k": 5,
             "total_relevant_ranks": 7,
             "rr_final_code": 1 / 3,
-            "ndcg_at_k": (1 + 1 / math.log2(4)) / (1 + 1 / math.log2(3)),
-            "ndcg_all_at_k": (1 + 1 / math.log2(4))
+            "ndcg_code_at_k": (1 + 1 / math.log2(4)) / (1 + 1 / math.log2(3)),
+            "ndcg_display_text_at_k": (1 + 1 / math.log2(4))
             / sum(1 / math.log2(i + 1) for i in range(1, 6)),
         },
         id="total-relevant-ranks-exceed-k",
@@ -205,8 +207,8 @@ EDGE_CASES = [
             "total_relevant_ranks": 5,
             # metrics
             "rr_final_code": 0.0,
-            "ndcg_at_k": 0.0,
-            "ndcg_all_at_k": 0.0,
+            "ndcg_code_at_k": 0.0,
+            "ndcg_display_text_at_k": 0.0,
         },
         id="empty_dict",
     ),
@@ -217,8 +219,8 @@ EDGE_CASES = [
             "total_relevant_ranks": 5,
             # metrics
             "rr_final_code": 0.0,
-            "ndcg_at_k": 0.0,
-            "ndcg_all_at_k": 0.0,
+            "ndcg_code_at_k": 0.0,
+            "ndcg_display_text_at_k": 0.0,
         },
         id="single_code_no_ranks",
     ),
@@ -229,8 +231,8 @@ EDGE_CASES = [
             "total_relevant_ranks": 5,
             # metrics
             "rr_final_code": 0.0,
-            "ndcg_at_k": 0.0,
-            "ndcg_all_at_k": 0.0,
+            "ndcg_code_at_k": 0.0,
+            "ndcg_display_text_at_k": 0.0,
         },
         id="multiple_codes_no_ranks",
     ),
@@ -241,9 +243,9 @@ EDGE_CASES = [
             "total_relevant_ranks": 5,
             # metrics
             "rr_final_code": 0.0,
-            "ndcg_at_k": (1 / math.log2(2))
+            "ndcg_code_at_k": (1 / math.log2(2))
             / sum(1 / math.log2(i + 1) for i in range(1, 3)),
-            "ndcg_all_at_k": (1 / math.log2(2) + 1 / math.log2(4))
+            "ndcg_display_text_at_k": (1 / math.log2(2) + 1 / math.log2(4))
             / sum(1 / math.log2(i + 1) for i in range(1, 6)),
         },
         id="final_code_missing_other_code_found",
@@ -254,8 +256,8 @@ EDGE_CASES = [
             "k": 5,
             "total_relevant_ranks": 5,
             "rr_final_code": 0.0,
-            "ndcg_at_k": 0.0,
-            "ndcg_all_at_k": 0.0,
+            "ndcg_code_at_k": 0.0,
+            "ndcg_display_text_at_k": 0.0,
         },
         id="final_code_missing_other_beyond_k",
     ),
@@ -265,8 +267,8 @@ EDGE_CASES = [
             "k": 5,
             "total_relevant_ranks": 5,
             "rr_final_code": 1 / 6,
-            "ndcg_at_k": 0.0,
-            "ndcg_all_at_k": 0.0,
+            "ndcg_code_at_k": 0.0,
+            "ndcg_display_text_at_k": 0.0,
         },
         id="single_relevant_rank_beyond_k",
     ),
@@ -276,8 +278,8 @@ EDGE_CASES = [
             "k": 5,
             "total_relevant_ranks": 5,
             "rr_final_code": 1.0,
-            "ndcg_at_k": 1.0,
-            "ndcg_all_at_k": (1 / math.log2(2))
+            "ndcg_code_at_k": 1.0,
+            "ndcg_display_text_at_k": (1 / math.log2(2))
             / sum(1 / math.log2(i + 1) for i in range(1, 6)),
         },
         id="only_in_cutoff_rank_contributes",
@@ -288,8 +290,8 @@ EDGE_CASES = [
             "k": 5,
             "total_relevant_ranks": 5,
             "rr_final_code": 1 / 7,
-            "ndcg_at_k": 0.0,
-            "ndcg_all_at_k": 0.0,
+            "ndcg_code_at_k": 0.0,
+            "ndcg_display_text_at_k": 0.0,
         },
         id="all_relevant_ranks_beyond_k",
     ),
@@ -331,53 +333,55 @@ def test_compute_reciprocal_rank_of_final_correct_code_with_edge_cases(
 def test_compute_normalized_discounted_cumulative_gain_at_k_with_examples(
     example_case,
 ):
-    """Check single-hit NDCG@k for representative examples."""
+    """Check single-hit NDCG_Code@k for representative examples."""
     ranks_by_code = example_case["ranks_by_code_dict"]
-    ndcg_at_k = compute_normalized_discounted_cumulative_gain_at_k(
+    ndcg_code_at_k = compute_normalized_discounted_cumulative_gain_at_k(
         ranks_by_code, example_case["k"]
     )
 
-    assert ndcg_at_k == pytest.approx(example_case["ndcg_at_k"])
+    assert ndcg_code_at_k == pytest.approx(example_case["ndcg_code_at_k"])
 
 
 def test_compute_normalized_discounted_cumulative_gain_at_k_all_with_examples(
     example_case,
 ):
-    """Check all-ranks NDCG@k for representative examples."""
+    """Check all-ranks NDCG_Code@k for representative examples."""
     ranks_by_code = example_case["ranks_by_code_dict"]
-    ndcg_all_at_k = compute_normalized_discounted_cumulative_gain_at_k(
+    ndcg_display_text_at_k = compute_normalized_discounted_cumulative_gain_at_k(
         ranks_by_code,
         example_case["k"],
         include_all_relevant_ranks=True,
         total_relevant_ranks=example_case["total_relevant_ranks"],
     )
 
-    assert ndcg_all_at_k == pytest.approx(example_case["ndcg_all_at_k"])
+    assert ndcg_display_text_at_k == pytest.approx(
+        example_case["ndcg_display_text_at_k"]
+    )
 
 
 def test_compute_normalized_discounted_cumulative_gain_at_k_with_edge_cases(
     edge_case,
 ):
-    """Check single-hit NDCG@k for empty and boundary cases."""
-    ndcg_at_k = compute_normalized_discounted_cumulative_gain_at_k(
+    """Check single-hit NDCG_Code@k for empty and boundary cases."""
+    ndcg_code_at_k = compute_normalized_discounted_cumulative_gain_at_k(
         edge_case["ranks_by_code_dict"], edge_case["k"]
     )
 
-    assert ndcg_at_k == pytest.approx(edge_case["ndcg_at_k"])
+    assert ndcg_code_at_k == pytest.approx(edge_case["ndcg_code_at_k"])
 
 
 def test_compute_normalized_discounted_cumulative_gain_at_k_all_with_edge_cases(
     edge_case,
 ):
-    """Check all-ranks NDCG@k for empty and boundary cases."""
-    ndcg_at_k = compute_normalized_discounted_cumulative_gain_at_k(
+    """Check all-ranks NDCG_Code@k for empty and boundary cases."""
+    ndcg_code_at_k = compute_normalized_discounted_cumulative_gain_at_k(
         edge_case["ranks_by_code_dict"],
         edge_case["k"],
         include_all_relevant_ranks=True,
         total_relevant_ranks=edge_case["total_relevant_ranks"],
     )
 
-    assert ndcg_at_k == pytest.approx(edge_case["ndcg_all_at_k"])
+    assert ndcg_code_at_k == pytest.approx(edge_case["ndcg_display_text_at_k"])
 
 
 def test_compute_normalized_discounted_cumulative_gain_at_k_all_requires_total_relevant_ranks():

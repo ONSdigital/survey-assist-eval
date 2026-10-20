@@ -35,8 +35,8 @@ class SAYTPerformanceMetrics(BaseModel):
     median_rank: float
     precision_at_k: dict[int, float]
     recall_at_k: dict[int, float]
-    ndcg_at_k: dict[int, float]
-    ndcg_all_at_k: dict[int, float]
+    ndcg_code_at_k: dict[int, float]
+    ndcg_display_text_at_k: dict[int, float]
 
     def report_metrics(self) -> str:
         """Pretty print the performance metrics."""
@@ -61,7 +61,12 @@ class SAYTPerformanceMetrics(BaseModel):
             f"  Median rank: {self.median_rank:.2f}\n",
         ]
         if not any(
-            (self.precision_at_k, self.recall_at_k, self.ndcg_at_k, self.ndcg_all_at_k)
+            (
+                self.precision_at_k,
+                self.recall_at_k,
+                self.ndcg_code_at_k,
+                self.ndcg_display_text_at_k,
+            )
         ):
             lines.append("Metrics at k not available, please provide k_values.")
             return "\n".join(lines)
@@ -77,21 +82,21 @@ class SAYTPerformanceMetrics(BaseModel):
             for k, val in sorted(self.recall_at_k.items()):
                 lines.append(f" Recall@{k}: {val:.4f}")
 
-        if self.ndcg_at_k:
+        if self.ndcg_code_at_k:
             lines.append("")
             lines.append("NDCG (first rank per code)")
-            for k, val in sorted(self.ndcg_at_k.items()):
-                lines.append(f" NDCG@{k}: {val:.4f}")
+            for k, val in sorted(self.ndcg_code_at_k.items()):
+                lines.append(f" NDCG_Code@{k}: {val:.4f}")
 
-        if self.ndcg_all_at_k:
+        if self.ndcg_display_text_at_k:
             lines.append("")
-            lines.append("NDCG (all relevant ranks)")
-            for k, val in sorted(self.ndcg_all_at_k.items()):
-                lines.append(f" NDCG_All@{k}: {val:.4f}")
+            lines.append("NDCG (all relevant display texts)")
+            for k, val in sorted(self.ndcg_display_text_at_k.items()):
+                lines.append(f" NDCG_Display_Text@{k}: {val:.4f}")
         else:
             lines.append("")
             lines.append(
-                "NDCG (all relevant ranks) not available, "
+                "NDCG (all relevant display texts) not available, "
                 "please provide a sayt_corpus_df."
             )
 
@@ -118,7 +123,7 @@ def compute_performance_metrics_from_suggestions(  # noqa: PLR0913 pylint: disab
         k_values: List of k values for which to compute Precision@K and Recall@K.
         ave_time_per_query: Average time taken per query in milliseconds.
         sayt_corpus_df: Optional DataFrame containing the SAYT corpus.
-            Required for computing NDCG considering all relevant ranks.
+            Required for computing NDCG considering all relevant display texts.
         code_digit_match_length: Optional length of the code to match for evaluation.
 
     Returns:
@@ -399,7 +404,7 @@ def add_sayt_metrics_columns(  # noqa: PLR0913 pylint: disable = R0913, R0917
         correct_codes_col: Column name containing correct code(s).
         k_values: List of k values for which to compute Precision@K and Recall@K.
         total_relevant_ranks_dict: Optional dictionary mapping correct codes to their total
-            relevant ranks. Required for computing NDCG considering all relevant ranks.
+            relevant ranks. Required for computing NDCG considering all relevant display texts.
         prefix: Optional prefix for the new metric columns. Defaults to None.
 
     Returns:
@@ -439,7 +444,7 @@ def add_sayt_metrics_columns(  # noqa: PLR0913 pylint: disable = R0913, R0917
                 ),
                 axis=1,
             )
-            df[f"{prefix}ndcg_at_{k}"] = df.apply(
+            df[f"{prefix}ndcg_code_at_{k}"] = df.apply(
                 lambda row, k=k: compute_normalized_discounted_cumulative_gain_at_k(
                     row[f"{prefix}ranks_of_correct_codes"], k=k
                 ),
@@ -447,7 +452,7 @@ def add_sayt_metrics_columns(  # noqa: PLR0913 pylint: disable = R0913, R0917
             )
 
             if total_relevant_ranks_dict is not None:
-                df[f"{prefix}ndcg_all_at_{k}"] = df.apply(
+                df[f"{prefix}ndcg_display_text_at_{k}"] = df.apply(
                     lambda row, k=k: compute_normalized_discounted_cumulative_gain_at_k(
                         row[f"{prefix}ranks_of_correct_codes"],
                         k=k,
@@ -543,11 +548,11 @@ def summarise_performance_metrics(  # noqa: PLR0913 pylint: disable = R0913, R09
         ),
         "precision_at_k": {k: df[f"{prefix}precision_at_{k}"].mean() for k in k_values},
         "recall_at_k": {k: df[f"{prefix}recall_at_{k}"].mean() for k in k_values},
-        "ndcg_at_k": {k: df[f"{prefix}ndcg_at_{k}"].mean() for k in k_values},
-        "ndcg_all_at_k": {
-            k: df[f"{prefix}ndcg_all_at_{k}"].mean()
+        "ndcg_code_at_k": {k: df[f"{prefix}ndcg_code_at_{k}"].mean() for k in k_values},
+        "ndcg_display_text_at_k": {
+            k: df[f"{prefix}ndcg_display_text_at_{k}"].mean()
             for k in k_values
-            if f"{prefix}ndcg_all_at_{k}" in df.columns
+            if f"{prefix}ndcg_display_text_at_{k}" in df.columns
         },
     }
 
