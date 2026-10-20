@@ -34,8 +34,8 @@ from survey_assist_eval.evaluation.sayt.performance_metrics_functions import (
 
 # %%
 CODE_TYPE = "sic"
-MAX_SUGGESTIONS = 30
 CORRECT_CODE_COL = "correct_sic_code"
+MAX_SUGGESTIONS = 30  # 9, 20, 25, 30
 CHARACTERS_LIST = list(range(6, 10))  # high characters
 # CHARACTERS_LIST = list(range(4, 6)) # low characters
 
@@ -228,14 +228,16 @@ suggesters = {
 
 
 # %%
+# Create two dataframes, one with hard_limit, another without
 test_df_hard_limit, avg_ms_dict_hard = get_suggestions_for_limit(
     test_df, suggesters, hard_limit=True
 )
 test_df_no_hard_limit, avg_ms_dict_no_hard = get_suggestions_for_limit(
     test_df, suggesters, hard_limit=False
 )
-# %%
 
+# %%
+# Get rows from the DF where suggestions list got extended (more than MAX_SUGGESTIONS)
 ties_no_hard = test_df_no_hard_limit[
     test_df_no_hard_limit[
         f"scores_{CHARACTERS_LIST[0]}chars_{next(iter(suggesters.keys()))}"
