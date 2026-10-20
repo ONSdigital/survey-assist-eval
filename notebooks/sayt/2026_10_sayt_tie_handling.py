@@ -36,12 +36,12 @@ from survey_assist_eval.evaluation.sayt.performance_metrics_functions import (
 CODE_TYPE = "sic"
 MAX_SUGGESTIONS = 30
 CORRECT_CODE_COL = "correct_sic_code"
-CHARACTERS_LIST = list(range(6, 10))
-# CHARACTERS_LIST = list(range(4, 6))
+CHARACTERS_LIST = list(range(6, 10))  # high characters
+# CHARACTERS_LIST = list(range(4, 6)) # low characters
 
-NGRAM_WEIGHT = 3
-PREFIX_WEIGHT = 4
-SEMANTIC_WEIGHT = 3
+NGRAM_WEIGHT = 3  # 3 for high, 4 for low characters
+PREFIX_WEIGHT = 4  # 4 for high, 5 for low characters
+SEMANTIC_WEIGHT = 3  # 3 for high, 1 for low characters
 
 # %%
 load_dotenv()
@@ -187,7 +187,7 @@ def find_extended_suggestion_ties(
     return extended_results, tied_results
 
 
-# %%
+# %% Read data
 test_df = pd.read_parquet(
     f"gs://{bucket_name}/evaluation-pipeline/original_datasets/sic_2k/sic_2k_test_data.parquet"
 )
@@ -204,6 +204,7 @@ test_df["employment_status"] = np.where(is_self_employed, "self_employed", "empl
 test_df = test_df.rename(columns={"clerical_codes": CORRECT_CODE_COL})
 
 # %%
+# Access the knowledgebase
 sayt_df = pd.read_csv(
     f"gs://{bucket_name}/sic_knowledgebase/sic_kb_for_sayt.csv", dtype=str
 )
@@ -215,9 +216,9 @@ sayt_corpus = build_sayt_corpus_from_df(
 )[1]
 
 # %%
-# define suggesters to evaluate
+# Define suggesters to evaluate
 suggesters = {
-    "equal_weights": build_lookup_suggester(
+    "suggester": build_lookup_suggester(
         sayt_corpus,
         ngram_weights=NGRAM_WEIGHT,
         prefix_weights=PREFIX_WEIGHT,
@@ -284,6 +285,7 @@ plot_rank_distributions(test_df_hard_limit, ranks)
 
 # %%
 # Unmatched queries for specific characters, with and without hard limit
+print(f"Max suggestions: {MAX_SUGGESTIONS}")
 for metric_column_name in suggestions_cols_to_compare:
     metrics_hard = compute_performance_metrics_from_suggestions(
         test_df_hard_limit,
@@ -301,21 +303,14 @@ for metric_column_name in suggestions_cols_to_compare:
         k_values=[1, 3, 5, MAX_SUGGESTIONS],
         ave_time_per_query=avg_ms_dict_no_hard.get(metric_column_name, 0),
     )
-    print("UNMATCHED QUERIES WITH HARD LIMIT")
     print(metrics_hard.suggestions_col)
-    print(metrics_hard.unmatched_query_count)
-    print()
-    print("UNMATCHED QUERIES NO HARD LIMIT")
-    print(metrics_no_hard.suggestions_col)
-    print(metrics_no_hard.unmatched_query_count)
-    print()
-print(MAX_SUGGESTIONS)
+    print(f"UNMATCHED QUERIES WITH HARD LIMIT: {metrics_hard.unmatched_query_count}")
+    print(f"UNMATCHED QUERIES NO HARD LIMIT: {metrics_no_hard.unmatched_query_count}\n")
 
 # %%
 for reported_column_name in suggestions_cols_to_compare:
     print(
-        reported_column_name,
-        sum(test_df_no_hard_limit[reported_column_name].apply(len) > MAX_SUGGESTIONS),
+        f"# rows with extended list of suggestions at {reported_column_name}: {sum(test_df_no_hard_limit[reported_column_name].apply(len) > MAX_SUGGESTIONS)}"  # pylint: disable=C0301
     )
 
 # %%
@@ -325,5 +320,5 @@ extended, same_rank = find_extended_suggestion_ties(
     next(iter(suggesters)),
     MAX_SUGGESTIONS,
 )
-print(same_rank)
+print(same_rank)  # works better without print, but ruff doesn't like bare variable
 # %%
