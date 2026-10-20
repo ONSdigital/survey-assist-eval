@@ -69,7 +69,7 @@ sic_kb_for_classifai = pd.read_csv(
     f"gs://{bucket_name}/sic_knowledgebase/sic_kb_for_sayt.csv", dtype=str
 )
 
-_, sayt2_corpus = build_sayt_corpus_from_df(
+sayt2_corpus_df, sayt2_corpus = build_sayt_corpus_from_df(
     df=sic_kb_for_classifai,
     search_text_col="search_text",
     display_text_col="display_text",
@@ -105,7 +105,6 @@ suggesters = {
         semantic_weights=1.0,
     ),
 }
-
 
 # %%
 
@@ -145,6 +144,7 @@ metrics_2_digit_match = compute_performance_metrics_from_suggestions(
     k_values=[1, 3, 5, MAX_SUGGESTIONS],
     ave_time_per_query=avg_ms_dict.get(suggestions_cols_to_compare[2], 0),
     code_digit_match_length=2,
+    sayt_corpus_df=sayt2_corpus_df,
 )
 
 print(metrics_2_digit_match.report_metrics())
@@ -159,6 +159,7 @@ compare_performance_metrics = build_sayt_metrics_comparison_table(
     code_type=CODE_TYPE,
     k_values=[1, 3, 5, MAX_SUGGESTIONS],
     ave_time_per_query_dict=avg_ms_dict,
+    sayt_corpus_df=sayt2_corpus_df,
 )
 
 compare_performance_metrics.head()
@@ -208,6 +209,7 @@ compare_performance_metrics = build_sayt_metrics_comparison_table(
     code_type=CODE_TYPE,
     k_values=[1, 3, 5, MAX_SUGGESTIONS],
     ave_time_per_query_dict=avg_ms_dict,
+    sayt_corpus_df=sayt2_corpus_df,
 )
 
 compare_performance_metrics.head()
@@ -221,6 +223,7 @@ compare_performance_metrics = build_sayt_metrics_comparison_table(
     code_digit_match_length=2,
     k_values=[1, 3, 5, MAX_SUGGESTIONS],
     ave_time_per_query_dict=avg_ms_dict,
+    sayt_corpus_df=sayt2_corpus_df,
 )
 
 compare_performance_metrics.head()
