@@ -88,17 +88,21 @@ def get_suggestions_for_limit(
 
 def plot_rank_distributions(
     evaluation_data: pd.DataFrame,
-    rank_columns: list[str],
+    plot_title: str,
 ) -> None:
     """Display a histogram of ranks for the supplied result columns.
 
     Args:
         evaluation_data: Results dataframe containing the rank columns.
-        rank_columns: Names of the rank columns to include in the histogram.
+        plot_title: Title for the plot.
 
     Returns:
         None.
     """
+    rank_columns = evaluation_data.columns[
+        evaluation_data.columns.str.startswith("rank_")
+    ].tolist()
+
     rank_df = pd.concat(
         [
             pd.DataFrame(
@@ -122,7 +126,7 @@ def plot_rank_distributions(
         nbins=30,
         barmode="group",
         opacity=0.7,
-        title="Rank distributions (with hard limit)",
+        title=plot_title,
         labels={"rank": "Rank", "count": "Count"},
     )
     fig.show()
@@ -150,9 +154,11 @@ def find_extended_suggestion_ties(
     extended_results = suggestion_results.copy()
     extended_suggestion_masks = []
     for num_chars in characters:
-        suggestion_column_name = f"suggestions_{num_chars}chars_{suggester_name}"
-        scores_col = f"scores_{num_chars}chars_{suggester_name}"
-        rank_col = f"rank_{num_chars}chars_{suggester_name}_5digitmatch"
+        suggestion_column_name = (
+            f"suggestions_{num_chars}chars_{suggester_name}_no_hard"
+        )
+        scores_col = f"scores_{num_chars}chars_{suggester_name}_no_hard"
+        rank_col = f"rank_{num_chars}chars_{suggester_name}_5digitmatch_no_hard"
 
         extended_mask = (
             extended_results[suggestion_column_name].str.len() > max_suggestions
@@ -231,84 +237,7 @@ suggesters = {
     ),
 }
 
-
-# # %%
-# # Create two dataframes, one with hard_limit, another without
-# test_df_hard_limit, avg_ms_dict_hard = get_suggestions_for_limit(
-#     test_df, suggesters, hard_limit=True, suggestions_limit=MAX_SUGGESTIONS
-# )
-# test_df_no_hard_limit, avg_ms_dict_no_hard = get_suggestions_for_limit(
-#     test_df, suggesters, hard_limit=False, suggestions_limit=MAX_SUGGESTIONS
-# )
-
-# # %%
-# # Get rows from the DF where suggestions list got extended (more than MAX_SUGGESTIONS)
-# ties_no_hard = test_df_no_hard_limit[
-#     test_df_no_hard_limit[
-#         f"scores_{CHARACTERS_LIST[0]}chars_{next(iter(suggesters.keys()))}"
-#     ].str.len()
-#     > MAX_SUGGESTIONS
-# ].reset_index(drop=True)
-
-# # %%
-# # Get matched queries count per character depending on presence of hard limit
-# test_df_metrics = pd.merge(
-#     test_df_hard_limit, test_df_no_hard_limit, on = ["unique_id"], suffixes=('_hard', '_no_hard')
-# )
-# suggestions_cols_to_compare = test_df_metrics.columns[
-#     test_df_metrics.columns.str.startswith("suggestions_")
-# ].tolist()
-
-# avg_ms_dict_combined = {
-#     **{f"{key}_hard": value for key, value in avg_ms_dict_hard.items()},
-#     **{f"{key}_no_hard": value for key, value in avg_ms_dict_no_hard.items()},
-# }
-# metrics_overall = build_sayt_metrics_comparison_table(
-#     df=test_df_metrics,
-#     suggestions_cols_to_compare=suggestions_cols_to_compare,
-#     correct_codes_col=f"{CORRECT_CODE_COL}_hard",
-#     ave_time_per_query_dict=avg_ms_dict_combined,
-#     code_type=CODE_TYPE,
-#     code_digit_match_length=None,
-#     k_values=[1, 5, 10, MAX_SUGGESTIONS]
-# ).sort_values(["suggestions_col"])
-# metrics_overall["matched_query_count"] = (
-#     metrics_overall["queries_with_ground_truth"]
-#     - metrics_overall["unmatched_query_count"]
-# )
-# display(metrics_overall[['suggestions_col', 'matched_query_count']].reset_index(drop=True))
-
-
-# # %%
-# ranks = test_df_no_hard_limit.columns[
-#     test_df_no_hard_limit.columns.str.startswith("rank_")
-# ].tolist()
-
-# nan_counts_per_char_retriever = {}
-# for column in ranks:
-#     nan_counts_per_char_retriever[column] = int(
-#         test_df_no_hard_limit[column].isna().sum()
-#     )
-
-# plot_rank_distributions(test_df_hard_limit, ranks)
-
-# # %%
-# for reported_column_name in suggestions_cols_to_compare:
-#     print(
-#         f"# rows with extended list of suggestions at {reported_column_name}: {sum(test_df_no_hard_limit[reported_column_name].apply(len) > MAX_SUGGESTIONS)}"  # pylint: disable=C0301
-#     )
-
-# # %%
-# extended, same_rank = find_extended_suggestion_ties(
-#     test_df_no_hard_limit,
-#     CHARACTERS_LIST,
-#     next(iter(suggesters)),
-#     MAX_SUGGESTIONS,
-# )
-# display(same_rank)
 # %%
-
-
 results_by_limit = {}
 
 for max_sug in MAX_SUGGESTIONS:
@@ -363,20 +292,17 @@ for max_sug in MAX_SUGGESTIONS:
         )
     )
 
-    ranks = test_df_no_hard_limit.columns[
-        test_df_no_hard_limit.columns.str.startswith("rank_")
-    ].tolist()
-    nan_counts_per_char_retriever = {
-        column: int(test_df_no_hard_limit[column].isna().sum()) for column in ranks
-    }
-    plot_rank_distributions(test_df_hard_limit, ranks)
+    plot_rank_distributions(test_df_hard_limit, "Rank distributions (with hard limit)")
+    plot_rank_distributions(
+        test_df_no_hard_limit, "Rank distributions (without hard limit)"
+    )
 
     for reported_column_name in suggestions_cols_to_compare:
         extended_count = (
             test_df_metrics[reported_column_name].apply(len) > max_sug
         ).sum()
         print(
-            f"# rows with extended list of suggestions at {reported_column_name} with {max_sug} suggestions limit: "
+            f"# rows with extended list of suggestions at {reported_column_name} with {max_sug} suggestions limit: "  # pylint: disable=C0301
             f"{extended_count}"
         )
 
@@ -386,7 +312,15 @@ for max_sug in MAX_SUGGESTIONS:
         next(iter(suggesters)),
         max_sug,
     )
-    display(same_rank)
+    same_score_columns = extended.columns[
+        extended.columns.str.startswith("same_score_at_limit_and_rank_")
+    ].tolist()
+
+    rank_greater_than_max_sug_columns = extended.columns[
+        extended.columns.str.startswith("rank_gt_max_suggestions_")
+    ].tolist()
+    cols_to_display = same_score_columns + rank_greater_than_max_sug_columns
+    display(same_rank[cols_to_display])
 
     results_by_limit[max_sug] = {
         "test_df_hard_limit": test_df_hard_limit,
@@ -394,7 +328,6 @@ for max_sug in MAX_SUGGESTIONS:
         "ties_no_hard": ties_no_hard,
         "test_df_metrics": test_df_metrics,
         "metrics_overall": metrics_overall,
-        "nan_counts_per_char_retriever": nan_counts_per_char_retriever,
         "extended": extended,
         "same_rank": same_rank,
     }
