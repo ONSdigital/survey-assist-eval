@@ -21,7 +21,6 @@ import numpy as np
 import pandas as pd
 import plotly.express as px
 from dotenv import load_dotenv
-from survey_assist_utils.logging import get_logger
 
 from notebooks.sayt.sayt_utils import (
     build_lookup_suggester,
@@ -36,12 +35,18 @@ from survey_assist_eval.evaluation.sayt.performance_metrics_functions import (
 CODE_TYPE = "sic"
 CORRECT_CODE_COL = "correct_sic_code"
 MAX_SUGGESTIONS = 30  # 9, 20, 25, 30
-CHARACTERS_LIST = list(range(6, 10))  # high characters
-# CHARACTERS_LIST = list(range(4, 6)) # low characters
+HIGH_CHARACTERS = True  # High characters: 6-9, low characters: 4-5
 
-NGRAM_WEIGHT = 3  # 3 for high, 4 for low characters
-PREFIX_WEIGHT = 4  # 4 for high, 5 for low characters
-SEMANTIC_WEIGHT = 3  # 3 for high, 1 for low characters
+if HIGH_CHARACTERS:
+    CHARACTERS_LIST = list(range(6, 10))
+    NGRAM_WEIGHT = 3
+    PREFIX_WEIGHT = 4
+    SEMANTIC_WEIGHT = 3
+else:
+    CHARACTERS_LIST = list(range(4, 6))
+    NGRAM_WEIGHT = 4
+    PREFIX_WEIGHT = 5
+    SEMANTIC_WEIGHT = 1
 
 # %%
 load_dotenv()
@@ -50,13 +55,11 @@ if not bucket_name:
     raise ValueError("EVALUATION_BUCKET_NAME environment variable not set")
 
 
-logger = get_logger(__name__)
-
-
 # %%
 def get_suggestions_for_limit(
     evaluation_data: pd.DataFrame,
     suggester_map: dict[str, Any],
+    suggestions_limit: int,
     *,
     hard_limit: bool,
 ) -> tuple[pd.DataFrame, dict]:
@@ -65,6 +68,7 @@ def get_suggestions_for_limit(
     Args:
         evaluation_data: Queries and evaluation data to generate suggestions for.
         suggester_map: Named suggesters to use for suggestion generation.
+        suggestions_limit: the maximum length of the suggestions list.
         hard_limit: Whether to enforce the suggestion limit strictly.
 
     Returns:
@@ -75,7 +79,7 @@ def get_suggestions_for_limit(
         df=evaluation_data,
         suggesters_dict=suggester_map,
         num_chars=CHARACTERS_LIST,
-        suggestions_limit=MAX_SUGGESTIONS,
+        suggestions_limit=suggestions_limit,
         hard_suggestions_limit=hard_limit,
         with_scores=True,
     )
@@ -230,10 +234,10 @@ suggesters = {
 # %%
 # Create two dataframes, one with hard_limit, another without
 test_df_hard_limit, avg_ms_dict_hard = get_suggestions_for_limit(
-    test_df, suggesters, hard_limit=True
+    test_df, suggesters, hard_limit=True, suggestions_limit=MAX_SUGGESTIONS
 )
 test_df_no_hard_limit, avg_ms_dict_no_hard = get_suggestions_for_limit(
-    test_df, suggesters, hard_limit=False
+    test_df, suggesters, hard_limit=False, suggestions_limit=MAX_SUGGESTIONS
 )
 
 # %%
