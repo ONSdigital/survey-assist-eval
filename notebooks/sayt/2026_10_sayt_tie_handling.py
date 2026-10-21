@@ -21,6 +21,7 @@ import numpy as np
 import pandas as pd
 import plotly.express as px
 from dotenv import load_dotenv
+from IPython.display import display
 
 from notebooks.sayt.sayt_utils import (
     build_lookup_suggester,
@@ -28,13 +29,13 @@ from notebooks.sayt.sayt_utils import (
     get_suggestions_by_chars,
 )
 from survey_assist_eval.evaluation.sayt.performance_metrics_functions import (
-    compute_performance_metrics_from_suggestions,
+    build_sayt_metrics_comparison_table,
 )
 
 # %%
 CODE_TYPE = "sic"
 CORRECT_CODE_COL = "correct_sic_code"
-MAX_SUGGESTIONS = 30  # 9, 20, 25, 30
+MAX_SUGGESTIONS = [9, 20, 25, 30]
 HIGH_CHARACTERS = True  # High characters: 6-9, low characters: 4-5
 
 if HIGH_CHARACTERS:
@@ -231,100 +232,170 @@ suggesters = {
 }
 
 
-# %%
-# Create two dataframes, one with hard_limit, another without
-test_df_hard_limit, avg_ms_dict_hard = get_suggestions_for_limit(
-    test_df, suggesters, hard_limit=True, suggestions_limit=MAX_SUGGESTIONS
-)
-test_df_no_hard_limit, avg_ms_dict_no_hard = get_suggestions_for_limit(
-    test_df, suggesters, hard_limit=False, suggestions_limit=MAX_SUGGESTIONS
-)
+# # %%
+# # Create two dataframes, one with hard_limit, another without
+# test_df_hard_limit, avg_ms_dict_hard = get_suggestions_for_limit(
+#     test_df, suggesters, hard_limit=True, suggestions_limit=MAX_SUGGESTIONS
+# )
+# test_df_no_hard_limit, avg_ms_dict_no_hard = get_suggestions_for_limit(
+#     test_df, suggesters, hard_limit=False, suggestions_limit=MAX_SUGGESTIONS
+# )
 
-# %%
-# Get rows from the DF where suggestions list got extended (more than MAX_SUGGESTIONS)
-ties_no_hard = test_df_no_hard_limit[
-    test_df_no_hard_limit[
-        f"scores_{CHARACTERS_LIST[0]}chars_{next(iter(suggesters.keys()))}"
-    ].str.len()
-    > MAX_SUGGESTIONS
-].reset_index(drop=True)
+# # %%
+# # Get rows from the DF where suggestions list got extended (more than MAX_SUGGESTIONS)
+# ties_no_hard = test_df_no_hard_limit[
+#     test_df_no_hard_limit[
+#         f"scores_{CHARACTERS_LIST[0]}chars_{next(iter(suggesters.keys()))}"
+#     ].str.len()
+#     > MAX_SUGGESTIONS
+# ].reset_index(drop=True)
 
-# %%
-suggestions_cols_to_compare = test_df_hard_limit.columns[
-    test_df_hard_limit.columns.str.startswith("suggestions_")
-].tolist()
+# # %%
+# # Get matched queries count per character depending on presence of hard limit
+# test_df_metrics = pd.merge(
+#     test_df_hard_limit, test_df_no_hard_limit, on = ["unique_id"], suffixes=('_hard', '_no_hard')
+# )
+# suggestions_cols_to_compare = test_df_metrics.columns[
+#     test_df_metrics.columns.str.startswith("suggestions_")
+# ].tolist()
 
+# avg_ms_dict_combined = {
+#     **{f"{key}_hard": value for key, value in avg_ms_dict_hard.items()},
+#     **{f"{key}_no_hard": value for key, value in avg_ms_dict_no_hard.items()},
+# }
+# metrics_overall = build_sayt_metrics_comparison_table(
+#     df=test_df_metrics,
+#     suggestions_cols_to_compare=suggestions_cols_to_compare,
+#     correct_codes_col=f"{CORRECT_CODE_COL}_hard",
+#     ave_time_per_query_dict=avg_ms_dict_combined,
+#     code_type=CODE_TYPE,
+#     code_digit_match_length=None,
+#     k_values=[1, 5, 10, MAX_SUGGESTIONS]
+# ).sort_values(["suggestions_col"])
+# metrics_overall["matched_query_count"] = (
+#     metrics_overall["queries_with_ground_truth"]
+#     - metrics_overall["unmatched_query_count"]
+# )
+# display(metrics_overall[['suggestions_col', 'matched_query_count']].reset_index(drop=True))
+
+
+# # %%
+# ranks = test_df_no_hard_limit.columns[
+#     test_df_no_hard_limit.columns.str.startswith("rank_")
+# ].tolist()
+
+# nan_counts_per_char_retriever = {}
+# for column in ranks:
+#     nan_counts_per_char_retriever[column] = int(
+#         test_df_no_hard_limit[column].isna().sum()
+#     )
+
+# plot_rank_distributions(test_df_hard_limit, ranks)
+
+# # %%
+# for reported_column_name in suggestions_cols_to_compare:
+#     print(
+#         f"# rows with extended list of suggestions at {reported_column_name}: {sum(test_df_no_hard_limit[reported_column_name].apply(len) > MAX_SUGGESTIONS)}"  # pylint: disable=C0301
+#     )
+
+# # %%
+# extended, same_rank = find_extended_suggestion_ties(
+#     test_df_no_hard_limit,
+#     CHARACTERS_LIST,
+#     next(iter(suggesters)),
+#     MAX_SUGGESTIONS,
+# )
+# display(same_rank)
 # %%
-for suggestions_col in suggestions_cols_to_compare:
-    metrics_hard = compute_performance_metrics_from_suggestions(
+
+
+results_by_limit = {}
+
+for max_sug in MAX_SUGGESTIONS:
+    # Create two dataframes, one with hard_limit, another without.
+    test_df_hard_limit, avg_ms_dict_hard = get_suggestions_for_limit(
+        test_df, suggesters, hard_limit=True, suggestions_limit=max_sug
+    )
+    test_df_no_hard_limit, avg_ms_dict_no_hard = get_suggestions_for_limit(
+        test_df, suggesters, hard_limit=False, suggestions_limit=max_sug
+    )
+
+    # Get rows where the suggestions list was extended beyond the limit.
+    ties_no_hard = test_df_no_hard_limit[
+        test_df_no_hard_limit[
+            f"scores_{CHARACTERS_LIST[0]}chars_{next(iter(suggesters.keys()))}"
+        ].str.len()
+        > max_sug
+    ].reset_index(drop=True)
+
+    # Compare metrics for hard- and no-hard-limit suggestions.
+    test_df_metrics = pd.merge(
         test_df_hard_limit,
-        correct_codes_col=CORRECT_CODE_COL,
-        suggestions_col=suggestions_col,
-        code_type=CODE_TYPE,
-        k_values=[1, 3, 5, MAX_SUGGESTIONS],
-        ave_time_per_query=avg_ms_dict_hard.get(suggestions_col, 0),
-    )
-    metrics_no_hard = compute_performance_metrics_from_suggestions(
         test_df_no_hard_limit,
-        correct_codes_col=CORRECT_CODE_COL,
-        suggestions_col=suggestions_col,
+        on=["unique_id"],
+        suffixes=("_hard", "_no_hard"),
+    )
+    suggestions_cols_to_compare = test_df_metrics.columns[
+        test_df_metrics.columns.str.startswith("suggestions_")
+    ].tolist()
+
+    avg_ms_dict_combined = {
+        **{f"{key}_hard": value for key, value in avg_ms_dict_hard.items()},
+        **{f"{key}_no_hard": value for key, value in avg_ms_dict_no_hard.items()},
+    }
+    metrics_overall = build_sayt_metrics_comparison_table(
+        df=test_df_metrics,
+        suggestions_cols_to_compare=suggestions_cols_to_compare,
+        correct_codes_col=f"{CORRECT_CODE_COL}_hard",
+        ave_time_per_query_dict=avg_ms_dict_combined,
         code_type=CODE_TYPE,
-        k_values=[1, 3, 5, MAX_SUGGESTIONS],
-        ave_time_per_query=avg_ms_dict_no_hard.get(suggestions_col, 0),
+        code_digit_match_length=None,
+        k_values=[1, 5, max_sug],
+    ).sort_values(["suggestions_col"])
+    metrics_overall["matched_query_count"] = (
+        metrics_overall["queries_with_ground_truth"]
+        - metrics_overall["unmatched_query_count"]
     )
-    print(metrics_hard.report_metrics())
-    print(metrics_no_hard.report_metrics())
-
-# %%
-ranks = test_df_no_hard_limit.columns[
-    test_df_no_hard_limit.columns.str.startswith("rank_")
-].tolist()
-
-nan_counts_per_char_retriever = {}
-for column in ranks:
-    nan_counts_per_char_retriever[column] = int(
-        test_df_no_hard_limit[column].isna().sum()
+    print(f"Suggestion limit: {max_sug}")
+    display(
+        metrics_overall[["suggestions_col", "matched_query_count"]].reset_index(
+            drop=True
+        )
     )
 
-plot_rank_distributions(test_df_hard_limit, ranks)
+    ranks = test_df_no_hard_limit.columns[
+        test_df_no_hard_limit.columns.str.startswith("rank_")
+    ].tolist()
+    nan_counts_per_char_retriever = {
+        column: int(test_df_no_hard_limit[column].isna().sum()) for column in ranks
+    }
+    plot_rank_distributions(test_df_hard_limit, ranks)
 
+    for reported_column_name in suggestions_cols_to_compare:
+        extended_count = (
+            test_df_metrics[reported_column_name].apply(len) > max_sug
+        ).sum()
+        print(
+            f"# rows with extended list of suggestions at {reported_column_name} with {max_sug} suggestions limit: "
+            f"{extended_count}"
+        )
 
-# %%
-# Unmatched queries for specific characters, with and without hard limit
-print(f"Max suggestions: {MAX_SUGGESTIONS}")
-for metric_column_name in suggestions_cols_to_compare:
-    metrics_hard = compute_performance_metrics_from_suggestions(
-        test_df_hard_limit,
-        correct_codes_col=CORRECT_CODE_COL,
-        suggestions_col=metric_column_name,
-        code_type=CODE_TYPE,
-        k_values=[1, 3, 5, MAX_SUGGESTIONS],
-        ave_time_per_query=avg_ms_dict_hard.get(metric_column_name, 0),
+    extended, same_rank = find_extended_suggestion_ties(
+        test_df_metrics,
+        CHARACTERS_LIST,
+        next(iter(suggesters)),
+        max_sug,
     )
-    metrics_no_hard = compute_performance_metrics_from_suggestions(
-        test_df_no_hard_limit,
-        correct_codes_col=CORRECT_CODE_COL,
-        suggestions_col=metric_column_name,
-        code_type=CODE_TYPE,
-        k_values=[1, 3, 5, MAX_SUGGESTIONS],
-        ave_time_per_query=avg_ms_dict_no_hard.get(metric_column_name, 0),
-    )
-    print(metrics_hard.suggestions_col)
-    print(f"UNMATCHED QUERIES WITH HARD LIMIT: {metrics_hard.unmatched_query_count}")
-    print(f"UNMATCHED QUERIES NO HARD LIMIT: {metrics_no_hard.unmatched_query_count}\n")
+    display(same_rank)
 
-# %%
-for reported_column_name in suggestions_cols_to_compare:
-    print(
-        f"# rows with extended list of suggestions at {reported_column_name}: {sum(test_df_no_hard_limit[reported_column_name].apply(len) > MAX_SUGGESTIONS)}"  # pylint: disable=C0301
-    )
-
-# %%
-extended, same_rank = find_extended_suggestion_ties(
-    test_df_no_hard_limit,
-    CHARACTERS_LIST,
-    next(iter(suggesters)),
-    MAX_SUGGESTIONS,
-)
-print(same_rank)  # works better without print, but ruff doesn't like bare variable
+    results_by_limit[max_sug] = {
+        "test_df_hard_limit": test_df_hard_limit,
+        "test_df_no_hard_limit": test_df_no_hard_limit,
+        "ties_no_hard": ties_no_hard,
+        "test_df_metrics": test_df_metrics,
+        "metrics_overall": metrics_overall,
+        "nan_counts_per_char_retriever": nan_counts_per_char_retriever,
+        "extended": extended,
+        "same_rank": same_rank,
+    }
 # %%
