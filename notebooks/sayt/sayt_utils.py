@@ -35,6 +35,7 @@ logger = get_logger(__name__)
 def build_lookup_suggester(
     corpus: list[tuple[str, str]],
     *,
+    semantic_spec_inputs: dict[str, Any] | None = None,
     prefix_weights: int | float | dict[int, float] = 1.0,
     ngram_weights: int | float | dict[int, float] = 1.0,
     semantic_weights: int | float | dict[int, float] = 1.0,
@@ -43,6 +44,8 @@ def build_lookup_suggester(
 
     Args:
         corpus: Search corpus as (search_text, display_text) tuples.
+        semantic_spec_inputs: Dictionary of inputs for the semantic retriever specification.
+            Can include keys like "model", "corpus_prefix", and "query_prefix". Defaults to None.
         prefix_weights: Weight for the prefix retriever. Pass 0 to exclude,
             or a non-zero value to include. Defaults to 1.0.
         ngram_weights: Weight for the ngram retriever. Pass 0 to exclude,
@@ -65,7 +68,7 @@ def build_lookup_suggester(
         weight_spec.append(NgramWeightSpec(weights=ngram_weights))
 
     if semantic_weights != 0:
-        retrievers.append(SemanticRetrieverSpec())
+        retrievers.append(SemanticRetrieverSpec(**(semantic_spec_inputs or {})))
         weight_spec.append(SemanticWeightSpec(weights=semantic_weights))
 
     if not retrievers:

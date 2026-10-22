@@ -7,11 +7,6 @@ import os
 import numpy as np
 import pandas as pd
 from dotenv import load_dotenv
-from survey_assist_embed_core.sayt import (
-    NgramRetrieverSpec,
-    PrefixRetrieverSpec,
-    SemanticRetrieverSpec,
-)
 from survey_assist_utils.logging import get_logger
 
 from notebooks.sayt.sayt_utils import build_lookup_suggester, build_sayt_corpus_from_df
@@ -23,7 +18,7 @@ MAX_SUGGESTIONS = 9
 CORRECT_CODE_COL = "correct_sic_code"
 NUM_CHARACTERS_LIST = list(range(4, 10))
 SEMANTIC_SUGGESTERS_ONLY = True
-OUTPUT_DIR = "data/figures/sayt/SA_898_semantic_model/semantic_search_only"
+OUTPUT_DIR = "data/figures/sayt/SA_898_semantic_model"
 
 # %%
 if not os.path.exists(OUTPUT_DIR):
@@ -69,205 +64,189 @@ _, sayt2_corpus = build_sayt_corpus_from_df(
 
 # %%
 if not SEMANTIC_SUGGESTERS_ONLY:
+    output_dir = f"{OUTPUT_DIR}/all_suggesters"
     suggesters = {
         "all_MiniLM_L6_v2": build_lookup_suggester(
             corpus=sayt2_corpus,
-            retrievers=[
-                PrefixRetrieverSpec(weight=1.0),
-                NgramRetrieverSpec(weight=1.0),
-                SemanticRetrieverSpec(weight=1.0, model="all-MiniLM-L6-v2"),
-            ],
+            semantic_spec_inputs={"model": "all-MiniLM-L6-v2"},
+            prefix_weights=1.0,
+            ngram_weights=1.0,
+            semantic_weights=1.0,
         ),
         "nomic_embed_plain": build_lookup_suggester(
             corpus=sayt2_corpus,
-            retrievers=[
-                PrefixRetrieverSpec(weight=1.0),
-                NgramRetrieverSpec(weight=1.0),
-                SemanticRetrieverSpec(
-                    weight=1.0, model="nomic-ai/nomic-embed-text-v1.5"
-                ),
-            ],
+            semantic_spec_inputs={"model": "nomic-ai/nomic-embed-text-v1.5"},
+            prefix_weights=1.0,
+            ngram_weights=1.0,
+            semantic_weights=1.0,
         ),
         "nomic_embed_search_doc": build_lookup_suggester(
             corpus=sayt2_corpus,
-            retrievers=[
-                PrefixRetrieverSpec(weight=1.0),
-                NgramRetrieverSpec(weight=1.0),
-                SemanticRetrieverSpec(
-                    weight=1.0,
-                    model="nomic-ai/nomic-embed-text-v1.5",
-                    corpus_prefix="search_document: ",
-                ),
-            ],
+            semantic_spec_inputs={
+                "model": "nomic-ai/nomic-embed-text-v1.5",
+                "corpus_prefix": "search_document: ",
+            },
+            prefix_weights=1.0,
+            ngram_weights=1.0,
+            semantic_weights=1.0,
         ),
         "nomic_embed_search_query": build_lookup_suggester(
             corpus=sayt2_corpus,
-            retrievers=[
-                PrefixRetrieverSpec(weight=1.0),
-                NgramRetrieverSpec(weight=1.0),
-                SemanticRetrieverSpec(
-                    weight=1.0,
-                    query_prefix="search_query: ",
-                    model="nomic-ai/nomic-embed-text-v1.5",
-                ),
-            ],
+            semantic_spec_inputs={
+                "model": "nomic-ai/nomic-embed-text-v1.5",
+                "query_prefix": "search_query: ",
+            },
+            prefix_weights=1.0,
+            ngram_weights=1.0,
+            semantic_weights=1.0,
         ),
         "nomic_embed_search_doc_and_query": build_lookup_suggester(
             corpus=sayt2_corpus,
-            retrievers=[
-                PrefixRetrieverSpec(weight=1.0),
-                NgramRetrieverSpec(weight=1.0),
-                SemanticRetrieverSpec(
-                    weight=1.0,
-                    model="nomic-ai/nomic-embed-text-v1.5",
-                    corpus_prefix="search_document: ",
-                    query_prefix="search_query: ",
-                ),
-            ],
+            semantic_spec_inputs={
+                "model": "nomic-ai/nomic-embed-text-v1.5",
+                "corpus_prefix": "search_document: ",
+                "query_prefix": "search_query: ",
+            },
+            prefix_weights=1.0,
+            ngram_weights=1.0,
+            semantic_weights=1.0,
         ),
         "nomic_embed_classification": build_lookup_suggester(
             corpus=sayt2_corpus,
-            retrievers=[
-                PrefixRetrieverSpec(weight=1.0),
-                NgramRetrieverSpec(weight=1.0),
-                SemanticRetrieverSpec(
-                    weight=1.0,
-                    corpus_prefix="classification: ",
-                    query_prefix="classification: ",
-                    model="nomic-ai/nomic-embed-text-v1.5",
-                ),
-            ],
+            semantic_spec_inputs={
+                "model": "nomic-ai/nomic-embed-text-v1.5",
+                "corpus_prefix": "classification: ",
+                "query_prefix": "classification: ",
+            },
+            prefix_weights=1.0,
+            ngram_weights=1.0,
+            semantic_weights=1.0,
         ),
         "nomic_embed_clustering": build_lookup_suggester(
             corpus=sayt2_corpus,
-            retrievers=[
-                PrefixRetrieverSpec(weight=1.0),
-                NgramRetrieverSpec(weight=1.0),
-                SemanticRetrieverSpec(
-                    weight=1.0,
-                    model="nomic-ai/nomic-embed-text-v1.5",
-                    corpus_prefix="clustering: ",
-                    query_prefix="clustering: ",
-                ),
-            ],
+            semantic_spec_inputs={
+                "model": "nomic-ai/nomic-embed-text-v1.5",
+                "corpus_prefix": "clustering: ",
+                "query_prefix": "clustering: ",
+            },
+            prefix_weights=1.0,
+            ngram_weights=1.0,
+            semantic_weights=1.0,
         ),
         "nomic_embed_search_document_both": build_lookup_suggester(
             corpus=sayt2_corpus,
-            retrievers=[
-                PrefixRetrieverSpec(weight=1.0),
-                NgramRetrieverSpec(weight=1.0),
-                SemanticRetrieverSpec(
-                    weight=1.0,
-                    model="nomic-ai/nomic-embed-text-v1.5",
-                    corpus_prefix="search_document: ",
-                    query_prefix="search_document: ",
-                ),
-            ],
+            semantic_spec_inputs={
+                "model": "nomic-ai/nomic-embed-text-v1.5",
+                "corpus_prefix": "search_document: ",
+                "query_prefix": "search_document: ",
+            },
+            prefix_weights=1.0,
+            ngram_weights=1.0,
+            semantic_weights=1.0,
         ),
         "nomic_embed_search_query_both": build_lookup_suggester(
             corpus=sayt2_corpus,
-            retrievers=[
-                PrefixRetrieverSpec(weight=1.0),
-                NgramRetrieverSpec(weight=1.0),
-                SemanticRetrieverSpec(
-                    weight=1.0,
-                    model="nomic-ai/nomic-embed-text-v1.5",
-                    corpus_prefix="search_query: ",
-                    query_prefix="search_query: ",
-                ),
-            ],
+            semantic_spec_inputs={
+                "model": "nomic-ai/nomic-embed-text-v1.5",
+                "corpus_prefix": "search_query: ",
+                "query_prefix": "search_query: ",
+            },
+            prefix_weights=1.0,
+            ngram_weights=1.0,
+            semantic_weights=1.0,
         ),
     }
 else:
+    output_dir = f"{OUTPUT_DIR}/semantic_search_only"
     suggesters = {
         "all_MiniLM_L6_v2": build_lookup_suggester(
             corpus=sayt2_corpus,
-            retrievers=[
-                SemanticRetrieverSpec(weight=1.0, model="all-MiniLM-L6-v2"),
-            ],
+            semantic_spec_inputs={"model": "all-MiniLM-L6-v2"},
+            prefix_weights=0.0,
+            ngram_weights=0.0,
+            semantic_weights=1.0,
         ),
         "nomic_embed_plain": build_lookup_suggester(
             corpus=sayt2_corpus,
-            retrievers=[
-                SemanticRetrieverSpec(
-                    weight=1.0, model="nomic-ai/nomic-embed-text-v1.5"
-                ),
-            ],
+            semantic_spec_inputs={"model": "nomic-ai/nomic-embed-text-v1.5"},
+            prefix_weights=0.0,
+            ngram_weights=0.0,
+            semantic_weights=1.0,
         ),
         "nomic_embed_search_doc": build_lookup_suggester(
             corpus=sayt2_corpus,
-            retrievers=[
-                SemanticRetrieverSpec(
-                    weight=1.0,
-                    model="nomic-ai/nomic-embed-text-v1.5",
-                    corpus_prefix="search_document: ",
-                ),
-            ],
+            semantic_spec_inputs={
+                "model": "nomic-ai/nomic-embed-text-v1.5",
+                "corpus_prefix": "search_document: ",
+            },
+            prefix_weights=0.0,
+            ngram_weights=0.0,
+            semantic_weights=1.0,
         ),
         "nomic_embed_search_query": build_lookup_suggester(
             corpus=sayt2_corpus,
-            retrievers=[
-                SemanticRetrieverSpec(
-                    weight=1.0,
-                    query_prefix="search_query: ",
-                    model="nomic-ai/nomic-embed-text-v1.5",
-                ),
-            ],
+            semantic_spec_inputs={
+                "model": "nomic-ai/nomic-embed-text-v1.5",
+                "query_prefix": "search_query: ",
+            },
+            prefix_weights=0.0,
+            ngram_weights=0.0,
+            semantic_weights=1.0,
         ),
         "nomic_embed_search_doc_and_query": build_lookup_suggester(
             corpus=sayt2_corpus,
-            retrievers=[
-                SemanticRetrieverSpec(
-                    weight=1.0,
-                    model="nomic-ai/nomic-embed-text-v1.5",
-                    corpus_prefix="search_document: ",
-                    query_prefix="search_query: ",
-                ),
-            ],
+            semantic_spec_inputs={
+                "model": "nomic-ai/nomic-embed-text-v1.5",
+                "corpus_prefix": "search_document: ",
+                "query_prefix": "search_query: ",
+            },
+            prefix_weights=0.0,
+            ngram_weights=0.0,
+            semantic_weights=1.0,
         ),
         "nomic_embed_classification": build_lookup_suggester(
             corpus=sayt2_corpus,
-            retrievers=[
-                SemanticRetrieverSpec(
-                    weight=1.0,
-                    corpus_prefix="classification: ",
-                    query_prefix="classification: ",
-                    model="nomic-ai/nomic-embed-text-v1.5",
-                ),
-            ],
+            semantic_spec_inputs={
+                "model": "nomic-ai/nomic-embed-text-v1.5",
+                "corpus_prefix": "classification: ",
+                "query_prefix": "classification: ",
+            },
+            prefix_weights=0.0,
+            ngram_weights=0.0,
+            semantic_weights=1.0,
         ),
         "nomic_embed_clustering": build_lookup_suggester(
             corpus=sayt2_corpus,
-            retrievers=[
-                SemanticRetrieverSpec(
-                    weight=1.0,
-                    model="nomic-ai/nomic-embed-text-v1.5",
-                    corpus_prefix="clustering: ",
-                    query_prefix="clustering: ",
-                ),
-            ],
+            semantic_spec_inputs={
+                "model": "nomic-ai/nomic-embed-text-v1.5",
+                "corpus_prefix": "clustering: ",
+                "query_prefix": "clustering: ",
+            },
+            prefix_weights=0.0,
+            ngram_weights=0.0,
+            semantic_weights=1.0,
         ),
         "nomic_embed_search_document_both": build_lookup_suggester(
             corpus=sayt2_corpus,
-            retrievers=[
-                SemanticRetrieverSpec(
-                    weight=1.0,
-                    model="nomic-ai/nomic-embed-text-v1.5",
-                    corpus_prefix="search_document: ",
-                    query_prefix="search_document: ",
-                ),
-            ],
+            semantic_spec_inputs={
+                "model": "nomic-ai/nomic-embed-text-v1.5",
+                "corpus_prefix": "search_document: ",
+                "query_prefix": "search_document: ",
+            },
+            prefix_weights=0.0,
+            ngram_weights=0.0,
+            semantic_weights=1.0,
         ),
         "nomic_embed_search_query_both": build_lookup_suggester(
             corpus=sayt2_corpus,
-            retrievers=[
-                SemanticRetrieverSpec(
-                    weight=1.0,
-                    model="nomic-ai/nomic-embed-text-v1.5",
-                    corpus_prefix="search_query: ",
-                    query_prefix="search_query: ",
-                ),
-            ],
+            semantic_spec_inputs={
+                "model": "nomic-ai/nomic-embed-text-v1.5",
+                "corpus_prefix": "search_query: ",
+                "query_prefix": "search_query: ",
+            },
+            prefix_weights=0.0,
+            ngram_weights=0.0,
+            semantic_weights=1.0,
         ),
     }
 
@@ -279,12 +258,12 @@ suggestions_df, fig, metrics_table = run_eval_for_suggesters(
     num_chars=NUM_CHARACTERS_LIST,
     suggestions_limit=MAX_SUGGESTIONS,
     correct_codes_col=CORRECT_CODE_COL,
-    output_dir=f"{OUTPUT_DIR}",
+    output_dir=output_dir,
     code_type=CODE_TYPE,
 )
 
 metrics_table.head()
-metrics_table.to_csv(f"{OUTPUT_DIR}/metrics_table.csv")
+metrics_table.to_csv(f"{output_dir}/metrics_table.csv")
 # %%
 # import ast
 
