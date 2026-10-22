@@ -5,14 +5,10 @@
 
 # %%
 import os
+from copy import copy
 
 import pandas as pd
 from dotenv import load_dotenv
-from survey_assist_embed_core.sayt import (
-    NgramRetrieverSpec,
-    PrefixRetrieverSpec,
-    SemanticRetrieverSpec,
-)
 from survey_assist_utils.logging import get_logger
 
 from notebooks.sayt.evaluation.hard_limit_metrics_functions import (
@@ -23,6 +19,7 @@ from notebooks.sayt.sayt_utils import (
     build_lookup_suggester,
     build_sayt_corpus_from_df,
     get_suggestions_by_chars,
+    update_suggester_weights,
 )
 from survey_assist_eval.evaluation.sayt.performance_metrics_functions import (
     build_sayt_metrics_comparison_table,
@@ -84,24 +81,30 @@ _, sayt2_corpus = build_sayt_corpus_from_df(
 )
 
 # %%
+# define a base suggester
+suggester_sayt2_corpus = build_lookup_suggester(
+    sayt2_corpus, prefix_weights=1.0, ngram_weights=1.0, semantic_weights=1.0
+)
 # define bunch of different suggesters to evaluate
 suggesters = {
-    "Ngrams only": build_lookup_suggester(
-        sayt2_corpus, retrievers=[NgramRetrieverSpec()]
+    "Default": suggester_sayt2_corpus,
+    "Ngrams only": update_suggester_weights(
+        suggester=copy(suggester_sayt2_corpus),
+        prefix_weights=0.0,
+        ngram_weights=1.0,
+        semantic_weights=0.0,
     ),
-    "Prefix only": build_lookup_suggester(
-        sayt2_corpus, retrievers=[PrefixRetrieverSpec()]
+    "Prefix only": update_suggester_weights(
+        suggester=copy(suggester_sayt2_corpus),
+        prefix_weights=1.0,
+        ngram_weights=0.0,
+        semantic_weights=0.0,
     ),
-    "Semantic only": build_lookup_suggester(
-        sayt2_corpus, retrievers=[SemanticRetrieverSpec()]
-    ),
-    "All Suggesters": build_lookup_suggester(
-        sayt2_corpus,
-        retrievers=[
-            NgramRetrieverSpec(),
-            PrefixRetrieverSpec(),
-            SemanticRetrieverSpec(),
-        ],
+    "Semantic only": update_suggester_weights(
+        suggester=copy(suggester_sayt2_corpus),
+        prefix_weights=0.0,
+        ngram_weights=0.0,
+        semantic_weights=1.0,
     ),
 }
 
