@@ -64,7 +64,7 @@ _, sayt2_corpus = build_sayt_corpus_from_df(
 
 # %%
 if not SEMANTIC_SUGGESTERS_ONLY:
-    output_dir = f"{OUTPUT_DIR}/all_suggesters"
+    output_dir = f"{OUTPUT_DIR}/all_suggesters/max_suggestions_{MAX_SUGGESTIONS}"
     suggesters = {
         "all_MiniLM_L6_v2": build_lookup_suggester(
             corpus=sayt2_corpus,
@@ -157,7 +157,7 @@ if not SEMANTIC_SUGGESTERS_ONLY:
         ),
     }
 else:
-    output_dir = f"{OUTPUT_DIR}/semantic_search_only"
+    output_dir = f"{OUTPUT_DIR}/semantic_search_only/max_suggestions_{MAX_SUGGESTIONS}"
     suggesters = {
         "all_MiniLM_L6_v2": build_lookup_suggester(
             corpus=sayt2_corpus,
