@@ -9,11 +9,12 @@ import subprocess
 
 import pandas as pd
 from dotenv import load_dotenv
+from IPython.display import display
 from survey_assist_utils.logging import get_logger
 
 # %%
 # Load environment variables and set up logging
-DATADROP_NUM = 2
+DATADROP_NUM = 1
 
 load_dotenv()
 bucket_name = os.getenv("PREPROD_DATA_BUCKET_NAME")
@@ -47,7 +48,7 @@ df_tlfs["unique_id"] = (
     + (df_tlfs.index + 2).astype(str)
 )
 df_tlfs = df_tlfs[df_tlfs["case_person_id"].notna()].reset_index(drop=True)
-print(df_tlfs.describe().T)
+display(df_tlfs.describe().T)
 
 df_fus = pd.read_excel(input_data_xlsx, sheet_name="FUS", dtype=str)
 df_fus["unique_id"] = (
@@ -57,7 +58,7 @@ df_fus["unique_id"] = (
     + "_"
     + (df_fus.index + 2).astype(str)
 )
-print(df_fus.describe().T)
+display(df_fus.describe().T)
 
 
 # %%
@@ -93,60 +94,54 @@ payload_cols = [
     SELF_EMPLOYED_DESC_COL,
 ]
 
-df = pd.concat(
+df_concat = pd.concat(
     [
-        df_tlfs.copy().rename(
+        df_tlfs.copy()
+        .rename(
             columns={
                 "soc2020_job_title_main_job": JOB_TITLE_COL,
                 "soc2020_job_description_main_job": JOB_DESCRIPTION_COL,
                 "sic2007_employed_main_job": INDUSTRY_DESCR_COL,
                 "sic2007_self_employed_main_job": SELF_EMPLOYED_DESC_COL,
             }
-        ),
-        df_fus.copy().rename(
+        )
+        .assign(source="main_job"),
+        df_tlfs.copy()
+        .rename(
+            columns={
+                "soc2020_job_title_second_job": JOB_TITLE_COL,
+                "soc2020_job_description_second_job": JOB_DESCRIPTION_COL,
+                "sic2007_employed_second_job": INDUSTRY_DESCR_COL,
+                "sic2007_self_employed_second_job": SELF_EMPLOYED_DESC_COL,
+            }
+        )
+        .assign(source="second_job"),
+        df_fus.copy()
+        .rename(
             columns={
                 "Main_activity": INDUSTRY_DESCR_COL,
             }
-        ),
+        )
+        .assign(source="fus"),
     ],
     ignore_index=True,
 )
 
-all_missing = pd.Series(True, index=df.index)
+all_missing = pd.Series(True, index=df_concat.index)
 for col in payload_cols:
-    all_missing = all_missing & (df[col].isna() | df[col].isin(["-9", -9, "-8", -8]))
+    all_missing = all_missing & (
+        df_concat[col].isna() | df_concat[col].isin(["-9", -9, "-8", -8, ""])
+    )
 if all_missing.any():
-    num_missing = all_missing.sum()
+    num_missing = all_missing.groupby(df_concat["source"]).sum()
     logger.warning(
         "There are rows with all relevant columns missing.",
         num_missing=str(num_missing),
     )
+    display(df_concat[all_missing & (df_concat["source"] == "main_job")])
 
-    for col in payload_cols:
-        second_col = (
-            "sic2007_employed_second_job"
-            if col == "sic2007_employee"
-            else col + "_second_job"
-        )
-        df.loc[all_missing, col] = df.loc[all_missing, second_col]
-
-    all_missing = pd.Series(True, index=df.index)
-    for col in payload_cols:
-        all_missing = all_missing & (
-            df[col].isna() | df[col].isin(["-9", -9, "-8", -8])
-        )
-
-    if num_missing > all_missing.sum():
-        logger.warning(
-            "Filled out missing values from second job information.",
-            num_filled=str(num_missing - all_missing.sum()),
-            num_missing=str(all_missing.sum()),
-        )
-
-    print(df[all_missing])
-
-df = df[["unique_id", *payload_cols]]
-print(df.describe().T)
+df = df_concat.loc[~all_missing, ["unique_id", "source", *payload_cols]].copy()
+display(df.describe().T)
 
 input_data_file = work_folder + "/prep_input_data.parquet"
 df.to_parquet(input_data_file, index=False)
@@ -179,7 +174,6 @@ out_df.loc[alt_msk, "alt_sic_candidates"] = out_df.loc[alt_msk, "alt_codes"].app
     lambda x: [y["code"] for y in x]
 )
 
-out_df["source"] = out_df["unique_id"].str.split("_").str[0]
 stats = out_df.groupby("source")["unambiguously_codable"].value_counts()
 logger.info(
     "Processed pipeline output.",
@@ -190,19 +184,50 @@ logger.info(
 # %%
 # Attach model codes to TLFS and FUS dataframe
 out_df_tlfs = (
-    df_tlfs[df_tlfs.columns.difference(["initial_code", "alt_sic_candidates"])]
+    df_tlfs[
+        df_tlfs.columns.difference(["initial_code", "alt_sic_candidates", "confidence"])
+    ]
     .copy()
     .merge(
-        out_df[["unique_id", "initial_code", "alt_sic_candidates"]].copy(),
+        (
+            out_df.loc[
+                out_df["source"] == "main_job",
+                ["unique_id", "initial_code", "alt_sic_candidates"],
+            ]
+            .copy()
+            .rename(
+                columns={
+                    "initial_code": "initial_code_main_job",
+                    "alt_sic_candidates": "alt_sic_candidates_main_job",
+                }
+            )
+        ),
+        on="unique_id",
+        how="left",
+    )
+    .merge(
+        out_df.loc[
+            out_df["source"] == "second_job",
+            ["unique_id", "initial_code", "alt_sic_candidates"],
+        ]
+        .copy()
+        .rename(
+            columns={
+                "initial_code": "initial_code_second_job",
+                "alt_sic_candidates": "alt_sic_candidates_second_job",
+            }
+        ),
         on="unique_id",
         how="left",
     )
 )
 tlfs_output_file = input_data_xlsx.replace(".xlsx", "_tlfs.csv")
-out_df_tlfs[df_tlfs.columns].to_csv(tlfs_output_file, index=False, quoting=False)
+out_df_tlfs.to_csv(tlfs_output_file, index=False)
 
 out_df_fus = (
-    df_fus[df_fus.columns.difference(["initial_code", "alt_sic_candidates"])]
+    df_fus[
+        df_fus.columns.difference(["initial_code", "alt_sic_candidates", "confidence"])
+    ]
     .copy()
     .merge(
         out_df[["unique_id", "initial_code", "alt_sic_candidates"]].copy(),
@@ -211,7 +236,7 @@ out_df_fus = (
     )
 )
 fus_output_file = input_data_xlsx.replace(".xlsx", "_fus.csv")
-out_df_fus[df_fus.columns].to_csv(fus_output_file, index=False, quoting=False)
+out_df_fus.to_csv(fus_output_file, index=False)
 
 logger.info(
     "SIC Classification attached to TLFS and FUS dataframes.",

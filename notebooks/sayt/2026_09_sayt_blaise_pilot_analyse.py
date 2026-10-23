@@ -8,6 +8,7 @@ import os
 import pandas as pd
 import plotly.express as px
 from dotenv import load_dotenv
+from scipy.stats import binomtest
 from survey_assist_utils.logging import get_logger
 
 from survey_assist_eval.data_cleaning.code_standard import SIC_EXPECTED_CODE_LENGTH
@@ -35,13 +36,13 @@ input_data_xlsx = (
     f"gs://{bucket_name}/2026-08-tlfs-sayt-free-text/???.xlsx",
 )[DATADROP_NUM - 1]
 
-output_dir = "data/plots/sayt_analysis"
-os.makedirs(output_dir, exist_ok=True)
+out_dir = "data/figures/sayt_analysis"
+os.makedirs(out_dir, exist_ok=True)
 
 logger.info(
     "Analysing SIC classification from SAYT Blaise pilot survey",
     input_data=input_data_xlsx,
-    output_dir=output_dir,
+    output_dir=out_dir,
 )
 
 
@@ -249,7 +250,7 @@ Accuracy: Overall percentage of correct codability/ambiguity decisions.
     font={"size": 10},
 )
 fig.update_layout(height=500, width=1000)
-fig.write_html(f"{output_dir}/sayt_sic_ambiguity_decision_metrics.html")
+fig.write_html(f"{out_dir}/sayt_sic_ambiguity_decision_metrics.html")
 fig.show()
 
 
@@ -326,7 +327,107 @@ MM: Many-to-Many match on the full set. (Is there any overlap between the cleric
 )
 fig.update_layout(height=500, width=770)
 
-fig.write_html(f"{output_dir}/sayt_sic_matching_accuracy_metrics.html")
+fig.write_html(f"{out_dir}/sayt_sic_matching_accuracy_metrics.html")
 fig.show()
+
+
+# %%
+# Compare sic_section distribution
+def extract_section(codes: set) -> str:
+    """Extract SIC section from a set of SIC codes."""
+    if not codes:
+        return "Uncodable"
+    if codes.issubset({"B", "D", "E"}):
+        return "B,D,E"
+    if codes.issubset({"R", "S", "T"}):
+        return "R,S,T"
+    if len(codes) == 1:
+        return next(iter(codes))
+    return "Uncodable"
+
+
+df_section = []
+for col_suffix in ["clerical", "cims", "sa"]:
+    df_section.append(
+        df_sub[f"{col_suffix}_codes_to_0digits"]
+        .map(extract_section)
+        .value_counts()
+        .rename_axis("sic_section")
+        .reset_index(name="count")
+        .assign(source=col_suffix)
+    )
+plot_df_section = pd.concat(df_section)
+
+# %%
+plot_df_section["sample_size"] = plot_df_section.groupby("source")["count"].transform(
+    "sum"
+)
+plot_df_section["Frequency"] = plot_df_section.groupby("source")["count"].transform(
+    lambda x: x / x.sum()
+)
+
+
+def add_proportion_confint(prop: float, nobs: int, alpha=0.05):
+    """Calculate confidence interval for a proportion."""
+    ci = binomtest(int(prop * nobs), nobs).proportion_ci(confidence_level=1 - alpha)
+    return prop - ci.low, ci.high - prop
+
+
+plot_df_section[["error_y_minus", "error_y_plus"]] = plot_df_section.apply(
+    lambda row: pd.Series(
+        add_proportion_confint(prop=row["Frequency"], nobs=row["sample_size"])
+    ),
+    axis=1,
+)
+
+# %%
+
+fig = px.bar(
+    plot_df_section,
+    x="sic_section",
+    y="Frequency",
+    color="source",
+    barmode="group",
+    title="Distribution of unambiguously coded responses at SIC Section level",
+    template="simple_white",
+    error_y="error_y_plus",
+    error_y_minus="error_y_minus",
+    hover_data={"count": True, "sample_size": True},
+)
+
+fig.update_xaxes(
+    title="SIC Section",
+    categoryorder="category ascending",
+    showgrid=True,
+    gridcolor="lightgrey",
+    ticks="outside",
+    showline=True,
+    mirror=True,
+    zeroline=False,
+    dtick=1,
+    tickson="boundaries",
+)
+
+# make the ci lines thinner
+fig.update_traces(error_y={"thickness": 1, "width": 2})
+fig.update_yaxes(showgrid=True, gridcolor="lightgrey", tickformat=".0%")
+
+# legend on top, no title
+fig.update_layout(
+    legend={
+        "title_text": "",
+        "orientation": "h",
+        "yanchor": "bottom",
+        "y": 1.02,
+        "xanchor": "right",
+        "x": 1,
+    }
+)
+
+fig.update_layout(height=500, width=1000)
+fig.show()
+
+if out_dir:
+    fig.write_html(f"{out_dir}/cc_sa_sic_section_distribution.html")
 
 # %%
