@@ -131,6 +131,9 @@ df_sub["sa_codes"] = prep_clerical_codes(df_sub, clerical_col="sa_combine")[
 # %%
 # Calculate performance at different number of digits
 DIGIT_LEVELS = [0, 2, 3, 4, 5]
+METHOD_ORDER = ["SurveyAssist", "CIMS", "Clerical"]
+METHOD_DTYPE = pd.CategoricalDtype(categories=METHOD_ORDER, ordered=True)
+
 for col in ["clerical_codes", "cims_codes", "sa_codes"]:
     for digits in DIGIT_LEVELS:
         df_sub[f"{col}_to_{digits}digits"] = df_sub[col].apply(
@@ -198,6 +201,7 @@ plot_df = pd.DataFrame(
         for k, v in eval_metrics.items()
     ]
 )
+plot_df["method"] = plot_df["method"].astype(METHOD_DTYPE)
 # remove dummy clerical_cc performance
 msk = plot_df["method"] == "Clerical"
 cols = set(plot_df.columns).difference(["digits", "method", "Codability"])
@@ -218,6 +222,7 @@ fig = px.line(
     x="digits",
     y="value",
     color="method",
+    category_orders={"method": METHOD_ORDER},
     facet_col="metrics",
     title="Ambiguity Decision Metrics by Number of Digits and Method",
     markers=True,
@@ -294,6 +299,7 @@ fig = px.line(
     x="digits",
     y="accu_value",
     color="method",
+    category_orders={"method": METHOD_ORDER},
     facet_col="metrics",
     title="Classification Accuracy Metrics by Number of Digits and Method",
     markers=True,
@@ -333,66 +339,81 @@ fig.show()
 
 # %%
 # Compare sic_section distribution
-def extract_section(codes: set) -> str:
-    """Extract SIC section from a set of SIC codes."""
+def extract_section(codes: set[str]) -> str:
+    """Extract SIC section from a set of SIC codes, grouped to match published LFS breakdowns.
+
+    Args:
+        codes: A set of SIC codes.
+
+    Returns:
+        str: The corresponding SIC section, or "Uncodable" if it cannot be determined.
+    """
+    codes = get_clean_n_digit_codes(codes, n=0, code_type="sic")[0]
     if not codes:
         return "Uncodable"
     if codes.issubset({"B", "D", "E"}):
         return "B,D,E"
     if codes.issubset({"R", "S", "T"}):
         return "R,S,T"
+    if codes.issubset({"O", "U"}):
+        return "O,U"
     if len(codes) == 1:
         return next(iter(codes))
     return "Uncodable"
 
 
 df_section = []
-for col_suffix in ["clerical", "cims", "sa"]:
+for col_suffix, method in [
+    ("sa", "SurveyAssist"),
+    ("cims", "CIMS"),
+    ("clerical", "Clerical"),
+]:
     df_section.append(
         df_sub[f"{col_suffix}_codes_to_0digits"]
         .map(extract_section)
         .value_counts()
         .rename_axis("sic_section")
         .reset_index(name="count")
-        .assign(source=col_suffix)
+        .assign(method=method)
     )
 plot_df_section = pd.concat(df_section)
+plot_df_section["method"] = plot_df_section["method"].astype(METHOD_DTYPE)
 
-# %%
-plot_df_section["sample_size"] = plot_df_section.groupby("source")["count"].transform(
-    "sum"
-)
-plot_df_section["Frequency"] = plot_df_section.groupby("source")["count"].transform(
-    lambda x: x / x.sum()
-)
+plot_df_section["sample_size"] = plot_df_section.groupby("method", observed=True)[
+    "count"
+].transform("sum")
+plot_df_section["frequency"] = plot_df_section.groupby("method", observed=True)[
+    "count"
+].transform(lambda x: x / x.sum())
 
 
-def add_proportion_confint(prop: float, nobs: int, alpha=0.05):
+def add_count_confint(prop: float, nobs: int, alpha=0.05):
     """Calculate confidence interval for a proportion."""
     ci = binomtest(int(prop * nobs), nobs).proportion_ci(confidence_level=1 - alpha)
-    return prop - ci.low, ci.high - prop
+    return (prop - ci.low) * nobs, (ci.high - prop) * nobs
 
 
 plot_df_section[["error_y_minus", "error_y_plus"]] = plot_df_section.apply(
     lambda row: pd.Series(
-        add_proportion_confint(prop=row["Frequency"], nobs=row["sample_size"])
+        add_count_confint(prop=row["frequency"], nobs=row["sample_size"])
     ),
     axis=1,
 )
 
 # %%
-
+# Plot distribution of SIC sections with confidence intervals
 fig = px.bar(
     plot_df_section,
     x="sic_section",
-    y="Frequency",
-    color="source",
+    y="count",
+    color="method",
+    category_orders={"method": METHOD_ORDER},
     barmode="group",
-    title="Distribution of unambiguously coded responses at SIC Section level",
+    title="Distribution of coded free-text responses at SIC Section level",
     template="simple_white",
     error_y="error_y_plus",
     error_y_minus="error_y_minus",
-    hover_data={"count": True, "sample_size": True},
+    hover_data={"frequency": ":.1%", "sample_size": True},
 )
 
 fig.update_xaxes(
@@ -410,7 +431,7 @@ fig.update_xaxes(
 
 # make the ci lines thinner
 fig.update_traces(error_y={"thickness": 1, "width": 2})
-fig.update_yaxes(showgrid=True, gridcolor="lightgrey", tickformat=".0%")
+fig.update_yaxes(title="Count", showgrid=True, gridcolor="lightgrey", tickformat=",d")
 
 # legend on top, no title
 fig.update_layout(
@@ -428,6 +449,6 @@ fig.update_layout(height=500, width=1000)
 fig.show()
 
 if out_dir:
-    fig.write_html(f"{out_dir}/cc_sa_sic_section_distribution.html")
+    fig.write_html(f"{out_dir}/sayt_sic_section_distribution.html")
 
 # %%
